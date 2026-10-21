@@ -167,10 +167,25 @@ function Status({ tone, children }: { tone: "green" | "blue" | "amber" | "red" |
   return <span className={`status status-${tone}`}><i />{children}</span>;
 }
 
-function TopBar({ title, subtitle, back, action, collegeBrand = false }: { title: string; subtitle?: string; back?: () => void; action?: ReactNode; collegeBrand?: boolean }) {
-  return <header className={`top-bar ${collegeBrand ? "college-brand-bar" : ""}`}>
-    {back ? <button className="icon-btn" onClick={back} aria-label="Back"><ArrowLeft size={20} /></button> : collegeBrand ? <div className="college-logo"><img src="/srm-trichy-logo.png" alt="SRM Trichy emblem" /></div> : <div className="app-mark"><Shield size={20} /></div>}
-    <div className="top-copy"><strong>{title}</strong>{subtitle && <span>{subtitle}</span>}</div>
+function TopBar({ title, subtitle, back, action, collegeBrand = true }: { title: string; subtitle?: string; back?: () => void; action?: ReactNode; collegeBrand?: boolean }) {
+  const isBranded = collegeBrand && !back;
+  return <header className={`top-bar ${isBranded ? "college-brand-bar" : ""}`}>
+    {back ? (
+      <button className="icon-btn" onClick={back} aria-label="Back"><ArrowLeft size={20} /></button>
+    ) : (
+      <div className={`college-logo ${isBranded ? "" : "mini"}`}><img src="/srm-trichy-emblem.png" alt="Trichy SRM emblem" /></div>
+    )}
+    <div className="top-copy">
+      {isBranded ? (
+        <div className="inst-lockup">
+          <span className="inst-title">TRICHY SRM</span>
+          <span className="inst-sub">Medical College Hospital & Research Centre</span>
+          {subtitle && <span className="inst-portal-tag">{subtitle}</span>}
+        </div>
+      ) : (
+        <><strong>{title}</strong>{subtitle && <span>{subtitle}</span>}</>
+      )}
+    </div>
     {action || <div className="top-spacer" />}
   </header>;
 }
@@ -286,7 +301,17 @@ function Login({ enter, go }: { enter: (role: Role) => void; go: (screen: Screen
     enter(matchedRole);
   };
   return <main className="phone-page login-page">
-    <section className="login-brand"><div className="large-mark"><ShieldCheck size={32} /></div><div><h1>Campus Secure</h1><p>Identity-led campus access</p></div></section>
+    <section className="login-brand">
+      <div className="login-college-emblem">
+        <img src="/srm-trichy-emblem.png" alt="Trichy SRM Medical College Emblem" />
+      </div>
+      <div className="login-inst-text">
+        <span className="inst-badge">OFFICIAL INSTITUTION PORTAL</span>
+        <h1 className="inst-title">TRICHY SRM</h1>
+        <h2 className="inst-sub">Medical College Hospital & Research Centre</h2>
+        <p className="app-subtitle">Campus Secure · Identity-Led Campus Access</p>
+      </div>
+    </section>
     <section className="login-card">
       <span className="overline">OFFICIAL ACCESS</span><h2>Sign in</h2>
       <label className="field"><span>Username</span><input value={username} onChange={event => setUsername(event.target.value)} placeholder="Enter username" autoCapitalize="none" /></label>
@@ -360,7 +385,7 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role }:
     <div className="page-content">
       <div className="progress-line"><span className="done"><Check size={12} /></span><i className="done" /><span className="active">2</span><i /><span>3</span></div>
       <section className="identity-hero"><div className={`captured-photo ${staff ? "staff-photo" : ""}`}><CircleUserRound size={48} /><span>Captured at 10:42 AM</span></div><div className="verified-badge"><ShieldCheck size={14} />{registerVerified ? "Register number verified" : `${student.similarity}% face match`}</div><h1>{personName}</h1><p>{staff ? "Staff" : "Student"} · {institute}</p></section>
-      <section className="info-card"><div className="card-kicker"><IdCard size={15} />IDENTITY DETAILS</div>{staff ? <dl><div><dt>Name</dt><dd>{staffMember.name}</dd></div><div><dt>Employee ID</dt><dd>{staffMember.employeeId}</dd></div><div><dt>Designation</dt><dd>{staffMember.designation}</dd></div><div><dt>Department</dt><dd>{staffMember.department}</dd></div><div><dt>Institute</dt><dd>{staffMember.institute}</dd></div></dl> : <dl><div><dt>Name</dt><dd>{student.name}</dd></div><div><dt>Register Number</dt><dd>{student.registerNumber}</dd></div><div><dt>Date of Birth</dt><dd>{student.dateOfBirth}</dd></div><div><dt>Department</dt><dd>{student.department}</dd></div><div><dt>Year</dt><dd>{student.year}</dd></div><div><dt>Batch</dt><dd>{student.batch}</dd></div><div><dt>Accommodation Type</dt><dd>{student.accommodationType}</dd></div>{student.accommodationType === "Hosteller" && <><div><dt>Hostel Name</dt><dd>{student.hostelName}</dd></div><div><dt>Room Number</dt><dd>{student.roomNumber}</dd></div></>}{student.accommodationType === "Day Scholar" && <><div><dt>Transportation Type</dt><dd>{student.transportationType}</dd></div><div><dt>Boarding Point</dt><dd>{student.boardingPoint ?? "null"}</dd></div><div><dt>Route Number</dt><dd>{student.routeNumber ?? "null"}</dd></div></>}</dl>}</section>
+      <section className="info-card"><div className="card-kicker"><img src="/srm-trichy-emblem.png" alt="" className="kicker-emblem" /><IdCard size={15} />TRICHY SRM MEDICAL COLLEGE · IDENTITY DETAILS</div>{staff ? <dl><div><dt>Name</dt><dd>{staffMember.name}</dd></div><div><dt>Employee ID</dt><dd>{staffMember.employeeId}</dd></div><div><dt>Designation</dt><dd>{staffMember.designation}</dd></div><div><dt>Department</dt><dd>{staffMember.department}</dd></div><div><dt>Institute</dt><dd>{staffMember.institute}</dd></div></dl> : <dl><div><dt>Name</dt><dd>{student.name}</dd></div><div><dt>Register Number</dt><dd>{student.registerNumber}</dd></div><div><dt>Date of Birth</dt><dd>{student.dateOfBirth}</dd></div><div><dt>Department</dt><dd>{student.department}</dd></div><div><dt>Year</dt><dd>{student.year}</dd></div><div><dt>Batch</dt><dd>{student.batch}</dd></div><div><dt>Accommodation Type</dt><dd>{student.accommodationType}</dd></div>{student.accommodationType === "Hosteller" && <><div><dt>Hostel Name</dt><dd>{student.hostelName}</dd></div><div><dt>Room Number</dt><dd>{student.roomNumber}</dd></div></>}{student.accommodationType === "Day Scholar" && <><div><dt>Transportation Type</dt><dd>{student.transportationType}</dd></div><div><dt>Boarding Point</dt><dd>{student.boardingPoint ?? "null"}</dd></div><div><dt>Route Number</dt><dd>{student.routeNumber ?? "null"}</dd></div></>}</dl>}</section>
       <section className="access-card allowed"><div><ShieldCheck size={21} /></div><div><span>{role === "warden" ? "RESIDENT IDENTITY" : "CAMPUS IDENTITY"}</span><strong>Internal person recognized</strong><p>Confirm to record entry at {location}.</p></div></section>
       <Button onClick={() => go("success")} icon={<Check size={17} />}>Confirm entry into {location}</Button>
     </div>
@@ -1113,7 +1138,7 @@ function VisitorPassDetails({ pass, title = "Visitor Pass Details", subtitle = "
         <div><span>{pass.entryType === "student" ? "STUDENT ENTRY" : "VISITOR PASS"}</span><h1>{pass.visitorName}</h1><p>{pass.studentNo || pass.passNumber} · Issued by {pass.supervisor}</p></div>
         <Status tone={passTone(pass.status)}>{pass.status}</Status>
       </section>
-      <section className="info-card pass-information"><div className="card-kicker"><TicketCheck size={15} />PASS INFORMATION</div><dl>
+      <section className="info-card pass-information"><div className="card-kicker"><img src="/srm-trichy-emblem.png" alt="" className="kicker-emblem" /><TicketCheck size={15} />TRICHY SRM MEDICAL COLLEGE · PASS INFORMATION</div><dl>
         <div><dt>{pass.entryType === "student" ? "Student Name" : "Visitor Name"}</dt><dd>{pass.visitorName}</dd></div><div><dt>{pass.entryType === "student" ? "Entry Number" : "Pass Number"}</dt><dd>{pass.passNumber}</dd></div>
         <div><dt>{pass.entryType === "student" ? "Student No" : "Visitor Phone Number"}</dt><dd>{pass.studentNo || pass.phone}</dd></div>
         <div><dt>Purpose</dt><dd>{pass.purpose}</dd></div>
@@ -1547,7 +1572,17 @@ function ForgotPassword({ go }: { go: (screen: Screen) => void }) {
     setSent(true);
   };
   return <main className="phone-page login-page">
-    <section className="login-brand"><div className="large-mark"><KeyRound size={30} /></div><div><h1>Reset password</h1><p>Every Entry. Verified.</p></div></section>
+    <section className="login-brand">
+      <div className="login-college-emblem">
+        <img src="/srm-trichy-emblem.png" alt="Trichy SRM Medical College Emblem" />
+      </div>
+      <div className="login-inst-text">
+        <span className="inst-badge">PASSWORD RECOVERY</span>
+        <h1 className="inst-title">TRICHY SRM</h1>
+        <h2 className="inst-sub">Medical College Hospital & Research Centre</h2>
+        <p className="app-subtitle">Campus Secure · Identity Verification</p>
+      </div>
+    </section>
     <section className="login-card">
       {sent ? <><span className="overline">REQUEST SENT</span><h2>Check with your admin</h2><div className="capture-note"><Check size={14} />A reset request for "{username.trim()}" was sent to the Campus Secure administrator. You will be contacted on your registered phone number.</div></> : <><span className="overline">ACCOUNT RECOVERY</span><h2>Forgot password</h2>
       <label className="field"><span>Username</span><input value={username} onChange={event => setUsername(event.target.value)} placeholder="Enter username" autoCapitalize="none" /></label>
@@ -1901,7 +1936,18 @@ function Profile({ role, go, back }: { role: Role; go: (screen: Screen) => void;
   const meta = roleMeta[role];
   return <>
     <TopBar title="Profile" subtitle="Account & access tools" back={back} />
-    <div className="page-content"><section className="profile-card"><div className="profile-avatar large">{meta.initials}</div><h1>{meta.name}</h1><p>{meta.label}</p><Status tone="green">Active session</Status></section>
+    <div className="page-content">
+      <div className="profile-institution-banner">
+        <div className="inst-banner-logo">
+          <img src="/srm-trichy-emblem.png" alt="Trichy SRM Medical College" />
+        </div>
+        <div className="inst-banner-copy">
+          <span className="overline">AFFILIATED INSTITUTION</span>
+          <strong>Trichy SRM Medical College</strong>
+          <small>Hospital & Research Centre</small>
+        </div>
+      </div>
+      <section className="profile-card"><div className="profile-avatar large">{meta.initials}</div><h1>{meta.name}</h1><p>{meta.label}</p><Status tone="green">Active session</Status></section>
       <div className="profile-scope"><span>AUTHORIZED SCOPE</span><strong>{meta.scope}</strong></div>
       {(role === "security" || role === "warden" || role === "staff") && <div className="profile-detail-row"><span>Phone Number</span><strong>{meta.phoneNumber}</strong></div>}
       {role === "supervisor" && <div className="profile-detail-row"><span>Phone Number</span><strong>{meta.phoneNumber}</strong></div>}
