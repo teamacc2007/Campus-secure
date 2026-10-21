@@ -19,6 +19,7 @@ from app.schemas.access_log import AccessLogCreate
 from app.api.deps import get_current_user
 from app.models.user import User
 
+from app.core.config import settings
 from ai.detector import FaceDetector
 from ai.embedder import FaceEmbedder
 from ai.matcher import FaceMatcher
@@ -26,9 +27,9 @@ from ai.liveness import LivenessEvaluator
 
 router = APIRouter(prefix="/ai", tags=["AI & Biometrics"])
 
-detector = FaceDetector()
-embedder = FaceEmbedder()
-matcher = FaceMatcher(match_threshold=0.68, uncertain_threshold=0.50)
+detector = FaceDetector(model_path=settings.FACE_DETECTION_MODEL_PATH)
+embedder = FaceEmbedder(model_path=settings.FACE_RECOGNITION_MODEL_PATH)
+matcher = FaceMatcher(match_threshold=settings.FACE_MATCH_THRESHOLD, uncertain_threshold=0.50)
 liveness_evaluator = LivenessEvaluator()
 
 

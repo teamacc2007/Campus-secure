@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../config/theme.dart';
 import '../services/api_service.dart';
 import '../widgets/top_bar.dart';
@@ -38,16 +40,42 @@ class _ScanScreenState extends State<ScanScreen> {
     try {
       if (verificationMethod == 'register') {
         final regNo = _registerController.text.trim();
-        final res = await ApiService.verifyFace(registerNumber: regNo);
+        final res = await ApiService.verifyFace(
+          registerNumber: regNo,
+          locationBlock: widget.role == 'warden' ? 'Hostel Kaveri Gate' : 'Gate 1 Main Entrance',
+        );
         if (res['is_recognized'] == true && res['matched_person'] != null) {
           widget.onIdentified(res['matched_person']);
         } else {
           widget.onUnrecognized();
         }
       } else {
-        // Face simulation / live test
-        // Test with preloaded student identity
-        final res = await ApiService.verifyFace(registerNumber: '22MBBS041');
+        // Open actual device camera with front camera preferred
+        final picker = ImagePicker();
+        final XFile? photo = await picker.pickImage(
+          source: ImageSource.camera,
+          preferredCameraDevice: CameraDevice.front,
+          maxWidth: 1024,
+          maxHeight: 1024,
+          imageQuality: 85,
+        );
+
+        if (photo == null) {
+          // User dismissed or closed the camera
+          setState(() {
+            isScanning = false;
+          });
+          return;
+        }
+
+        final bytes = await photo.readAsBytes();
+        final base64Image = base64Encode(bytes);
+
+        final res = await ApiService.verifyFace(
+          imageBase64: base64Image,
+          locationBlock: widget.role == 'warden' ? 'Hostel Kaveri Gate' : 'Gate 1 Main Entrance',
+        );
+
         if (res['is_recognized'] == true && res['matched_person'] != null) {
           widget.onIdentified(res['matched_person']);
         } else {
