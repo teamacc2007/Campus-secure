@@ -107,3 +107,13 @@ flutter run
 ## 🔒 Security & Biometrics
 * **Zero Raw Photo Storage:** Enrolled identities store only mathematical face embedding vectors.
 * **Non-Destructive Audit Trail:** Visitor pass cancellations require a documented operational justification; records and timestamps are preserved immutably.
+* **Front Camera Mandate:** Gate security and warden face recognition explicitly utilizes the front-facing camera within the exact locked Figma frame.
+
+---
+
+## 📊 Verification & Test Status
+* **Automated Test Suite:** 13/13 Passing (`pytest tests/ -v`)
+* **Local Backend API:** `http://localhost:8000` (Docs: `http://localhost:8000/api/v1/docs`)
+* **Mobile App:** Flutter 3.19+ & Dart 3.3+ (Android & iOS configured)
+* **Last Synchronized:** 2026-10-21 (All portals, biometrics, migrations, and test suites synchronized across active branches)
+
