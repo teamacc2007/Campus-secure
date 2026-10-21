@@ -1,0 +1,10 @@
+{
+  "description": "Securely manage campus access with real-time identity verification, visitor tracking, and access control to enhance safety and streamline entry processes.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
