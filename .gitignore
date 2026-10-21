@@ -19,3 +19,30 @@ logs/
 # beside it.
 /.plugins/
 /.opencode-skills/
+
+# Python
+backend/venv/
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.egg-info/
+
+# Flutter / Dart
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+mobile/build/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+
+# Media & Uploads
+uploads/
+media/
+*.db
+*.sqlite3
+
