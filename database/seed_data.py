@@ -16,6 +16,7 @@ from app.models.guard import SecurityGuard, Supervisor
 from app.models.visitor_pass import VisitorPass
 from app.models.access_log import AccessLog
 from app.models.notification import Notification
+from app.models.biometric import BiometricTemplate
 
 
 def seed_database():
@@ -144,6 +145,28 @@ def seed_database():
                 )
                 db.add(s)
                 print(f"[Seed] Created Student: {reg_no} - {name}")
+        db.commit()
+
+        # Seed biometric templates for enrolled faces
+        enrolled_faces = [
+            ("student", "23MED0412", "/faces/sur_crop.jpg"),
+            ("student", "23AHS0185", "/faces/mon_crop.jpg"),
+            ("student", "22ECE0531", "/faces/mith_crop.jpg"),
+            ("student", "22CSE0789", "/faces/thiru_crop.jpg"),
+        ]
+        for p_type, reg_no, photo in enrolled_faces:
+            existing_bt = db.query(BiometricTemplate).filter(BiometricTemplate.person_identifier == reg_no).first()
+            if not existing_bt:
+                emb = [float((hash(reg_no + str(i)) % 1000) / 1000.0) for i in range(128)]
+                bt = BiometricTemplate(
+                    person_type=p_type,
+                    person_identifier=reg_no,
+                    embedding_data=json.dumps(emb),
+                    model_version="zncc-color-v1",
+                    is_active=True,
+                )
+                db.add(bt)
+                print(f"[Seed] Created BiometricTemplate: {reg_no}")
         db.commit()
 
         # 5. Staff
