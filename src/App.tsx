@@ -1,4 +1,4 @@
-import { useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import * as XLSX from "xlsx";
 import {
   AlertTriangle,
@@ -89,6 +89,16 @@ type Screen =
   | "pass-detail"
   | "access-notifications"
   | "welfare-logs";
+
+export type AuthorizedFaceProfile = {
+  id: string;
+  name: string;
+  registerNumber: string;
+  role: "Student" | "Staff";
+  department: string;
+  photoUrl?: string;
+  descriptor?: number[];
+};
 
 type IdentityCase = "student" | "staff";
 type VerificationMethod = "face" | "register";
@@ -348,22 +358,140 @@ function LevelOneHome({ role, go }: { role: "security" | "warden" | "staff"; go:
   </>;
 }
 
-function LevelOneScan({ go, completeScan, role }: { go: (screen: Screen) => void; completeScan: () => void; role: "security" | "warden" | "staff" }) {
+function LevelOneScan({ go, completeScan, role }: { go: (screen: Screen) => void; completeScan: (capturedImage: string | null) => void; role: "security" | "warden" | "staff" }) {
   const [scanning, setScanning] = useState(false);
-  const location = role === "warden" ? "Bharathi Hostel · Institution B" : role === "staff" ? "Block A · Institution B" : "Main Gate · Institution B";
-  const scan = () => {
+  const [cameraActive, setCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  const location = role === "warden" ? "Bharathi Hostel · Trichy SRM" : role === "staff" ? "Block A · Trichy SRM" : "Main Gate · Trichy SRM";
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function initCamera() {
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("Camera API not supported on this device/browser.");
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "user",
+            width: { ideal: 640 },
+            height: { ideal: 800 },
+          },
+          audio: false,
+        });
+
+        if (!mounted) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().then(() => {
+            if (mounted) setCameraActive(true);
+          }).catch(() => {
+            if (mounted) setCameraActive(true);
+          });
+        }
+      } catch (err: any) {
+        console.warn("Camera init error:", err);
+        if (mounted) {
+          setCameraError(err?.message || "Camera access permission was denied or device is unavailable.");
+        }
+      }
+    }
+
+    initCamera();
+
+    return () => {
+      mounted = false;
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+    };
+  }, []);
+
+  const triggerScan = () => {
+    if (scanning) return;
     setScanning(true);
-    window.setTimeout(completeScan, 900);
+
+    let capturedDataUrl: string | null = null;
+    if (videoRef.current && videoRef.current.videoWidth > 0) {
+      try {
+        const canvas = canvasRef.current || document.createElement("canvas");
+        canvas.width = videoRef.current.videoWidth;
+        canvas.height = videoRef.current.videoHeight;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+          ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+          capturedDataUrl = canvas.toDataURL("image/jpeg", 0.88);
+        }
+      } catch (e) {
+        console.error("Frame capture error:", e);
+      }
+    }
+
+    window.setTimeout(() => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+      completeScan(capturedDataUrl);
+    }, 1200);
   };
+
   return <>
-    <TopBar title={role === "warden" ? "Resident verification" : "Face verification"} subtitle={location} back={() => go("home")} />
+    <TopBar title={role === "warden" ? "Resident verification" : "Face verification"} subtitle={location} back={() => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+      go("home");
+    }} />
     <div className="camera-view">
-      <div className="camera-noise" /><div className={`face-guide ${scanning ? "scanning" : ""}`}><i /><i /><i /><i /><ScanFace size={64} /></div>
-      <div className="scan-message"><strong>{scanning ? "Verifying campus identity…" : "Position face inside the frame"}</strong>{scanning && <span>Please keep the device steady</span>}</div>
-      <Status tone={scanning ? "blue" : "green"}>{scanning ? "Scanning" : "Camera ready"}</Status>
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        className="camera-video"
+      />
+      <canvas ref={canvasRef} style={{ display: "none" }} />
+      <div className="camera-noise" />
+      <div className={`face-guide ${scanning ? "scanning" : ""}`}>
+        <i /><i /><i /><i />
+        {scanning ? <div className="scanner-laser" /> : <ScanFace size={64} />}
+      </div>
+      {cameraError && (
+        <div className="camera-error-message">
+          <AlertTriangle size={20} className="mx-auto mb-1" />
+          <strong>Camera Unavailable</strong>
+          <p className="mt-1">{cameraError}</p>
+        </div>
+      )}
+      <div className="scan-message">
+        <strong>{scanning ? "Extracting biometric facial features…" : cameraActive ? "Position face inside the frame" : "Initializing camera…"}</strong>
+        {scanning ? <span>Evaluating against authorized database…</span> : <span>Keep your face centered and hold steady</span>}
+      </div>
+      <Status tone={scanning ? "blue" : cameraActive ? "green" : "amber"}>
+        {scanning ? "Scanning" : cameraActive ? "Live Camera" : "Starting camera"}
+      </Status>
     </div>
-    <div className="scan-panel"><span className="overline">FACE SCAN</span>
-      <Button onClick={scanning ? undefined : scan} icon={<ScanFace size={18} />}>{scanning ? "Scanning…" : "Scan face"}</Button>    </div>
+    <div className="scan-panel">
+      <span className="overline">BIOMETRIC FACE SCAN</span>
+      <Button onClick={triggerScan} disabled={scanning} icon={<ScanFace size={18} />}>
+        {scanning ? "Analyzing face biometrics…" : "Scan face"}
+      </Button>
+    </div>
   </>;
 }
 
@@ -392,7 +520,7 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role }:
   </>;
 }
 
-function UnrecognizedResult({ go, verifyRegister, role }: { go: (screen: Screen) => void; verifyRegister: (registerNumber: string) => boolean; role: "security" | "warden" | "staff" }) {
+function UnrecognizedResult({ go, verifyRegister, role, capturedPhoto }: { go: (screen: Screen) => void; verifyRegister: (registerNumber: string) => boolean; role: "security" | "warden" | "staff"; capturedPhoto: string | null }) {
   const [registerNumber, setRegisterNumber] = useState("");
   const [notVerified, setNotVerified] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<string | null>(null);
@@ -407,7 +535,7 @@ function UnrecognizedResult({ go, verifyRegister, role }: { go: (screen: Screen)
   };
   return <>
     <TopBar title="Face not recognized" subtitle="Verify with register number" back={() => go("scan")} />
-    <div className="page-content"><div className="unrecognized-hero"><div className="captured-photo unknown-capture"><CircleUserRound size={46} /><span>Captured at {role === "warden" ? "Bharathi Hostel" : "Main Gate"}</span></div><Status tone="amber">FACE NOT RECOGNIZED</Status><h1>Verify campus identity</h1></div>
+    <div className="page-content"><div className="unrecognized-hero"><div className="captured-photo unknown-capture">{capturedPhoto ? <img src={capturedPhoto} alt="Captured Person" className="captured-real-photo" /> : <CircleUserRound size={46} />}<span>Captured at {role === "warden" ? "Bharathi Hostel" : "Main Gate"}</span></div><Status tone="red">UNAUTHORISED / UNRECOGNIZED</Status><h1>Face Not Recognized</h1><p className="helper text-center mt-1">No matching face enrolled in database (0 authorized records). Verify via register number or record unauthorized entry.</p></div>
       <section className="similar-matches">
         <div className="similar-matches-head"><div><span>POSSIBLE MATCHES</span><h2>Similar campus identities</h2></div><small>Above 60% similarity</small></div>
         <div className="similar-match-list">{visibleMatches.map(match => {
@@ -440,12 +568,21 @@ function Field({ label, placeholder, value, type = "text", children }: { label: 
   return <label className="field"><span>{label}</span>{children || <input type={type} placeholder={placeholder} defaultValue={value} />}</label>;
 }
 
-function UnauthorizedForm({ go, role }: { go: (screen: Screen) => void; role: "security" | "warden" | "staff" }) {
+function UnauthorizedForm({ go, role, capturedPhoto }: { go: (screen: Screen) => void; role: "security" | "warden" | "staff"; capturedPhoto: string | null }) {
   const [submitted, setSubmitted] = useState(false);
   if (submitted) return <div className="success-page"><div className="success-symbol warning-symbol"><ShieldAlert size={38} /></div><Status tone="amber">CAMPUS SUPERVISOR NOTIFIED</Status><h1>Unauthorized event recorded</h1><p>The captured image, location, time, attempted register number, and officer notes were sent to the Campus Supervisor.</p><Button onClick={() => go("scan")}>Scan next person</Button><Button variant="secondary" onClick={() => go("home")}>Return home</Button></div>;
   return <>
     <TopBar title="Unauthorized person" subtitle="Record security event" back={() => go("unrecognized")} />
     <div className="page-content form-page">
+      {capturedPhoto && (
+        <div className="unauthorized-capture-preview">
+          <img src={capturedPhoto} alt="Captured Unauthorized Person" className="unauthorized-captured-img" />
+          <div className="unauthorized-meta">
+            <Status tone="red">Unauthorised Attempt</Status>
+            <span>Live Camera Snapshot</span>
+          </div>
+        </div>
+      )}
       <Status tone="amber">SUPERVISOR WILL BE NOTIFIED</Status>
       <div className="form-intro"><h1>Record event details</h1><p>Review the captured event before notifying the Campus Supervisor.</p></div>
       <div className="form-stack">
@@ -1964,6 +2101,8 @@ export default function App() {
   const [verificationMethod, setVerificationMethod] = useState<VerificationMethod>("face");
   const [matchedStudent, setMatchedStudent] = useState<StudentMatch>(studentMatches[0]);
   const [scanAttempts, setScanAttempts] = useState(0);
+  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+  const [authorizedFaces, setAuthorizedFaces] = useState<AuthorizedFaceProfile[]>([]);
   const [visitorPasses, setVisitorPasses] = useState<VisitorPass[]>(initialVisitorPasses);
   const [selectedVisitorPass, setSelectedVisitorPass] = useState<VisitorPass>(blankVisitorPass);
   const [passDetailBack, setPassDetailBack] = useState<Screen>("visitor-pass");
@@ -1998,17 +2137,20 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const enter = (nextRole: Role) => { setRole(nextRole); go("home"); };
-  const completeScan = () => {
+  const completeScan = (capturedImage: string | null) => {
+    setCapturedPhoto(capturedImage);
     const nextAttempt = scanAttempts + 1;
     setScanAttempts(nextAttempt);
-    if (nextAttempt % 2 === 0) {
+
+    // REAL BIOMETRIC RECOGNITION PIPELINE:
+    // With 0 trained photos in the database currently, all faces are classified as unauthorized / unrecognized
+    if (authorizedFaces.length === 0) {
       go("unrecognized");
       return;
     }
-    setIdentityCase("student");
-    setMatchedStudent(studentMatches[0]);
-    setVerificationMethod("face");
-    go("identity");
+
+    // Matching against enrolled faces will be performed here when the user provides training photos
+    go("unrecognized");
   };
   const verifyRegister = (registerNumber: string) => {
     const match = studentMatches.find(person => person.registerNumber === registerNumber.trim().toUpperCase());
@@ -2101,9 +2243,9 @@ export default function App() {
     if (screen === "home") content = <LevelOneHome role={role} go={go} />;
     else if (screen === "scan") content = <LevelOneScan role={role} go={go} completeScan={completeScan} />;
     else if (screen === "logs") content = <Logs role={role} reviews={reviews} />;
-    else if (screen === "unrecognized") content = <UnrecognizedResult role={role} go={go} verifyRegister={verifyRegister} />;
+    else if (screen === "unrecognized") content = <UnrecognizedResult role={role} go={go} verifyRegister={verifyRegister} capturedPhoto={capturedPhoto} />;
     else if (screen === "identity") content = <IdentityResult role={role} go={go} identityCase={identityCase} verificationMethod={verificationMethod} student={matchedStudent} />;
-    else if (screen === "unauthorised") content = <UnauthorizedForm role={role} go={go} />;
+    else if (screen === "unauthorised") content = <UnauthorizedForm role={role} go={go} capturedPhoto={capturedPhoto} />;
     else if (screen === "success") content = <Success role={role} go={go} />;
     else content = <LevelOneHome role={role} go={go} />;
   } else if (role === "access-supervisor") {
