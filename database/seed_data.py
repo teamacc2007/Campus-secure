@@ -110,6 +110,10 @@ def seed_database():
 
         # 4. Students
         students_data = [
+            ("23MED0412", "Sur", "SU", "18-05-2005", "General Medicine & Surgery", "II Year", "2023 - 2028", "Hostel", "Bharathi Hostel", "B-204", None, None, None),
+            ("23AHS0185", "Mon", "MO", "12-09-2005", "Medical Laboratory Technology", "II Year", "2023 - 2027", "Day Scholar", None, None, "Route M-14", "Trichy Central Junction", None),
+            ("22ECE0531", "Mith", "MI", "04-07-2004", "Electronics & Communication", "III Year", "2022 - 2026", "Hostel", "Cauvery Hostel", "C-312", None, None, None),
+            ("22CSE0789", "Thiru", "TH", "29-01-2004", "Computer Science & Engineering", "III Year", "2022 - 2026", "Day Scholar", None, None, None, None, "TN-09-BK-4421"),
             ("22MBBS041", "Kavitha R", "KR", "14-05-2004", "MBBS", "III Year", "2022 - 2027", "Hostel", "Kaveri Hostel", "304", None, None, None),
             ("23ECE0721", "Ananya Krishnan", "AK", "22-08-2005", "Electronics & Communication", "II Year", "2023 - 2027", "Day Scholar", None, None, "Route 12", "Central Bus Stand", None),
             ("22CSE1048", "Rahul Menon", "RM", "10-11-2003", "Computer Science & Engg", "III Year", "2022 - 2026", "Day Scholar", None, None, None, None, "TN-45-AZ-9988"),

@@ -1048,4 +1048,57 @@ h1, h2, h3, p, dl, dd { margin: 0; }
   background: #f0f7ff !important;
 }
 
+.trained-order-badge {
+  font-size: 9px;
+  font-weight: 800;
+  color: #64748b;
+  background: #e2e8f0;
+  padding: 2px 6px;
+  border-radius: 6px;
+  flex: none;
+}
+.no-similar-matches-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #fff8eb;
+  border: 1px solid #fed7aa;
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-top: 6px;
+  box-shadow: 0 2px 8px rgba(234, 88, 12, 0.05);
+}
+.no-similar-matches-card .card-alert-icon {
+  color: #ea580c;
+  flex: none;
+  margin-top: 2px;
+}
+.no-similar-matches-card strong {
+  font-size: 11px;
+  color: #9a3412;
+  display: block;
+  margin-bottom: 3px;
+}
+.no-similar-matches-card p {
+  font-size: 9px;
+  color: #7c2d12;
+  line-height: 1.35;
+  margin: 0;
+}
+.biometric-score-pill-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.biometric-score-pill-row span {
+  font-size: 8px;
+  font-weight: 700;
+  background: #ffedd5;
+  color: #9a3412;
+  padding: 2px 7px;
+  border-radius: 6px;
+  border: 1px solid #fdba74;
+}
+
 

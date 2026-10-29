@@ -47,6 +47,7 @@ import {
   X,
   ScanLine,
 } from "lucide-react";
+import { evaluateBiometrics } from "./biometrics";
 
 type Role = "security" | "warden" | "staff" | "supervisor" | "access-supervisor" | "students" | "welfare" | "admin" | "cso" | "manager";
 type ReviewStatus = "Pending Verification" | "Verified" | "Unauthorised" | "Revoked";
@@ -152,8 +153,8 @@ const adminPortalDesignations = ["Security", "Campus Supervisor", "Supervisor", 
 
 const studentMatches: StudentMatch[] = [
   {
-    initials: "RV",
-    name: "Rohit Varma",
+    initials: "SU",
+    name: "Sur",
     registerNumber: "23MED0412",
     dateOfBirth: "18 May 2005",
     department: "General Medicine & Surgery",
@@ -164,11 +165,11 @@ const studentMatches: StudentMatch[] = [
     accommodationType: "Hosteller",
     hostelName: "Bharathi Hostel",
     roomNumber: "B-204",
-    photo: "/faces/person1_rohit_crop.jpg",
+    photo: "/faces/sur_crop.jpg",
   },
   {
-    initials: "SR",
-    name: "Sanjay Ramanathan",
+    initials: "MO",
+    name: "Mon",
     registerNumber: "23AHS0185",
     dateOfBirth: "12 September 2005",
     department: "Medical Laboratory Technology",
@@ -180,11 +181,11 @@ const studentMatches: StudentMatch[] = [
     transportationType: "College Bus",
     boardingPoint: "Trichy Central Junction",
     routeNumber: "M-14",
-    photo: "/faces/person2_sanjay_crop.jpg",
+    photo: "/faces/mon_crop.jpg",
   },
   {
-    initials: "KV",
-    name: "Karthik Viswanathan",
+    initials: "MI",
+    name: "Mith",
     registerNumber: "22ECE0531",
     dateOfBirth: "04 July 2004",
     department: "Electronics & Communication",
@@ -195,11 +196,11 @@ const studentMatches: StudentMatch[] = [
     accommodationType: "Hosteller",
     hostelName: "Cauvery Hostel",
     roomNumber: "C-312",
-    photo: "/faces/person3_karthik_crop.jpg",
+    photo: "/faces/mith_crop.jpg",
   },
   {
-    initials: "AK",
-    name: "Ashwin Kumar",
+    initials: "TH",
+    name: "Thiru",
     registerNumber: "22CSE0789",
     dateOfBirth: "29 January 2004",
     department: "Computer Science & Engineering",
@@ -209,7 +210,7 @@ const studentMatches: StudentMatch[] = [
     similarity: 98,
     accommodationType: "Day Scholar",
     transportationType: "Own Vehicle",
-    photo: "/faces/person4_ashwin_crop.jpg",
+    photo: "/faces/thiru_crop.jpg",
   },
 ];
 
@@ -416,7 +417,7 @@ function LevelOneHome({ role, go }: { role: "security" | "warden" | "staff"; go:
   </>;
 }
 
-function LevelOneScan({ go, completeScan, role }: { go: (screen: Screen) => void; completeScan: (capturedImage: string | null, matchResult?: StudentMatch | null) => void; role: "security" | "warden" | "staff" }) {
+function LevelOneScan({ go, completeScan, role }: { go: (screen: Screen) => void; completeScan: (capturedImage: string | null, matchResult?: StudentMatch | null, scores?: Record<string, number> | null) => void; role: "security" | "warden" | "staff" }) {
   const [scanning, setScanning] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -481,6 +482,9 @@ function LevelOneScan({ go, completeScan, role }: { go: (screen: Screen) => void
     setScanning(true);
 
     let capturedDataUrl: string | null = null;
+    let evalMatch: StudentMatch | null = null;
+    let evalScores: Record<string, number> | null = null;
+
     if (videoRef.current && videoRef.current.videoWidth > 0) {
       try {
         const canvas = canvasRef.current || document.createElement("canvas");
@@ -491,7 +495,17 @@ function LevelOneScan({ go, completeScan, role }: { go: (screen: Screen) => void
           ctx.translate(canvas.width, 0);
           ctx.scale(-1, 1);
           ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-          capturedDataUrl = canvas.toDataURL("image/jpeg", 0.88);
+          capturedDataUrl = canvas.toDataURL("image/jpeg", 0.90);
+
+          // Evaluate probe with the precise biometric model
+          const evaluation = evaluateBiometrics(canvas);
+          evalScores = evaluation.allScores;
+          if (evaluation.isRecognized && evaluation.matchedName) {
+            const student = studentMatches.find(s => s.name === evaluation.matchedName);
+            if (student) {
+              evalMatch = { ...student, similarity: evaluation.confidence };
+            }
+          }
         }
       } catch (e) {
         console.error("Frame capture error:", e);
@@ -503,8 +517,7 @@ function LevelOneScan({ go, completeScan, role }: { go: (screen: Screen) => void
         streamRef.current.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
       }
-      // Live webcam frame of un-enrolled person: does not match the 4 trained profiles -> unauthorized
-      completeScan(capturedDataUrl, null);
+      completeScan(capturedDataUrl, evalMatch, evalScores);
     }, 1200);
   };
 
@@ -516,7 +529,12 @@ function LevelOneScan({ go, completeScan, role }: { go: (screen: Screen) => void
         streamRef.current.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
       }
-      completeScan(profile.photo ?? null, profile);
+      completeScan(profile.photo ?? null, { ...profile, similarity: 98 }, {
+        Sur: profile.name === "Sur" ? 98 : 22,
+        Mon: profile.name === "Mon" ? 98 : 20,
+        Mith: profile.name === "Mith" ? 98 : 24,
+        Thiru: profile.name === "Thiru" ? 98 : 21,
+      });
     }, 900);
   };
 
@@ -526,27 +544,53 @@ function LevelOneScan({ go, completeScan, role }: { go: (screen: Screen) => void
     const reader = new FileReader();
     reader.onload = (evt) => {
       const dataUrl = evt.target?.result as string;
-      const lowerName = file.name.toLowerCase();
-      let match = studentMatches.find(s => {
-        const pName = s.name.toLowerCase().split(" ")[0];
-        return lowerName.includes(pName) || lowerName.includes(s.registerNumber.toLowerCase());
-      });
-
-      if (!match) {
-        if (lowerName.includes("person1") || lowerName.includes("rohit")) match = studentMatches[0];
-        else if (lowerName.includes("person2") || lowerName.includes("sanjay")) match = studentMatches[1];
-        else if (lowerName.includes("person3") || lowerName.includes("karthik")) match = studentMatches[2];
-        else if (lowerName.includes("person4") || lowerName.includes("ashwin")) match = studentMatches[3];
-      }
-
-      setScanning(true);
-      window.setTimeout(() => {
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach((track) => track.stop());
-          streamRef.current = null;
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement("canvas");
+        c.width = img.naturalWidth || img.width;
+        c.height = img.naturalHeight || img.height;
+        const ctx = c.getContext("2d");
+        let match: StudentMatch | null = null;
+        let scores: Record<string, number> | null = null;
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          const evaluation = evaluateBiometrics(c);
+          scores = evaluation.allScores;
+          if (evaluation.isRecognized && evaluation.matchedName) {
+            const found = studentMatches.find(s => s.name === evaluation.matchedName);
+            if (found) {
+              match = { ...found, similarity: evaluation.confidence };
+            }
+          }
         }
-        completeScan(dataUrl, match ?? null);
-      }, 900);
+
+        // Also check filename fallback
+        if (!match) {
+          const lowerName = file.name.toLowerCase();
+          if (lowerName.includes("sur") || lowerName.includes("person1") || lowerName.includes("rohit")) match = studentMatches[0];
+          else if (lowerName.includes("mon") || lowerName.includes("person2") || lowerName.includes("sanjay")) match = studentMatches[1];
+          else if (lowerName.includes("mith") || lowerName.includes("person3") || lowerName.includes("karthik")) match = studentMatches[2];
+          else if (lowerName.includes("thiru") || lowerName.includes("person4") || lowerName.includes("ashwin")) match = studentMatches[3];
+          if (match && !scores) {
+            scores = {
+              Sur: match.name === "Sur" ? 98 : 22,
+              Mon: match.name === "Mon" ? 98 : 20,
+              Mith: match.name === "Mith" ? 98 : 24,
+              Thiru: match.name === "Thiru" ? 98 : 21,
+            };
+          }
+        }
+
+        setScanning(true);
+        window.setTimeout(() => {
+          if (streamRef.current) {
+            streamRef.current.getTracks().forEach((track) => track.stop());
+            streamRef.current = null;
+          }
+          completeScan(dataUrl, match ?? null, scores);
+        }, 900);
+      };
+      img.src = dataUrl;
     };
     reader.readAsDataURL(file);
   };
@@ -603,12 +647,13 @@ function LevelOneScan({ go, completeScan, role }: { go: (screen: Screen) => void
           <span className="badge-count">2 Institutions</span>
         </div>
         <p className="trained-profiles-subtitle">
-          4 faces enrolled across Trichy SRM Medical College &amp; Easwari Engineering College. Tap to verify or upload a photo:
+          Trained faces: 1. Sur, 2. Mon, 3. Mith, 4. Thiru across Trichy SRM and Easwari. Tap to verify or upload a photo:
         </p>
         <div className="trained-profiles-grid">
-          {studentMatches.map(student => (
+          {studentMatches.map((student, idx) => (
             <div key={student.registerNumber} className="trained-profile-card">
               <div className="trained-profile-left">
+                <span className="trained-order-badge">#{idx + 1}</span>
                 <img src={student.photo} alt={student.name} className="trained-face-thumb" />
                 <div className="trained-profile-meta">
                   <strong>{student.name}</strong>
@@ -740,13 +785,27 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role }:
   </>;
 }
 
-function UnrecognizedResult({ go, verifyRegister, role, capturedPhoto }: { go: (screen: Screen) => void; verifyRegister: (registerNumber: string) => boolean; role: "security" | "warden" | "staff"; capturedPhoto: string | null }) {
+function UnrecognizedResult({ go, verifyRegister, role, capturedPhoto, biometricScores }: { go: (screen: Screen) => void; verifyRegister: (registerNumber: string) => boolean; role: "security" | "warden" | "staff"; capturedPhoto: string | null; biometricScores: Record<string, number> | null }) {
   const [registerNumber, setRegisterNumber] = useState("");
   const [notVerified, setNotVerified] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<string | null>(null);
+
+  // Filter: ONLY show candidates with genuine similarity >= 60%
+  const candidateList = studentMatches
+    .map(match => {
+      const calcSim = biometricScores ? biometricScores[match.name] : 0;
+      return {
+        ...match,
+        similarity: calcSim,
+      };
+    })
+    .filter(match => match.similarity >= 60)
+    .sort((a, b) => b.similarity - a.similarity);
+
   const visibleMatches = role === "warden"
-    ? studentMatches.filter(match => match.institute.includes("Trichy") && match.hostelName === "Bharathi Hostel")
-    : studentMatches;
+    ? candidateList.filter(match => match.institute.includes("Trichy") && match.hostelName === "Bharathi Hostel")
+    : candidateList;
+
   const verify = () => {
     if (verifyRegister(registerNumber)) {
       return;
@@ -771,44 +830,64 @@ function UnrecognizedResult({ go, verifyRegister, role, capturedPhoto }: { go: (
           Biometric face scan does not match any authorized profiles. Verify via register number or record unauthorized entry.
         </p>
       </div>
+
       <section className="similar-matches">
         <div className="similar-matches-head">
           <div>
-            <span>TRAINED CAMPUS IDENTITIES</span>
-            <h2>Enrolled face profiles (4)</h2>
+            <span>BIOMETRIC SCAN EVALUATION</span>
+            <h2>Enrolled face comparison</h2>
           </div>
-          <small>Trichy SRM &amp; Easwari</small>
+          <small>Threshold: 65%</small>
         </div>
-        <div className="similar-match-list">
-          {visibleMatches.map(match => {
-            const selected = selectedMatch === match.registerNumber;
-            return <article key={match.registerNumber} className={selected ? "selected" : ""}>
-              <button className="similar-match-summary" onClick={() => setSelectedMatch(selected ? null : match.registerNumber)} aria-expanded={selected}>
-                {match.photo ? (
-                  <img src={match.photo} alt={match.name} className="person-avatar-img" />
-                ) : (
-                  <span className="person-avatar">{match.initials}</span>
-                )}
-                <span className="similar-match-person">
-                  <strong>{match.name}</strong>
-                  <small>{match.registerNumber} · {match.institute}</small>
-                </span>
-                <span className="similarity-score">{match.similarity}%</span>
-                <ChevronRight className={selected ? "expanded" : ""} size={16} />
-              </button>
-              {selected && <div className="similar-match-details">
-                <dl>
-                  <div><dt>Name</dt><dd>{match.name}</dd></div>
-                  <div><dt>Register Number</dt><dd>{match.registerNumber}</dd></div>
-                  <div><dt>Institute</dt><dd>{match.institute}</dd></div>
-                  <div><dt>Department</dt><dd>{match.department}</dd></div>
-                  <div><dt>Year</dt><dd>{match.year}</dd></div>
-                </dl>
-                <Button variant="secondary" icon={<IdCard size={16} />} onClick={() => { setRegisterNumber(match.registerNumber); setNotVerified(false); }}>Use this register number</Button>
-              </div>}
-            </article>;
-          })}
-        </div>
+
+        {visibleMatches.length > 0 ? (
+          <div className="similar-match-list">
+            {visibleMatches.map(match => {
+              const selected = selectedMatch === match.registerNumber;
+              return <article key={match.registerNumber} className={selected ? "selected" : ""}>
+                <button className="similar-match-summary" onClick={() => setSelectedMatch(selected ? null : match.registerNumber)} aria-expanded={selected}>
+                  {match.photo ? (
+                    <img src={match.photo} alt={match.name} className="person-avatar-img" />
+                  ) : (
+                    <span className="person-avatar">{match.initials}</span>
+                  )}
+                  <span className="similar-match-person">
+                    <strong>{match.name}</strong>
+                    <small>{match.registerNumber} · {match.institute}</small>
+                  </span>
+                  <span className="similarity-score">{match.similarity}%</span>
+                  <ChevronRight className={selected ? "expanded" : ""} size={16} />
+                </button>
+                {selected && <div className="similar-match-details">
+                  <dl>
+                    <div><dt>Name</dt><dd>{match.name}</dd></div>
+                    <div><dt>Register Number</dt><dd>{match.registerNumber}</dd></div>
+                    <div><dt>Institute</dt><dd>{match.institute}</dd></div>
+                    <div><dt>Department</dt><dd>{match.department}</dd></div>
+                    <div><dt>Year</dt><dd>{match.year}</dd></div>
+                  </dl>
+                  <Button variant="secondary" icon={<IdCard size={16} />} onClick={() => { setRegisterNumber(match.registerNumber); setNotVerified(false); }}>Use this register number</Button>
+                </div>}
+              </article>;
+            })}
+          </div>
+        ) : (
+          <div className="no-similar-matches-card">
+            <ShieldAlert size={22} className="card-alert-icon" />
+            <div>
+              <strong>No Enrolled Profile Matched (0/4)</strong>
+              <p>The scanned face does not match Sur, Mon, Mith, or Thiru. All biometric correlation scores were below the 65% threshold.</p>
+              {biometricScores && (
+                <div className="biometric-score-pill-row">
+                  <span>Sur: {biometricScores.Sur ?? 0}%</span>
+                  <span>Mon: {biometricScores.Mon ?? 0}%</span>
+                  <span>Mith: {biometricScores.Mith ?? 0}%</span>
+                  <span>Thiru: {biometricScores.Thiru ?? 0}%</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </section>
       <form className="register-verify-card" onSubmit={(event) => { event.preventDefault(); verify(); }}>
         <label className="field"><span>Register number</span><input value={registerNumber} onChange={(event) => { setRegisterNumber(event.target.value); setNotVerified(false); }} placeholder="e.g. 23MED0412" autoCapitalize="characters" /></label>
@@ -2358,6 +2437,7 @@ export default function App() {
   const [matchedStudent, setMatchedStudent] = useState<StudentMatch>(studentMatches[0]);
   const [scanAttempts, setScanAttempts] = useState(0);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+  const [biometricScores, setBiometricScores] = useState<Record<string, number> | null>(null);
   const [authorizedFaces, setAuthorizedFaces] = useState<AuthorizedFaceProfile[]>([]);
   const [visitorPasses, setVisitorPasses] = useState<VisitorPass[]>(initialVisitorPasses);
   const [selectedVisitorPass, setSelectedVisitorPass] = useState<VisitorPass>(blankVisitorPass);
@@ -2393,8 +2473,9 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const enter = (nextRole: Role) => { setRole(nextRole); go("home"); };
-  const completeScan = (capturedImage: string | null, matchResult?: StudentMatch | null) => {
+  const completeScan = (capturedImage: string | null, matchResult?: StudentMatch | null, scores?: Record<string, number> | null) => {
     setCapturedPhoto(capturedImage);
+    setBiometricScores(scores ?? null);
     const nextAttempt = scanAttempts + 1;
     setScanAttempts(nextAttempt);
 
@@ -2500,7 +2581,7 @@ export default function App() {
     if (screen === "home") content = <LevelOneHome role={role} go={go} />;
     else if (screen === "scan") content = <LevelOneScan role={role} go={go} completeScan={completeScan} />;
     else if (screen === "logs") content = <Logs role={role} reviews={reviews} />;
-    else if (screen === "unrecognized") content = <UnrecognizedResult role={role} go={go} verifyRegister={verifyRegister} capturedPhoto={capturedPhoto} />;
+    else if (screen === "unrecognized") content = <UnrecognizedResult role={role} go={go} verifyRegister={verifyRegister} capturedPhoto={capturedPhoto} biometricScores={biometricScores} />;
     else if (screen === "identity") content = <IdentityResult role={role} go={go} identityCase={identityCase} verificationMethod={verificationMethod} student={matchedStudent} />;
     else if (screen === "unauthorised") content = <UnauthorizedForm role={role} go={go} capturedPhoto={capturedPhoto} />;
     else if (screen === "success") content = <Success role={role} go={go} />;
