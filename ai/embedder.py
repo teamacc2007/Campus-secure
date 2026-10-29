@@ -2,7 +2,10 @@ import os
 import cv2
 import numpy as np
 from typing import Optional
-import onnxruntime as ort
+try:
+    import onnxruntime as ort
+except ImportError:
+    ort = None
 
 
 class FaceEmbedder:

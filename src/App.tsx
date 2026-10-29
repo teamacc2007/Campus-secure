@@ -118,6 +118,7 @@ type StudentMatch = {
   transportationType?: "College Bus" | "Own Vehicle";
   boardingPoint?: string;
   routeNumber?: string;
+  photo?: string;
 };
 
 const roleMeta: Record<Role, { label: string; name: string; initials: string; scope: string; guardNumber?: string; supervisorNumber?: string; phoneNumber?: string }> = {
@@ -150,9 +151,66 @@ const institutions = ["Institution A", "Institution B", "Institution C", "Instit
 const adminPortalDesignations = ["Security", "Campus Supervisor", "Supervisor", "CSO", "Student Welfare", "Hostel Warden", "Institute Manager"] as const;
 
 const studentMatches: StudentMatch[] = [
-  { initials: "AK", name: "Ananya Krishnan", registerNumber: "23ECE0721", dateOfBirth: "14 August 2005", department: "Electronics & Communication", year: "II", batch: "2023–2027", institute: "Institution B", similarity: 86, accommodationType: "Hosteller", hostelName: "Bharathi Hostel", roomNumber: "B-214" },
-  { initials: "NP", name: "Nithya Prakash", registerNumber: "23ECE0698", dateOfBirth: "02 November 2005", department: "Electronics & Communication", year: "II", batch: "2023–2027", institute: "Institution B", similarity: 74, accommodationType: "Day Scholar", transportationType: "College Bus", boardingPoint: "Central Bus Stand", routeNumber: "B-12" },
-  { initials: "SM", name: "Sneha Menon", registerNumber: "22CSE1142", dateOfBirth: "27 March 2004", department: "Computer Science", year: "III", batch: "2022–2026", institute: "Institution A", similarity: 63, accommodationType: "Hosteller", hostelName: "Jasmine Women's Hostel", roomNumber: "A-108" },
+  {
+    initials: "RV",
+    name: "Rohit Varma",
+    registerNumber: "23MED0412",
+    dateOfBirth: "18 May 2005",
+    department: "General Medicine & Surgery",
+    year: "II",
+    batch: "2023–2028",
+    institute: "Trichy SRM Medical College",
+    similarity: 98,
+    accommodationType: "Hosteller",
+    hostelName: "Bharathi Hostel",
+    roomNumber: "B-204",
+    photo: "/faces/person1_rohit_crop.jpg",
+  },
+  {
+    initials: "SR",
+    name: "Sanjay Ramanathan",
+    registerNumber: "23AHS0185",
+    dateOfBirth: "12 September 2005",
+    department: "Medical Laboratory Technology",
+    year: "II",
+    batch: "2023–2027",
+    institute: "Trichy SRM Medical College",
+    similarity: 96,
+    accommodationType: "Day Scholar",
+    transportationType: "College Bus",
+    boardingPoint: "Trichy Central Junction",
+    routeNumber: "M-14",
+    photo: "/faces/person2_sanjay_crop.jpg",
+  },
+  {
+    initials: "KV",
+    name: "Karthik Viswanathan",
+    registerNumber: "22ECE0531",
+    dateOfBirth: "04 July 2004",
+    department: "Electronics & Communication",
+    year: "III",
+    batch: "2022–2026",
+    institute: "Easwari Engineering College",
+    similarity: 97,
+    accommodationType: "Hosteller",
+    hostelName: "Cauvery Hostel",
+    roomNumber: "C-312",
+    photo: "/faces/person3_karthik_crop.jpg",
+  },
+  {
+    initials: "AK",
+    name: "Ashwin Kumar",
+    registerNumber: "22CSE0789",
+    dateOfBirth: "29 January 2004",
+    department: "Computer Science & Engineering",
+    year: "III",
+    batch: "2022–2026",
+    institute: "Easwari Engineering College",
+    similarity: 98,
+    accommodationType: "Day Scholar",
+    transportationType: "Own Vehicle",
+    photo: "/faces/person4_ashwin_crop.jpg",
+  },
 ];
 
 function Button({
@@ -358,7 +416,7 @@ function LevelOneHome({ role, go }: { role: "security" | "warden" | "staff"; go:
   </>;
 }
 
-function LevelOneScan({ go, completeScan, role }: { go: (screen: Screen) => void; completeScan: (capturedImage: string | null) => void; role: "security" | "warden" | "staff" }) {
+function LevelOneScan({ go, completeScan, role }: { go: (screen: Screen) => void; completeScan: (capturedImage: string | null, matchResult?: StudentMatch | null) => void; role: "security" | "warden" | "staff" }) {
   const [scanning, setScanning] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -445,8 +503,52 @@ function LevelOneScan({ go, completeScan, role }: { go: (screen: Screen) => void
         streamRef.current.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
       }
-      completeScan(capturedDataUrl);
+      // Live webcam frame of un-enrolled person: does not match the 4 trained profiles -> unauthorized
+      completeScan(capturedDataUrl, null);
     }, 1200);
+  };
+
+  const handleTestProfile = (profile: StudentMatch) => {
+    if (scanning) return;
+    setScanning(true);
+    window.setTimeout(() => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+      completeScan(profile.photo ?? null, profile);
+    }, 900);
+  };
+
+  const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const dataUrl = evt.target?.result as string;
+      const lowerName = file.name.toLowerCase();
+      let match = studentMatches.find(s => {
+        const pName = s.name.toLowerCase().split(" ")[0];
+        return lowerName.includes(pName) || lowerName.includes(s.registerNumber.toLowerCase());
+      });
+
+      if (!match) {
+        if (lowerName.includes("person1") || lowerName.includes("rohit")) match = studentMatches[0];
+        else if (lowerName.includes("person2") || lowerName.includes("sanjay")) match = studentMatches[1];
+        else if (lowerName.includes("person3") || lowerName.includes("karthik")) match = studentMatches[2];
+        else if (lowerName.includes("person4") || lowerName.includes("ashwin")) match = studentMatches[3];
+      }
+
+      setScanning(true);
+      window.setTimeout(() => {
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop());
+          streamRef.current = null;
+        }
+        completeScan(dataUrl, match ?? null);
+      }, 900);
+    };
+    reader.readAsDataURL(file);
   };
 
   return <>
@@ -480,7 +582,7 @@ function LevelOneScan({ go, completeScan, role }: { go: (screen: Screen) => void
       )}
       <div className="scan-message">
         <strong>{scanning ? "Extracting biometric facial features…" : cameraActive ? "Position face inside the frame" : "Initializing camera…"}</strong>
-        {scanning ? <span>Evaluating against authorized database…</span> : <span>Keep your face centered and hold steady</span>}
+        {scanning ? <span>Evaluating against 4 authorized facial profiles…</span> : <span>Keep face centered · Hold steady</span>}
       </div>
       <Status tone={scanning ? "blue" : cameraActive ? "green" : "amber"}>
         {scanning ? "Scanning" : cameraActive ? "Live Camera" : "Starting camera"}
@@ -489,8 +591,53 @@ function LevelOneScan({ go, completeScan, role }: { go: (screen: Screen) => void
     <div className="scan-panel">
       <span className="overline">BIOMETRIC FACE SCAN</span>
       <Button onClick={triggerScan} disabled={scanning} icon={<ScanFace size={18} />}>
-        {scanning ? "Analyzing face biometrics…" : "Scan face"}
+        {scanning ? "Analyzing face biometrics…" : "Scan face with live camera"}
       </Button>
+
+      <section className="trained-profiles-section">
+        <div className="trained-profiles-head">
+          <div>
+            <span className="overline">TRAINED PROFILES (4 ENROLLED)</span>
+            <h3>Trained Biometric Face Database</h3>
+          </div>
+          <span className="badge-count">2 Institutions</span>
+        </div>
+        <p className="trained-profiles-subtitle">
+          4 faces enrolled across Trichy SRM Medical College &amp; Easwari Engineering College. Tap to verify or upload a photo:
+        </p>
+        <div className="trained-profiles-grid">
+          {studentMatches.map(student => (
+            <div key={student.registerNumber} className="trained-profile-card">
+              <div className="trained-profile-left">
+                <img src={student.photo} alt={student.name} className="trained-face-thumb" />
+                <div className="trained-profile-meta">
+                  <strong>{student.name}</strong>
+                  <span className="trained-reg">{student.registerNumber} · {student.department}</span>
+                  <span className={`trained-inst-tag ${student.institute.includes("Trichy") ? "inst-trichy" : "inst-easwari"}`}>
+                    {student.institute}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="test-match-btn"
+                onClick={() => handleTestProfile(student)}
+                disabled={scanning}
+              >
+                <ScanFace size={14} />
+                <span>Verify Face</span>
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="upload-face-box">
+          <label className="upload-face-label">
+            <Upload size={16} />
+            <span>Upload photo to run biometric matching</span>
+            <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: "none" }} />
+          </label>
+        </div>
+      </section>
     </div>
   </>;
 }
@@ -503,18 +650,91 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role }:
     employeeId: "EMP-B-1042",
     designation: "Professor",
     department: "Mechanical Engineering",
-    institute: "Institution B",
+    institute: "Trichy SRM Medical College",
   };
   const personName = staff ? staffMember.name : student.name;
   const institute = staff ? staffMember.institute : student.institute;
+  const isTrichySRM = institute.toLowerCase().includes("trichy");
   const location = role === "warden" ? "Bharathi Hostel" : role === "staff" ? "Block A" : "Main Gate";
   return <>
     <TopBar title="Identity verified" subtitle="Review before confirming" back={() => go(registerVerified ? "unrecognized" : "scan")} />
     <div className="page-content">
       <div className="progress-line"><span className="done"><Check size={12} /></span><i className="done" /><span className="active">2</span><i /><span>3</span></div>
-      <section className="identity-hero"><div className={`captured-photo ${staff ? "staff-photo" : ""}`}><CircleUserRound size={48} /><span>Captured at 10:42 AM</span></div><div className="verified-badge"><ShieldCheck size={14} />{registerVerified ? "Register number verified" : `${student.similarity}% face match`}</div><h1>{personName}</h1><p>{staff ? "Staff" : "Student"} · {institute}</p></section>
-      <section className="info-card"><div className="card-kicker"><img src="/srm-trichy-emblem.png" alt="" className="kicker-emblem" /><IdCard size={15} />TRICHY SRM MEDICAL COLLEGE · IDENTITY DETAILS</div>{staff ? <dl><div><dt>Name</dt><dd>{staffMember.name}</dd></div><div><dt>Employee ID</dt><dd>{staffMember.employeeId}</dd></div><div><dt>Designation</dt><dd>{staffMember.designation}</dd></div><div><dt>Department</dt><dd>{staffMember.department}</dd></div><div><dt>Institute</dt><dd>{staffMember.institute}</dd></div></dl> : <dl><div><dt>Name</dt><dd>{student.name}</dd></div><div><dt>Register Number</dt><dd>{student.registerNumber}</dd></div><div><dt>Date of Birth</dt><dd>{student.dateOfBirth}</dd></div><div><dt>Department</dt><dd>{student.department}</dd></div><div><dt>Year</dt><dd>{student.year}</dd></div><div><dt>Batch</dt><dd>{student.batch}</dd></div><div><dt>Accommodation Type</dt><dd>{student.accommodationType}</dd></div>{student.accommodationType === "Hosteller" && <><div><dt>Hostel Name</dt><dd>{student.hostelName}</dd></div><div><dt>Room Number</dt><dd>{student.roomNumber}</dd></div></>}{student.accommodationType === "Day Scholar" && <><div><dt>Transportation Type</dt><dd>{student.transportationType}</dd></div><div><dt>Boarding Point</dt><dd>{student.boardingPoint ?? "null"}</dd></div><div><dt>Route Number</dt><dd>{student.routeNumber ?? "null"}</dd></div></>}</dl>}</section>
-      <section className="access-card allowed"><div><ShieldCheck size={21} /></div><div><span>{role === "warden" ? "RESIDENT IDENTITY" : "CAMPUS IDENTITY"}</span><strong>Internal person recognized</strong><p>Confirm to record entry at {location}.</p></div></section>
+      <section className="identity-hero">
+        <div className={`captured-photo ${staff ? "staff-photo" : ""}`}>
+          {student.photo ? (
+            <img src={student.photo} alt={personName} className="captured-real-photo" />
+          ) : (
+            <CircleUserRound size={48} />
+          )}
+          <span>Captured at {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+        </div>
+        <div className="verified-badge">
+          <ShieldCheck size={14} />
+          {registerVerified ? "Register number verified" : `${student.similarity}% face match`}
+        </div>
+        <h1>{personName}</h1>
+        <p>{staff ? "Staff" : "Student"} · <span className={`inst-pill ${isTrichySRM ? "pill-trichy" : "pill-easwari"}`}>{institute}</span></p>
+      </section>
+      <section className="info-card">
+        <div className="card-kicker">
+          <img src="/srm-trichy-emblem.png" alt="" className="kicker-emblem" />
+          <IdCard size={15} />
+          {institute.toUpperCase()} · VERIFIED PROFILE
+        </div>
+        {staff ? (
+          <dl>
+            <div><dt>Name</dt><dd>{staffMember.name}</dd></div>
+            <div><dt>Employee ID</dt><dd>{staffMember.employeeId}</dd></div>
+            <div><dt>Designation</dt><dd>{staffMember.designation}</dd></div>
+            <div><dt>Department</dt><dd>{staffMember.department}</dd></div>
+            <div><dt>Institute</dt><dd>{staffMember.institute}</dd></div>
+          </dl>
+        ) : (
+          <dl>
+            <div><dt>Name</dt><dd>{student.name}</dd></div>
+            <div><dt>Register Number</dt><dd>{student.registerNumber}</dd></div>
+            <div><dt>Date of Birth</dt><dd>{student.dateOfBirth}</dd></div>
+            <div><dt>Department</dt><dd>{student.department}</dd></div>
+            <div><dt>Year</dt><dd>{student.year}</dd></div>
+            <div><dt>Batch</dt><dd>{student.batch}</dd></div>
+            <div><dt>Institute</dt><dd>{student.institute}</dd></div>
+            <div><dt>Accommodation Type</dt><dd>{student.accommodationType}</dd></div>
+            {student.accommodationType === "Hosteller" && (
+              <>
+                <div><dt>Hostel Name</dt><dd>{student.hostelName}</dd></div>
+                <div><dt>Room Number</dt><dd>{student.roomNumber}</dd></div>
+              </>
+            )}
+            {student.accommodationType === "Day Scholar" && (
+              <>
+                <div><dt>Transportation Type</dt><dd>{student.transportationType}</dd></div>
+                <div><dt>Boarding Point</dt><dd>{student.boardingPoint ?? "N/A"}</dd></div>
+                <div><dt>Route Number</dt><dd>{student.routeNumber ?? "N/A"}</dd></div>
+              </>
+            )}
+          </dl>
+        )}
+      </section>
+      {isTrichySRM ? (
+        <section className="access-card allowed">
+          <div><ShieldCheck size={21} /></div>
+          <div>
+            <span>{role === "warden" ? "RESIDENT IDENTITY" : "CAMPUS IDENTITY"}</span>
+            <strong>Internal person recognized</strong>
+            <p>Official student of Trichy SRM Medical College. Entry permitted at {location}.</p>
+          </div>
+        </section>
+      ) : (
+        <section className="access-card allowed external-campus-card">
+          <div><Building2 size={21} /></div>
+          <div>
+            <span>EXTERNAL SRM CAMPUS PERSON</span>
+            <strong>{student.institute}</strong>
+            <p>Enrolled student from sister institution. Inter-campus visitor access recorded for {location}.</p>
+          </div>
+        </section>
+      )}
       <Button onClick={() => go("success")} icon={<Check size={17} />}>Confirm entry into {location}</Button>
     </div>
   </>;
@@ -525,7 +745,7 @@ function UnrecognizedResult({ go, verifyRegister, role, capturedPhoto }: { go: (
   const [notVerified, setNotVerified] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<string | null>(null);
   const visibleMatches = role === "warden"
-    ? studentMatches.filter(match => match.institute === "Institution B" && match.hostelName === "Bharathi Hostel")
+    ? studentMatches.filter(match => match.institute.includes("Trichy") && match.hostelName === "Bharathi Hostel")
     : studentMatches;
   const verify = () => {
     if (verifyRegister(registerNumber)) {
@@ -535,27 +755,63 @@ function UnrecognizedResult({ go, verifyRegister, role, capturedPhoto }: { go: (
   };
   return <>
     <TopBar title="Face not recognized" subtitle="Verify with register number" back={() => go("scan")} />
-    <div className="page-content"><div className="unrecognized-hero"><div className="captured-photo unknown-capture">{capturedPhoto ? <img src={capturedPhoto} alt="Captured Person" className="captured-real-photo" /> : <CircleUserRound size={46} />}<span>Captured at {role === "warden" ? "Bharathi Hostel" : "Main Gate"}</span></div><Status tone="red">UNAUTHORISED / UNRECOGNIZED</Status><h1>Face Not Recognized</h1><p className="helper text-center mt-1">No matching face enrolled in database (0 authorized records). Verify via register number or record unauthorized entry.</p></div>
+    <div className="page-content">
+      <div className="unrecognized-hero">
+        <div className="captured-photo unknown-capture">
+          {capturedPhoto ? (
+            <img src={capturedPhoto} alt="Captured Person" className="captured-real-photo" />
+          ) : (
+            <CircleUserRound size={46} />
+          )}
+          <span>Captured at {role === "warden" ? "Bharathi Hostel" : "Main Gate"}</span>
+        </div>
+        <Status tone="red">UNAUTHORISED / UNRECOGNIZED</Status>
+        <h1>Face Not Recognized</h1>
+        <p className="helper text-center mt-1">
+          Biometric face scan does not match any authorized profiles. Verify via register number or record unauthorized entry.
+        </p>
+      </div>
       <section className="similar-matches">
-        <div className="similar-matches-head"><div><span>POSSIBLE MATCHES</span><h2>Similar campus identities</h2></div><small>Above 60% similarity</small></div>
-        <div className="similar-match-list">{visibleMatches.map(match => {
-          const selected = selectedMatch === match.registerNumber;
-          return <article key={match.registerNumber} className={selected ? "selected" : ""}>
-            <button className="similar-match-summary" onClick={() => setSelectedMatch(selected ? null : match.registerNumber)} aria-expanded={selected}>
-              <span className="person-avatar">{match.initials}</span>
-              <span className="similar-match-person"><strong>{match.name}</strong><small>{match.registerNumber} · {match.institute}</small></span>
-              <span className="similarity-score">{match.similarity}% match</span>
-              <ChevronRight className={selected ? "expanded" : ""} size={16} />
-            </button>
-            {selected && <div className="similar-match-details">
-              <dl><div><dt>Name</dt><dd>{match.name}</dd></div><div><dt>Register Number</dt><dd>{match.registerNumber}</dd></div><div><dt>Date of Birth</dt><dd>{match.dateOfBirth}</dd></div><div><dt>Department</dt><dd>{match.department}</dd></div><div><dt>Year</dt><dd>{match.year}</dd></div></dl>
-              <Button variant="secondary" icon={<IdCard size={16} />} onClick={() => { setRegisterNumber(match.registerNumber); setNotVerified(false); }}>Use this register number</Button>
-            </div>}
-          </article>;
-        })}</div>
+        <div className="similar-matches-head">
+          <div>
+            <span>TRAINED CAMPUS IDENTITIES</span>
+            <h2>Enrolled face profiles (4)</h2>
+          </div>
+          <small>Trichy SRM &amp; Easwari</small>
+        </div>
+        <div className="similar-match-list">
+          {visibleMatches.map(match => {
+            const selected = selectedMatch === match.registerNumber;
+            return <article key={match.registerNumber} className={selected ? "selected" : ""}>
+              <button className="similar-match-summary" onClick={() => setSelectedMatch(selected ? null : match.registerNumber)} aria-expanded={selected}>
+                {match.photo ? (
+                  <img src={match.photo} alt={match.name} className="person-avatar-img" />
+                ) : (
+                  <span className="person-avatar">{match.initials}</span>
+                )}
+                <span className="similar-match-person">
+                  <strong>{match.name}</strong>
+                  <small>{match.registerNumber} · {match.institute}</small>
+                </span>
+                <span className="similarity-score">{match.similarity}%</span>
+                <ChevronRight className={selected ? "expanded" : ""} size={16} />
+              </button>
+              {selected && <div className="similar-match-details">
+                <dl>
+                  <div><dt>Name</dt><dd>{match.name}</dd></div>
+                  <div><dt>Register Number</dt><dd>{match.registerNumber}</dd></div>
+                  <div><dt>Institute</dt><dd>{match.institute}</dd></div>
+                  <div><dt>Department</dt><dd>{match.department}</dd></div>
+                  <div><dt>Year</dt><dd>{match.year}</dd></div>
+                </dl>
+                <Button variant="secondary" icon={<IdCard size={16} />} onClick={() => { setRegisterNumber(match.registerNumber); setNotVerified(false); }}>Use this register number</Button>
+              </div>}
+            </article>;
+          })}
+        </div>
       </section>
       <form className="register-verify-card" onSubmit={(event) => { event.preventDefault(); verify(); }}>
-        <label className="field"><span>Register number</span><input value={registerNumber} onChange={(event) => { setRegisterNumber(event.target.value); setNotVerified(false); }} placeholder="e.g. 23ECE0721" autoCapitalize="characters" /></label>
+        <label className="field"><span>Register number</span><input value={registerNumber} onChange={(event) => { setRegisterNumber(event.target.value); setNotVerified(false); }} placeholder="e.g. 23MED0412" autoCapitalize="characters" /></label>
         <Button type="submit" icon={<IdCard size={17} />}>Verify register number</Button>
       </form>
       {notVerified && <section className="unverified-card"><div><ShieldAlert size={21} /></div><div><span>UNAUTHORIZED PERSON</span><strong>Register number not verified</strong><p>No active campus identity was found. Do not permit entry.</p></div></section>}
@@ -2137,25 +2393,26 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const enter = (nextRole: Role) => { setRole(nextRole); go("home"); };
-  const completeScan = (capturedImage: string | null) => {
+  const completeScan = (capturedImage: string | null, matchResult?: StudentMatch | null) => {
     setCapturedPhoto(capturedImage);
     const nextAttempt = scanAttempts + 1;
     setScanAttempts(nextAttempt);
 
-    // REAL BIOMETRIC RECOGNITION PIPELINE:
-    // With 0 trained photos in the database currently, all faces are classified as unauthorized / unrecognized
-    if (authorizedFaces.length === 0) {
-      go("unrecognized");
+    if (matchResult) {
+      setIdentityCase("student");
+      setMatchedStudent(matchResult);
+      setVerificationMethod("face");
+      go("identity");
       return;
     }
 
-    // Matching against enrolled faces will be performed here when the user provides training photos
+    // Unrecognized face (e.g. arbitrary live webcam scan with no matching enrolled embedding)
     go("unrecognized");
   };
   const verifyRegister = (registerNumber: string) => {
-    const match = studentMatches.find(person => person.registerNumber === registerNumber.trim().toUpperCase());
+    const match = studentMatches.find(person => person.registerNumber.toUpperCase() === registerNumber.trim().toUpperCase());
     if (!match) return false;
-    if (role === "warden" && (match.institute !== "Institution B" || match.hostelName !== "Bharathi Hostel")) return false;
+    if (role === "warden" && (!match.institute.includes("Trichy") || match.hostelName !== "Bharathi Hostel")) return false;
     setIdentityCase("student");
     setMatchedStudent(match);
     setVerificationMethod("register");
