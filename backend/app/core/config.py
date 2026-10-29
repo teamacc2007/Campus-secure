@@ -37,9 +37,9 @@ class Settings(BaseSettings):
         os.path.join(os.path.dirname(__file__), "../../../ai/models/face_detection_yunet_2023mar.onnx")
     )
     FACE_RECOGNITION_MODEL_PATH: str = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "../../../ai/models/arcface_mobilefacenet.onnx")
+        os.path.join(os.path.dirname(__file__), "../../../ai/models/face_recognition_sface_2021dec.onnx")
     )
-    FACE_MATCH_THRESHOLD: float = 0.68
+    FACE_MATCH_THRESHOLD: float = 0.65
     LIVENESS_THRESHOLD: float = 0.75
 
     # CORS

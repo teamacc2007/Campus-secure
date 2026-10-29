@@ -46,6 +46,24 @@ def get_current_user(
     return user
 
 
+def get_current_user_optional(
+    db: Session = Depends(get_db),
+    token: Optional[str] = Depends(oauth2_scheme),
+) -> Optional[User]:
+    if not token:
+        return None
+    try:
+        payload = decode_token(token)
+        if not payload:
+            return None
+        user_id = payload.get("sub")
+        if not user_id:
+            return None
+        return db.query(User).filter(User.id == int(user_id)).first()
+    except Exception:
+        return None
+
+
 def require_roles(allowed_roles: List[str]):
     def role_checker(current_user: User = Depends(get_current_user)) -> User:
         if current_user.role not in allowed_roles and current_user.role != "admin":

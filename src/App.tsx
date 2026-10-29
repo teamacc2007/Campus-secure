@@ -489,7 +489,7 @@ function LevelOneScan({ go, completeScan, role }: { go: (screen: Screen) => void
     };
   }, []);
 
-  const triggerScan = () => {
+  const triggerScan = async () => {
     if (scanning) return;
     setScanning(true);
 
@@ -509,13 +509,48 @@ function LevelOneScan({ go, completeScan, role }: { go: (screen: Screen) => void
           ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
           capturedDataUrl = canvas.toDataURL("image/jpeg", 0.90);
 
-          // Evaluate probe with the precise biometric model
-          const evaluation = evaluateBiometrics(canvas);
-          evalScores = evaluation.allScores;
-          if (evaluation.isRecognized && evaluation.matchedName) {
-            const student = studentMatches.find(s => s.name === evaluation.matchedName);
-            if (student) {
-              evalMatch = { ...student, similarity: evaluation.confidence };
+          if (role === "security") {
+            try {
+              const resp = await fetch("http://localhost:8000/api/v1/ai/verify-face", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  image_base64: capturedDataUrl,
+                  location_block: "Gate 1 Main Entrance",
+                  guard_name: "G. Selvam",
+                }),
+              });
+              if (resp.ok) {
+                const data = await resp.json();
+                if (data.candidate_scores) {
+                  evalScores = {
+                    Sur: Math.round(data.candidate_scores["Sur"] || 0),
+                    Mon: Math.round(data.candidate_scores["Mon"] || 0),
+                    Mith: Math.round(data.candidate_scores["Mith"] || 0),
+                    Thiru: Math.round(data.candidate_scores["Thiru"] || 0),
+                  };
+                }
+                if (data.is_recognized && data.matched_person) {
+                  const student = studentMatches.find(s => s.name === data.matched_person.name);
+                  if (student) {
+                    evalMatch = { ...student, similarity: Math.round(data.similarity_score * 100) };
+                  }
+                }
+              }
+            } catch (err) {
+              console.warn("Backend face verification unavailable, using client biometric model fallback", err);
+            }
+          }
+
+          if (!evalScores) {
+            // Evaluate probe with the precise biometric model
+            const evaluation = evaluateBiometrics(canvas);
+            evalScores = evaluation.allScores;
+            if (evaluation.isRecognized && evaluation.matchedName) {
+              const student = studentMatches.find(s => s.name === evaluation.matchedName);
+              if (student) {
+                evalMatch = { ...student, similarity: evaluation.confidence };
+              }
             }
           }
         }
@@ -557,14 +592,48 @@ function LevelOneScan({ go, completeScan, role }: { go: (screen: Screen) => void
     reader.onload = (evt) => {
       const dataUrl = evt.target?.result as string;
       const img = new Image();
-      img.onload = () => {
+      img.onload = async () => {
         const c = document.createElement("canvas");
         c.width = img.naturalWidth || img.width;
         c.height = img.naturalHeight || img.height;
         const ctx = c.getContext("2d");
         let match: StudentMatch | null = null;
         let scores: Record<string, number> | null = null;
-        if (ctx) {
+
+        if (role === "security") {
+          try {
+            const resp = await fetch("http://localhost:8000/api/v1/ai/verify-face", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                image_base64: dataUrl,
+                location_block: "Gate 1 Main Entrance",
+                guard_name: "G. Selvam",
+              }),
+            });
+            if (resp.ok) {
+              const data = await resp.json();
+              if (data.candidate_scores) {
+                scores = {
+                  Sur: Math.round(data.candidate_scores["Sur"] || 0),
+                  Mon: Math.round(data.candidate_scores["Mon"] || 0),
+                  Mith: Math.round(data.candidate_scores["Mith"] || 0),
+                  Thiru: Math.round(data.candidate_scores["Thiru"] || 0),
+                };
+              }
+              if (data.is_recognized && data.matched_person) {
+                const found = studentMatches.find(s => s.name === data.matched_person.name);
+                if (found) {
+                  match = { ...found, similarity: Math.round(data.similarity_score * 100) };
+                }
+              }
+            }
+          } catch (err) {
+            console.warn("Backend face verification unavailable for upload, using fallback", err);
+          }
+        }
+
+        if (!scores && ctx) {
           ctx.drawImage(img, 0, 0);
           const evaluation = evaluateBiometrics(c);
           scores = evaluation.allScores;

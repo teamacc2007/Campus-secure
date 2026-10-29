@@ -23,6 +23,16 @@ def seed_database():
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
 
+    # Load enrolled real embeddings if available
+    enrolled_embeddings = {}
+    embeddings_file = os.path.abspath(os.path.join(os.path.dirname(__file__), "../public/faces/enrolled_embeddings.json"))
+    if os.path.exists(embeddings_file):
+        try:
+            with open(embeddings_file, "r") as f:
+                enrolled_embeddings = json.load(f)
+        except Exception as e:
+            print(f"[Seed] Warning: could not load enrolled embeddings: {e}")
+
     try:
         # 1. Institution
         inst = db.query(Institution).filter(Institution.short_code == "TSRMMCHRC").first()
@@ -111,21 +121,27 @@ def seed_database():
 
         # 4. Students
         students_data = [
-            ("23MED0412", "Sur", "SU", "18-05-2005", "General Medicine & Surgery", "II Year", "2023 - 2028", "Hostel", "Bharathi Hostel", "B-204", None, None, None),
-            ("23AHS0185", "Mon", "MO", "12-09-2005", "Medical Laboratory Technology", "II Year", "2023 - 2027", "Day Scholar", None, None, "Route M-14", "Trichy Central Junction", None),
-            ("22ECE0531", "Mith", "MI", "04-07-2004", "Electronics & Communication", "III Year", "2022 - 2026", "Hostel", "Cauvery Hostel", "C-312", None, None, None),
-            ("22CSE0789", "Thiru", "TH", "29-01-2004", "Computer Science & Engineering", "III Year", "2022 - 2026", "Day Scholar", None, None, None, None, "TN-09-BK-4421"),
-            ("22MBBS041", "Kavitha R", "KR", "14-05-2004", "MBBS", "III Year", "2022 - 2027", "Hostel", "Kaveri Hostel", "304", None, None, None),
-            ("23ECE0721", "Ananya Krishnan", "AK", "22-08-2005", "Electronics & Communication", "II Year", "2023 - 2027", "Day Scholar", None, None, "Route 12", "Central Bus Stand", None),
-            ("22CSE1048", "Rahul Menon", "RM", "10-11-2003", "Computer Science & Engg", "III Year", "2022 - 2026", "Day Scholar", None, None, None, None, "TN-45-AZ-9988"),
-            ("21BPT019", "Mohammed Farhan", "MF", "05-02-2003", "Physiotherapy", "IV Year", "2021 - 2025", "Hostel", "Ponni Hostel", "112", None, None, None),
-            ("24NUR005", "Pooja Sundaram", "PS", "18-09-2006", "B.Sc Nursing", "I Year", "2024 - 2028", "Hostel", "Kaveri Hostel", "208", None, None, None),
+            ("23MED0412", "Sur", "SU", "18-05-2005", "General Medicine & Surgery", "II Year", "2023 - 2028", "Hostel", "Bharathi Hostel", "B-204", None, None, None, "/faces/sur_crop.jpg"),
+            ("23AHS0185", "Mon", "MO", "12-09-2005", "Medical Laboratory Technology", "II Year", "2023 - 2027", "Day Scholar", None, None, "Route M-14", "Trichy Central Junction", None, "/faces/mon_crop.jpg"),
+            ("22ECE0531", "Mith", "MI", "04-07-2004", "Electronics & Communication", "III Year", "2022 - 2026", "Hostel", "Cauvery Hostel", "C-312", None, None, None, "/faces/mith_crop.jpg"),
+            ("22CSE0789", "Thiru", "TH", "29-01-2004", "Computer Science & Engineering", "III Year", "2022 - 2026", "Day Scholar", None, None, None, None, "TN-09-BK-4421", "/faces/thiru_crop.jpg"),
+            ("22MBBS041", "Kavitha R", "KR", "14-05-2004", "MBBS", "III Year", "2022 - 2027", "Hostel", "Kaveri Hostel", "304", None, None, None, None),
+            ("23ECE0721", "Ananya Krishnan", "AK", "22-08-2005", "Electronics & Communication", "II Year", "2023 - 2027", "Day Scholar", None, None, "Route 12", "Central Bus Stand", None, None),
+            ("22CSE1048", "Rahul Menon", "RM", "10-11-2003", "Computer Science & Engg", "III Year", "2022 - 2026", "Day Scholar", None, None, None, None, "TN-45-AZ-9988", None),
+            ("21BPT019", "Mohammed Farhan", "MF", "05-02-2003", "Physiotherapy", "IV Year", "2021 - 2025", "Hostel", "Ponni Hostel", "112", None, None, None, None),
+            ("24NUR005", "Pooja Sundaram", "PS", "18-09-2006", "B.Sc Nursing", "I Year", "2024 - 2028", "Hostel", "Kaveri Hostel", "208", None, None, None, None),
         ]
-        for reg_no, name, init, dob, dept, yr, batch, res_type, h_name, room, b_route, b_point, veh in students_data:
+        for reg_no, name, init, dob, dept, yr, batch, res_type, h_name, room, b_route, b_point, veh, photo in students_data:
             existing_s = db.query(Student).filter(Student.register_number == reg_no).first()
-            if not existing_s:
-                # Deterministic synthetic embedding vector
+            # Genuine embedding if enrolled, else deterministic fallback
+            if name in enrolled_embeddings:
+                emb_vec = enrolled_embeddings[name]
+            elif reg_no in enrolled_embeddings:
+                emb_vec = enrolled_embeddings[reg_no]
+            else:
                 emb_vec = [float((hash(reg_no + str(i)) % 1000) / 1000.0) for i in range(128)]
+
+            if not existing_s:
                 s = Student(
                     register_number=reg_no,
                     name=name,
@@ -140,33 +156,47 @@ def seed_database():
                     bus_route=b_route,
                     bus_boarding_point=b_point,
                     vehicle_number=veh,
+                    photo_url=photo,
                     institution_id=inst.id,
                     face_embedding=json.dumps(emb_vec),
+                    is_active=True,
                 )
                 db.add(s)
                 print(f"[Seed] Created Student: {reg_no} - {name}")
+            else:
+                # Update existing student record with verified embedding & photo
+                existing_s.face_embedding = json.dumps(emb_vec)
+                existing_s.is_active = True
+                if photo:
+                    existing_s.photo_url = photo
+                print(f"[Seed] Updated Student: {reg_no} - {name} with verified embedding")
         db.commit()
 
         # Seed biometric templates for enrolled faces
         enrolled_faces = [
-            ("student", "23MED0412", "/faces/sur_crop.jpg"),
-            ("student", "23AHS0185", "/faces/mon_crop.jpg"),
-            ("student", "22ECE0531", "/faces/mith_crop.jpg"),
-            ("student", "22CSE0789", "/faces/thiru_crop.jpg"),
+            ("student", "23MED0412", "Sur", "/faces/sur_crop.jpg"),
+            ("student", "23AHS0185", "Mon", "/faces/mon_crop.jpg"),
+            ("student", "22ECE0531", "Mith", "/faces/mith_crop.jpg"),
+            ("student", "22CSE0789", "Thiru", "/faces/thiru_crop.jpg"),
         ]
-        for p_type, reg_no, photo in enrolled_faces:
+        for p_type, reg_no, p_name, photo in enrolled_faces:
             existing_bt = db.query(BiometricTemplate).filter(BiometricTemplate.person_identifier == reg_no).first()
+            emb = enrolled_embeddings.get(p_name, enrolled_embeddings.get(reg_no, [float((hash(reg_no + str(i)) % 1000) / 1000.0) for i in range(128)]))
             if not existing_bt:
-                emb = [float((hash(reg_no + str(i)) % 1000) / 1000.0) for i in range(128)]
                 bt = BiometricTemplate(
                     person_type=p_type,
                     person_identifier=reg_no,
                     embedding_data=json.dumps(emb),
-                    model_version="zncc-color-v1",
+                    model_version="sface-yunet-v1",
                     is_active=True,
                 )
                 db.add(bt)
                 print(f"[Seed] Created BiometricTemplate: {reg_no}")
+            else:
+                existing_bt.embedding_data = json.dumps(emb)
+                existing_bt.model_version = "sface-yunet-v1"
+                existing_bt.is_active = True
+                print(f"[Seed] Updated BiometricTemplate: {reg_no}")
         db.commit()
 
         # 5. Staff
@@ -186,6 +216,7 @@ def seed_database():
                     designation=desig,
                     institution_id=inst.id,
                     face_embedding=json.dumps(emb_vec),
+                    is_active=True,
                 )
                 db.add(st)
                 print(f"[Seed] Created Staff: {emp_id} - {name}")
@@ -198,50 +229,65 @@ def seed_database():
                 "R. Natarajan",
                 "9840123456",
                 "Guest Lecture on Clinical Ethics",
-                "Annual Medical Symposium 2026",
-                "Medical Student Conference",
-                "21-10-2026",
-                "22-10-2026",
-                ["Auditorium", "Dean Office", "Medical College Block"],
-                "Dr. S. Venkatesh",
-                "9876543212",
-                "Active",
+                "Gate 1 Main Entrance",
+                "Prof. S. Venkatesh",
+                "Pharmacology",
+                "Approved",
+                "2026-10-21 09:30 AM",
+                "2026-10-21 05:00 PM",
+                "Single Visitor Pass",
+                1,
             ),
             (
                 "VP-2026-0002",
-                "Priya Mohan",
-                "9443219876",
-                "Hostel Ward Visit",
-                None,
-                None,
-                "21-10-2026",
-                "21-10-2026",
-                ["Kaveri Hostel", "Visitor Lounge"],
+                "S. Meenakshi Sundaram",
+                "9443123456",
+                "Parent Visit - Ward Kaverikannan (Hostel B-204)",
+                "Hostel Gate North",
                 "Dr. K. Raman",
-                "9876543211",
-                "Active",
+                "Hostel Administration",
+                "Pending",
+                "2026-10-21 02:00 PM",
+                "2026-10-21 06:30 PM",
+                "Single Visitor Pass",
+                1,
+            ),
+            (
+                "VP-2026-0003",
+                "K. Ganesan & Team",
+                "9789123456",
+                "Medical Gas Pipeline Maintenance Team",
+                "Gate 2 Hospital Entrance",
+                "Dr. Arun Kumar",
+                "Biomedical Engineering",
+                "Cancelled",
+                "2026-10-21 11:00 AM",
+                "2026-10-21 04:00 PM",
+                "Contractor Pass",
+                4,
             ),
         ]
-        for p_num, v_name, phone, purp, ev_name, ev_purp, s_date, e_date, blocks, c_name, c_phone, stat in vp_data:
-            existing_vp = db.query(VisitorPass).filter(VisitorPass.pass_number == p_num).first()
+        for pass_no, v_name, phone, purp, gate, host, dept, st, valid_from, valid_to, pass_type, count in vp_data:
+            existing_vp = db.query(VisitorPass).filter(VisitorPass.pass_number == pass_no).first()
             if not existing_vp:
                 vp = VisitorPass(
-                    pass_number=p_num,
+                    pass_number=pass_no,
                     visitor_name=v_name,
                     visitor_phone=phone,
                     purpose=purp,
-                    event_name=ev_name,
-                    event_purpose=ev_purp,
-                    start_date=s_date,
-                    end_date=e_date,
-                    accessible_blocks=blocks,
-                    coordinator_name=c_name,
-                    coordinator_phone=c_phone,
-                    status=stat,
-                    created_by="P. Anitha (Access Supervisor)",
+                    entry_gate=gate,
+                    host_person_name=host,
+                    host_department=dept,
+                    status=st,
+                    valid_from=valid_from,
+                    valid_to=valid_to,
+                    pass_type=pass_type,
+                    visitor_count=count,
+                    cancellation_reason="Work rescheduled by contractor team" if st == "Cancelled" else None,
+                    institution_id=inst.id,
                 )
                 db.add(vp)
-                print(f"[Seed] Created Visitor Pass: {p_num}")
+                print(f"[Seed] Created VisitorPass: {pass_no}")
         db.commit()
 
         # 7. Access Logs
@@ -275,10 +321,11 @@ def seed_database():
         db.commit()
 
         print("\n[SUCCESS] Database seeding successfully completed!")
+
     except Exception as e:
         db.rollback()
-        print(f"[ERROR] Database seeding failed: {e}")
-        raise
+        print(f"[Seed] Error during seeding: {e}")
+        raise e
     finally:
         db.close()
 

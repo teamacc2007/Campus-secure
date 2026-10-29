@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
@@ -12,8 +13,9 @@ def log_access_event(
 ) -> AccessLog:
     if not log_data.record_identifier:
         now_str = datetime.now().strftime("%Y%m%d%H%M%S")
+        suffix = uuid.uuid4().hex[:4].upper()
         prefix = "ENT" if log_data.verification_status == "Authorized" else "SEC"
-        log_data.record_identifier = f"{prefix}-{now_str}"
+        log_data.record_identifier = f"{prefix}-{now_str}-{suffix}"
 
     initial_actions = []
     if log_data.verification_status != "Authorized":

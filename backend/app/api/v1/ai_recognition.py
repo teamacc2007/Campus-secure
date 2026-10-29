@@ -2,6 +2,7 @@ import base64
 import json
 import cv2
 import numpy as np
+from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
@@ -16,7 +17,7 @@ from app.models.staff import Staff
 from app.models.access_log import AccessLog
 from app.services.access_log_service import log_access_event
 from app.schemas.access_log import AccessLogCreate
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user_optional
 from app.models.user import User
 
 from app.core.config import settings
@@ -46,13 +47,20 @@ def decode_base64_image(base64_str: str) -> np.ndarray:
 def verify_face_endpoint(
     req: FaceVerifyRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
+    guard_display_name = req.guard_name or (current_user.full_name if current_user else "G. Selvam")
+
     # Check if direct register_number fallback was provided
     if req.register_number:
-        student = db.query(Student).filter(Student.register_number == req.register_number.strip()).first()
+        student = db.query(Student).filter(Student.register_number == req.register_number.strip().upper()).first()
         if student:
-            # Log successful access
+            # Check student authorization
+            is_authorized = bool(student.is_active)
+            status_text = "Authorized" if is_authorized else "Unauthorized"
+            review_text = "Verified" if is_authorized else "Unauthorised"
+
+            # Log access event
             log_access_event(
                 db,
                 AccessLogCreate(
@@ -61,19 +69,19 @@ def verify_face_endpoint(
                     identifier_value=student.register_number,
                     department=student.department,
                     location_block=req.location_block,
-                    guard_name=req.guard_name or current_user.full_name,
+                    guard_name=guard_display_name,
                     event_type="ENTRY",
                     verification_method="Register ID",
-                    verification_status="Authorized",
-                    review_status="Verified",
+                    verification_status=status_text,
+                    review_status=review_text,
                     student_id=student.id,
                 ),
             )
             return FaceVerifyResponse(
-                success=True,
+                success=is_authorized,
                 is_recognized=True,
                 is_live=True,
-                verification_status="Authorized",
+                verification_status=status_text,
                 similarity_score=1.0,
                 matched_person=MatchedPerson(
                     person_type="student",
@@ -89,7 +97,8 @@ def verify_face_endpoint(
                     photo_url=student.photo_url,
                     similarity_score=1.0,
                 ),
-                message="Identity verified via Register ID lookup.",
+                candidate_scores={student.name: 100.0},
+                message=f"Identity verified via Register ID lookup ({status_text}).",
             )
 
     # Process image if provided
@@ -103,7 +112,7 @@ def verify_face_endpoint(
     if probe_img is None:
         raise HTTPException(status_code=400, detail="Neither image data nor register number was provided.")
 
-    # 1. Face detection
+    # 1. Face detection with real facial landmarks
     faces = detector.detect_faces(probe_img)
     if not faces:
         return FaceVerifyResponse(
@@ -115,17 +124,36 @@ def verify_face_endpoint(
             message="No face detected in the camera frame.",
         )
 
-    # Pick the largest face
-    primary_face = max(faces, key=lambda f: f["box"][2] * f["box"][3])
-    x, y, w, h = primary_face["box"]
-    # Ensure crop within bounds
-    ih, iw = probe_img.shape[:2]
-    x1, y1 = max(0, x), max(0, y)
-    x2, y2 = min(iw, x + w), min(ih, y + h)
-    face_crop = probe_img[y1:y2, x1:x2]
+    # Error handling: Multiple faces in single scan
+    if len(faces) > 1:
+        return FaceVerifyResponse(
+            success=False,
+            is_recognized=False,
+            is_live=False,
+            verification_status="Unauthorized",
+            similarity_score=0.0,
+            message="Multiple faces detected in camera frame. Only one individual permitted per security scan.",
+        )
 
-    # 2. Liveness Evaluation
-    liveness_res = liveness_evaluator.evaluate(face_crop)
+    primary_face = faces[0]
+    landmarks = primary_face.get("landmarks", [])
+
+    # Check landmark detection
+    if len(landmarks) < 2:
+        return FaceVerifyResponse(
+            success=False,
+            is_recognized=False,
+            is_live=False,
+            verification_status="Unauthorized",
+            similarity_score=0.0,
+            message="Facial landmark detection failed. Ensure face is centered and facing the camera directly.",
+        )
+
+    # 2. Align face using real facial landmark coordinates
+    aligned_face = detector.align_face(probe_img, primary_face)
+
+    # 3. Liveness Evaluation
+    liveness_res = liveness_evaluator.evaluate(aligned_face)
     if not liveness_res["is_live"]:
         # Log unauthorized attempt due to presentation attack
         log_access_event(
@@ -136,7 +164,7 @@ def verify_face_endpoint(
                 identifier_value="SPOOF-ALERT",
                 department="N/A",
                 location_block=req.location_block,
-                guard_name=req.guard_name or current_user.full_name,
+                guard_name=guard_display_name,
                 event_type="ENTRY",
                 verification_method="Face Recognition",
                 verification_status="Unauthorized",
@@ -151,15 +179,16 @@ def verify_face_endpoint(
             verification_status="Unauthorized",
             similarity_score=0.0,
             liveness_details=LivenessCheckResult(**liveness_res),
+            landmarks=landmarks,
             message="Liveness check failed. Potential presentation attack detected.",
         )
 
-    # 3. Extract Probe Embedding
-    probe_embedding = embedder.extract_embedding(face_crop)
+    # 4. Extract Probe Embedding using facial landmark aligned features
+    probe_embedding = embedder.extract_embedding(probe_img, primary_face)
 
-    # 4. Build Gallery from enrolled Students and Staff
-    enrolled_students = db.query(Student).filter(Student.is_active == True).all()
-    gallery = []
+    # 5. Build Gallery from enrolled Students and Staff
+    enrolled_students = db.query(Student).all()
+    gallery: List[Dict[str, Any]] = []
     for s in enrolled_students:
         emb = None
         if s.face_embedding:
@@ -181,9 +210,10 @@ def verify_face_endpoint(
             "room_number": s.room_number,
             "photo_url": s.photo_url,
             "embedding": emb,
+            "is_active": s.is_active,
         })
 
-    enrolled_staff = db.query(Staff).filter(Staff.is_active == True).all()
+    enrolled_staff = db.query(Staff).all()
     for st in enrolled_staff:
         emb = None
         if st.face_embedding:
@@ -201,12 +231,71 @@ def verify_face_endpoint(
             "designation": st.designation,
             "photo_url": st.photo_url,
             "embedding": emb,
+            "is_active": st.is_active,
         })
 
-    # 5. Vector matching
+    # 6. Compute candidate comparison scores across gallery
+    candidate_scores: Dict[str, float] = {}
+    for item in gallery:
+        target_emb = item.get("embedding")
+        if target_emb:
+            sim = matcher.cosine_similarity(probe_embedding, np.array(target_emb, dtype=np.float32))
+            score_pct = round(max(0.0, sim) * 100, 1)
+            candidate_scores[item["name"]] = score_pct
+
+    # 7. Vector matching
     best_candidate, score, decision = matcher.find_best_match(probe_embedding, gallery)
 
+    # 8. PostgreSQL / Database authorization verification
     if decision == "MATCH" and best_candidate:
+        is_active = best_candidate.get("is_active", True)
+        if not is_active:
+            # Recognized person is inactive/revoked in database -> Unauthorized
+            log_access_event(
+                db,
+                AccessLogCreate(
+                    person_type=best_candidate["type"].capitalize(),
+                    name=best_candidate["name"],
+                    identifier_value=best_candidate["identifier"],
+                    department=best_candidate["department"],
+                    location_block=req.location_block,
+                    guard_name=guard_display_name,
+                    event_type="ENTRY",
+                    verification_method="Face Recognition",
+                    verification_status="Unauthorized",
+                    review_status="Unauthorised",
+                    flag_reason="Recognized individual is marked inactive in institution records",
+                    student_id=best_candidate["id"] if best_candidate["type"] == "student" else None,
+                    staff_id=best_candidate["id"] if best_candidate["type"] == "staff" else None,
+                ),
+            )
+            return FaceVerifyResponse(
+                success=False,
+                is_recognized=True,
+                is_live=True,
+                verification_status="Unauthorized",
+                similarity_score=score,
+                matched_person=MatchedPerson(
+                    person_type=best_candidate["type"],
+                    identifier=best_candidate["identifier"],
+                    name=best_candidate["name"],
+                    initials=best_candidate.get("initials"),
+                    department=best_candidate["department"],
+                    year_roman=best_candidate.get("year_roman"),
+                    batch=best_candidate.get("batch"),
+                    residence_type=best_candidate.get("residence_type"),
+                    hostel_name=best_candidate.get("hostel_name"),
+                    room_number=best_candidate.get("room_number"),
+                    designation=best_candidate.get("designation"),
+                    photo_url=best_candidate.get("photo_url"),
+                    similarity_score=score,
+                ),
+                candidate_scores=candidate_scores,
+                landmarks=landmarks,
+                message="Recognized identity is inactive or revoked in institution records.",
+            )
+
+        # Active and authorized
         person_type_display = "Student" if best_candidate["type"] == "student" else "Staff"
         log_access_event(
             db,
@@ -216,7 +305,7 @@ def verify_face_endpoint(
                 identifier_value=best_candidate["identifier"],
                 department=best_candidate["department"],
                 location_block=req.location_block,
-                guard_name=req.guard_name or current_user.full_name,
+                guard_name=guard_display_name,
                 event_type="ENTRY",
                 verification_method="Face Recognition",
                 verification_status="Authorized",
@@ -246,6 +335,8 @@ def verify_face_endpoint(
                 photo_url=best_candidate.get("photo_url"),
                 similarity_score=score,
             ),
+            candidate_scores=candidate_scores,
+            landmarks=landmarks,
             liveness_details=LivenessCheckResult(**liveness_res),
             message="Face match confirmed and entry authorized.",
         )
@@ -260,26 +351,28 @@ def verify_face_endpoint(
                 identifier_value=best_candidate["identifier"],
                 department=best_candidate["department"],
                 location_block=req.location_block,
-                guard_name=req.guard_name or current_user.full_name,
+                guard_name=guard_display_name,
                 event_type="ENTRY",
                 verification_method="Face Recognition",
                 verification_status="Flagged",
                 review_status="Pending Verification",
-                flag_reason=f"Similarity score {score} falls in uncertain threshold (0.50 - 0.68)",
+                flag_reason=f"Similarity score {score} falls in uncertain threshold (0.50 - {settings.FACE_MATCH_THRESHOLD})",
             ),
         )
         return FaceVerifyResponse(
-            success=True,
+            success=False,
             is_recognized=False,
             is_live=True,
             verification_status="Flagged",
             similarity_score=score,
+            candidate_scores=candidate_scores,
+            landmarks=landmarks,
             liveness_details=LivenessCheckResult(**liveness_res),
             message="Low confidence similarity. Logged for supervisor verification.",
         )
 
     else:
-        # Unrecognized face
+        # Unrecognized face (below threshold)
         log_access_event(
             db,
             AccessLogCreate(
@@ -288,12 +381,12 @@ def verify_face_endpoint(
                 identifier_value="UNREC-FACE",
                 department="N/A",
                 location_block=req.location_block,
-                guard_name=req.guard_name or current_user.full_name,
+                guard_name=guard_display_name,
                 event_type="ENTRY",
                 verification_method="Face Recognition",
                 verification_status="Unauthorized",
                 review_status="Unauthorised",
-                flag_reason="Face does not match any enrolled student or staff record",
+                flag_reason=f"Face does not match any enrolled record above {int(settings.FACE_MATCH_THRESHOLD * 100)}% threshold",
             ),
         )
         return FaceVerifyResponse(
@@ -302,6 +395,8 @@ def verify_face_endpoint(
             is_live=True,
             verification_status="Unauthorized",
             similarity_score=score,
+            candidate_scores=candidate_scores,
+            landmarks=landmarks,
             liveness_details=LivenessCheckResult(**liveness_res),
-            message="Face not recognized in institution database.",
+            message=f"Face not recognized in institution database. All scores below {int(settings.FACE_MATCH_THRESHOLD * 100)}% threshold.",
         )

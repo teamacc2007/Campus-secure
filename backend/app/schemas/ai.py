@@ -41,4 +41,6 @@ class FaceVerifyResponse(BaseModel):
     similarity_score: float
     matched_person: Optional[MatchedPerson] = None
     liveness_details: Optional[LivenessCheckResult] = None
+    candidate_scores: Optional[Dict[str, float]] = None
+    landmarks: Optional[List[List[float]]] = None
     message: str

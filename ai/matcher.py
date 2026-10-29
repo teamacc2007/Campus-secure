@@ -3,7 +3,7 @@ from typing import List, Tuple, Optional, Dict, Any
 
 
 class FaceMatcher:
-    def __init__(self, match_threshold: float = 0.68, uncertain_threshold: float = 0.50):
+    def __init__(self, match_threshold: float = 0.65, uncertain_threshold: float = 0.50):
         self.match_threshold = match_threshold
         self.uncertain_threshold = uncertain_threshold
 
