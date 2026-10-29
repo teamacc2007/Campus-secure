@@ -400,10 +400,6 @@ function Login({ enter, go }: { enter: (role: Role) => void; go: (screen: Screen
       <button className="text-action forgot-link" onClick={() => go("forgot")}>Forgot password?</button>
       {error && <div className="login-error"><AlertTriangle size={14} />{error}</div>}
       <Button onClick={signIn}>Sign in securely<ChevronRight size={17} /></Button>
-      <div className="credential-help">
-        <strong>Demo Login Access (Password: 12345)</strong>
-        <span>Valid roles: supervisor, security, warden, staff, access, welfare, students, admin, cso, manager</span>
-      </div>
     </section>
   </main>;
 }
