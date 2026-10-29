@@ -341,20 +341,32 @@ function Login({ enter, go }: { enter: (role: Role) => void; go: (screen: Screen
   const [error, setError] = useState("");
   const credentials: Record<string, Role> = {
     security: "security",
+    guard: "security",
     warden: "warden",
     "hostel warden": "warden",
+    "hostel-warden": "warden",
     staff: "staff",
+    faculty: "staff",
+    supervisor: "supervisor",
     "campus supervisor": "supervisor",
+    "campus-supervisor": "supervisor",
     "access supervisor": "access-supervisor",
+    "access-supervisor": "access-supervisor",
     access: "access-supervisor",
+    students: "students",
+    student: "students",
     "student affair": "students",
     "student affairs": "students",
+    "student-affairs": "students",
     welfare: "welfare",
     "student welfare": "welfare",
+    "student-welfare": "welfare",
     admin: "admin",
+    administrator: "admin",
     cso: "cso",
     manager: "manager",
     "institute manager": "manager",
+    "institute-manager": "manager",
   };
   const signIn = () => {
     if (!username.trim() || !password) {
@@ -388,6 +400,10 @@ function Login({ enter, go }: { enter: (role: Role) => void; go: (screen: Screen
       <button className="text-action forgot-link" onClick={() => go("forgot")}>Forgot password?</button>
       {error && <div className="login-error"><AlertTriangle size={14} />{error}</div>}
       <Button onClick={signIn}>Sign in securely<ChevronRight size={17} /></Button>
+      <div className="credential-help">
+        <strong>Demo Login Access (Password: 12345)</strong>
+        <span>Valid roles: supervisor, security, warden, staff, access, welfare, students, admin, cso, manager</span>
+      </div>
     </section>
   </main>;
 }
