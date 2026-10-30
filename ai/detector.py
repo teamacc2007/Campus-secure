@@ -5,7 +5,7 @@ from typing import List, Tuple, Optional, Dict, Any
 
 
 class FaceDetector:
-    def __init__(self, model_path: Optional[str] = None, score_threshold: float = 0.6):
+    def __init__(self, model_path: Optional[str] = None, score_threshold: float = 0.5):
         self.score_threshold = score_threshold
         if model_path is None:
             default_path = os.path.abspath(
@@ -26,6 +26,7 @@ class FaceDetector:
                     nms_threshold=0.3,
                     top_k=5000,
                 )
+                print(f"[FaceDetector] Loaded YuNet face detector from {model_path} (score_threshold={score_threshold})")
             except Exception as e:
                 print(f"[FaceDetector] Failed to load YuNet model: {e}. Falling back to OpenCV Cascade.")
                 self.yunet = None

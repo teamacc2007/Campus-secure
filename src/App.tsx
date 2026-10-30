@@ -667,18 +667,40 @@ function LevelOneScan({ go, completeScan, role }: { go: (screen: Screen) => void
               if (resp.ok) {
                 const data = await resp.json();
                 if (data.candidate_scores) {
-                  evalScores = {
-                    Sur: Math.round(data.candidate_scores["Sur"] || 0),
-                    Mon: Math.round(data.candidate_scores["Mon"] || 0),
-                    Mith: Math.round(data.candidate_scores["Mith"] || 0),
-                    Thiru: Math.round(data.candidate_scores["Thiru"] || 0),
-                  };
+                  evalScores = {};
+                  for (const [key, val] of Object.entries(data.candidate_scores)) {
+                    evalScores[key] = Math.round(Number(val));
+                  }
                 }
                 if (data.is_recognized && data.matched_person) {
-                  const student = studentMatches.find(s => s.name === data.matched_person.name);
-                  if (student) {
-                    evalMatch = { ...student, similarity: Math.round(data.similarity_score * 100) };
+                  const reg = (data.matched_person.identifier || "").toUpperCase();
+                  const pname = (data.matched_person.name || "").toLowerCase();
+                  let student = studentMatches.find(s => 
+                    s.registerNumber.toUpperCase() === reg ||
+                    s.name.toLowerCase() === pname ||
+                    pname.startsWith(s.name.toLowerCase()) ||
+                    s.name.toLowerCase().startsWith(pname)
+                  );
+                  if (!student) {
+                    student = {
+                      initials: data.matched_person.initials || "ST",
+                      name: data.matched_person.name,
+                      registerNumber: data.matched_person.identifier,
+                      dateOfBirth: "01 Jan 2004",
+                      department: data.matched_person.department,
+                      year: data.matched_person.year_roman || "III",
+                      batch: data.matched_person.batch || "2022–2026",
+                      institute: "Easwari Engineering College",
+                      similarity: Math.round(data.similarity_score * 100),
+                      accommodationType: (data.matched_person.residence_type as any) || "Day Scholar",
+                      photo: data.matched_person.photo_url || capturedDataUrl || "/faces/sur_crop.jpg",
+                    };
                   }
+                  evalMatch = {
+                    ...student,
+                    similarity: Math.round(data.similarity_score * 100),
+                    photo: data.matched_person.photo_url || student.photo,
+                  };
                 }
               }
             } catch (err) {
@@ -1018,7 +1040,7 @@ function UnrecognizedResult({ go, verifyRegister, role, capturedPhoto, biometric
   // Filter: ONLY show candidates with genuine similarity >= 60%
   const candidateList = studentMatches
     .map(match => {
-      const calcSim = biometricScores ? biometricScores[match.name] : 0;
+      const calcSim = biometricScores ? (biometricScores[match.name] ?? biometricScores[match.registerNumber] ?? 0) : 0;
       return {
         ...match,
         similarity: calcSim,

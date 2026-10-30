@@ -392,6 +392,14 @@ def verify_face_endpoint(
     # 4. Extract Probe Embedding using facial landmark aligned features
     probe_embedding = embedder.extract_embedding(probe_img, primary_face)
 
+    # Invariance against mirrored camera streams (front-facing webcams / CSS scaleX(-1))
+    probe_flip = cv2.flip(probe_img, 1)
+    flip_faces = detector.detect_faces(probe_flip)
+    flip_faces.sort(key=lambda f: f["box"][2] * f["box"][3], reverse=True)
+    probe_flip_embedding = None
+    if flip_faces:
+        probe_flip_embedding = embedder.extract_embedding(probe_flip, flip_faces[0])
+
     # 5. Build Gallery from enrolled Students and Staff (with multi-reference support)
     enrolled_students = db.query(Student).all()
     gallery: List[Dict[str, Any]] = []
@@ -432,19 +440,46 @@ def verify_face_endpoint(
             "is_active": st.is_active,
         })
 
-    # 6. Compute candidate comparison scores across gallery (max sim across references)
+    # 6. Compute candidate comparison scores across gallery (max sim across references and orientations)
     candidate_scores: Dict[str, float] = {}
     for item in gallery:
         target_embs = item.get("embeddings") or ([item["embedding"]] if item.get("embedding") else [])
         best_sim = 0.0
         for e in target_embs:
-            sim = matcher.cosine_similarity(probe_embedding, np.array(e, dtype=np.float32))
+            ref_arr = np.array(e, dtype=np.float32)
+            sim1 = matcher.cosine_similarity(probe_embedding, ref_arr)
+            sim2 = matcher.cosine_similarity(probe_flip_embedding, ref_arr) if probe_flip_embedding is not None else 0.0
+            sim = max(sim1, sim2)
             if sim > best_sim:
                 best_sim = sim
-        candidate_scores[item["name"]] = round(max(0.0, best_sim) * 100, 1)
+        sim_pct = round(max(0.0, best_sim) * 100, 1)
+        candidate_scores[item["name"]] = sim_pct
+        candidate_scores[item["identifier"]] = sim_pct
+        if item.get("initials"):
+            candidate_scores[item["initials"]] = sim_pct
 
-    # 7. Vector matching across multi-reference gallery
-    best_candidate, score, decision = matcher.find_best_match(probe_embedding, gallery)
+    # Also map Sur, Mon, Mith, Thiru aliases for Figma card compatibility
+    name_alias_map = {
+        "23MED0412": ["Sur", "Surendhar G"],
+        "23AHS0185": ["Mon", "Moniesh V"],
+        "22ECE0531": ["Mith", "Mithun K"],
+        "22CSE0789": ["Thiru", "Thirumavalavan"],
+    }
+    for reg, aliases in name_alias_map.items():
+        if reg in candidate_scores:
+            for al in aliases:
+                candidate_scores[al] = candidate_scores[reg]
+
+    # 7. Vector matching across multi-reference gallery (testing both probe orientations)
+    best_candidate1, score1, decision1 = matcher.find_best_match(probe_embedding, gallery)
+    best_candidate2, score2, decision2 = (None, -1.0, "NO_MATCH")
+    if probe_flip_embedding is not None:
+        best_candidate2, score2, decision2 = matcher.find_best_match(probe_flip_embedding, gallery)
+
+    if score2 > score1:
+        best_candidate, score, decision = best_candidate2, score2, decision2
+    else:
+        best_candidate, score, decision = best_candidate1, score1, decision1
 
     # 8. PostgreSQL / Database authorization verification
     if decision == "MATCH" and best_candidate:

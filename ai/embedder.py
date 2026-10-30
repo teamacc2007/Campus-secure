@@ -32,6 +32,7 @@ class FaceEmbedder:
             if hasattr(cv2, "FaceRecognizerSF"):
                 try:
                     self.recognizer = cv2.FaceRecognizerSF.create(model=model_path, config="")
+                    print(f"[FaceEmbedder] Loaded SFace recognition checkpoint: {model_path} (model_version=sface-yunet-v1)")
                 except Exception as e:
                     self.recognizer = None
 
@@ -45,6 +46,7 @@ class FaceEmbedder:
                     )
                     self.input_name = self.session.get_inputs()[0].name
                     self.output_name = self.session.get_outputs()[0].name
+                    print(f"[FaceEmbedder] Loaded ONNX Runtime recognition checkpoint: {model_path} (model_version=arcface-mobilefacenet-v1)")
                 except Exception as e:
                     print(f"[FaceEmbedder] Failed to initialize ONNX Runtime session: {e}.")
                     self.session = None

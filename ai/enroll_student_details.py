@@ -24,27 +24,53 @@ def process_and_enroll_student_details():
     embedder = FaceEmbedder()
     matcher = FaceMatcher()
     
-    # Load existing genuine primary identities
+    # Helper to generate multiple reference templates covering crop, full, mirroring, and lighting variations
+    def generate_templates(crop_path, raw_path=None):
+        temps = []
+        if crop_path and os.path.exists(crop_path):
+            c_img = cv2.imread(crop_path)
+            if c_img is not None:
+                fc = detector.detect_faces(c_img)
+                if fc:
+                    temps.append(embedder.extract_embedding(c_img, fc[0]).tolist())
+                    c_flip = cv2.flip(c_img, 1)
+                    fc_flip = detector.detect_faces(c_flip)
+                    if fc_flip:
+                        temps.append(embedder.extract_embedding(c_flip, fc_flip[0]).tolist())
+        if raw_path and os.path.exists(raw_path):
+            r_img = cv2.imread(raw_path)
+            if r_img is not None:
+                fr = detector.detect_faces(r_img)
+                if fr:
+                    temps.append(embedder.extract_embedding(r_img, fr[0]).tolist())
+                    r_flip = cv2.flip(r_img, 1)
+                    fr_flip = detector.detect_faces(r_flip)
+                    if fr_flip:
+                        temps.append(embedder.extract_embedding(r_flip, fr_flip[0]).tolist())
+                    for a, b in [(1.15, 12), (0.85, -12)]:
+                        adj = cv2.convertScaleAbs(r_img, alpha=a, beta=b)
+                        f_adj = detector.detect_faces(adj)
+                        if f_adj:
+                            temps.append(embedder.extract_embedding(adj, f_adj[0]).tolist())
+        return temps
+
+    # Load existing genuine primary identities with multi-reference templates
     primary_identities = {
-        "Sur": ("23MED0412", os.path.join(base_dir, "public/faces/sur.jpg")),
-        "Mon": ("23AHS0185", os.path.join(base_dir, "public/faces/mon.jpg")),
-        "Mith": ("22ECE0531", os.path.join(base_dir, "public/faces/mith.jpg")),
-        "Thiru": ("22CSE0789", os.path.join(base_dir, "public/faces/thiru.jpg")),
+        "Sur": ("23MED0412", os.path.join(base_dir, "public/faces/sur_crop.jpg"), os.path.join(base_dir, "public/faces/sur.jpg")),
+        "Mon": ("23AHS0185", os.path.join(base_dir, "public/faces/mon_crop.jpg"), os.path.join(base_dir, "public/faces/mon.jpg")),
+        "Mith": ("22ECE0531", os.path.join(base_dir, "public/faces/mith_crop.jpg"), os.path.join(base_dir, "public/faces/mith.jpg")),
+        "Thiru": ("22CSE0789", os.path.join(base_dir, "public/faces/thiru_crop.jpg"), os.path.join(base_dir, "public/faces/thiru.jpg")),
     }
-    
+
     primary_embeddings = {}
-    for name, (reg, path) in primary_identities.items():
-        if os.path.exists(path):
-            img_p = cv2.imread(path)
-            f_p = sorted(detector.detect_faces(img_p), key=lambda f: f["box"][2] * f["box"][3], reverse=True)[0]
-            emb_p = embedder.extract_embedding(img_p, f_p)
-            primary_embeddings[name] = (reg, emb_p)
-            
     enrolled_embeddings = {}
-    for name, (reg, emb_p) in primary_embeddings.items():
-        emb_list = emb_p.tolist() if hasattr(emb_p, "tolist") else list(emb_p)
-        enrolled_embeddings[name] = emb_list
-        enrolled_embeddings[reg] = emb_list
+    for name, (reg, crop_p, full_p) in primary_identities.items():
+        temps = generate_templates(crop_p, full_p)
+        if temps:
+            primary_embeddings[name] = (reg, np.array(temps[0], dtype=np.float32))
+            enrolled_embeddings[name] = temps
+            enrolled_embeddings[reg] = temps
+            print(f"Generated {len(temps)} reference templates for primary identity {name} ({reg})")
         
     processed_records = []
     duplicate_records = []
@@ -106,19 +132,22 @@ def process_and_enroll_student_details():
             })
             continue
             
-        # Independent enrolled identity
-        enrolled_embeddings[reg] = emb_list
-        enrolled_embeddings[name] = emb_list
+        # Independent enrolled identity with multi-reference templates
+        doc_temps = generate_templates(dest_crop_path, dest_raw_path)
+        if not doc_temps:
+            doc_temps = [emb_list]
+        enrolled_embeddings[reg] = doc_temps
+        enrolled_embeddings[name] = doc_temps
         
         processed_records.append({
             "identifier": reg,
             "name": name,
             "photo_url": f"/faces/student_details/{dest_crop_name}",
             "raw_photo_url": f"/faces/student_details/{dest_raw_name}",
-            "embedding": emb_list,
+            "embedding": doc_temps,
             "fields": fields
         })
-        print(f"Enrolled independent identity {name} ({reg}) - landmarks: {len(primary['landmarks'])}, emb len: {len(emb_list)}")
+        print(f"Enrolled independent identity {name} ({reg}) - {len(doc_temps)} templates generated")
         
     embeddings_file = os.path.join(base_dir, "public/faces/enrolled_embeddings.json")
     with open(embeddings_file, "w") as f:
