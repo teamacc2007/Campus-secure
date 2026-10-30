@@ -606,6 +606,12 @@ function formatYearBatch(yearRaw?: string, batchRaw?: string) {
   return { displayYear, displayBatch };
 }
 
+function formatRomanYearWithSuffix(yearRaw?: string): string {
+  if (!yearRaw) return "II Year";
+  const roman = yearRaw.replace(/year/gi, "").trim();
+  return roman ? `${roman} Year` : yearRaw.trim();
+}
+
 function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) => void; completeScan: (capturedImage: string | null, matchResult?: StudentMatch | null, scores?: Record<string, number> | null) => void; role: "security" | "warden" | "staff"; logs?: LogRecord[] }) {
   const [scanning, setScanning] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
@@ -1141,6 +1147,7 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role, c
   const location = role === "warden" ? "Bharathi Hostel" : role === "staff" ? "Block A" : "Main Gate";
 
   const { displayYear, displayBatch } = formatYearBatch(activeStudent.year, activeStudent.batch);
+  const profileYear = formatRomanYearWithSuffix(activeStudent.year);
 
   return <>
     <TopBar title="Identity verified" subtitle="Review before confirming" back={() => go(registerVerified ? "unrecognized" : "scan")} />
@@ -1188,8 +1195,14 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role, c
             <div><dt>Name</dt><dd>{activeStudent.name}</dd></div>
             <div><dt>Register Number</dt><dd>{activeStudent.registerNumber}</dd></div>
             <div><dt>Date of Birth</dt><dd>{activeStudent.dateOfBirth}</dd></div>
-            <div><dt>Department</dt><dd>{activeStudent.department}</dd></div>
-            <div><dt>Year</dt><dd>{displayYear}</dd></div>
+            {role === "security" ? (
+              <div><dt>Year & Department</dt><dd>{profileYear} · {activeStudent.department}</dd></div>
+            ) : (
+              <>
+                <div><dt>Department</dt><dd>{activeStudent.department}</dd></div>
+                <div><dt>Year</dt><dd>{displayYear}</dd></div>
+              </>
+            )}
             <div><dt>Batch</dt><dd>{displayBatch}</dd></div>
             <div><dt>Institute</dt><dd>{activeStudent.institute}</dd></div>
             <div><dt>Accommodation Type</dt><dd>{activeStudent.accommodationType}</dd></div>
