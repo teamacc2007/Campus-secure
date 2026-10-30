@@ -1,6 +1,6 @@
 # Campus Secure - Mobile Application & Enterprise Backend
 
-An identity-led, real-time campus access control and security system built for **Trichy SRM Medical College Hospital & Research Centre**.
+An identity-led, real-time campus access control and security system built for **SRM GROUP OF INSTITUTION TRICHY**.
 
 Developed with:
 * **Mobile Application:** Flutter & Dart (reproducing the exact, final, and locked Figma mobile design specifications with zero visual alterations).

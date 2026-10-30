@@ -38,7 +38,7 @@ def seed_database():
         inst = db.query(Institution).filter(Institution.short_code == "TSRMMCHRC").first()
         if not inst:
             inst = Institution(
-                name="Trichy SRM Medical College Hospital & Research Centre",
+                name="SRM GROUP OF INSTITUTION TRICHY",
                 short_code="TSRMMCHRC",
                 campus_code="SRM-TRICHY-01",
                 address="SRM Nagar, Irungalur, Tiruchirappalli, Tamil Nadu 621105",

@@ -1,7 +1,7 @@
 # Campus Secure - System Architecture
 
 ## Overview
-Campus Secure is an enterprise-grade campus access control, identity verification, and security management platform for **Trichy SRM Medical College Hospital & Research Centre**.
+Campus Secure is an enterprise-grade campus access control, identity verification, and security management platform for **SRM GROUP OF INSTITUTION TRICHY**.
 
 The platform is designed around strict separation of concerns, multi-role mobile operations, high-speed face biometrics, and immutable security audit trails.
 

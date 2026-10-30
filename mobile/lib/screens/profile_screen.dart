@@ -92,7 +92,7 @@ class ProfileScreen extends StatelessWidget {
 
                   _infoRow('Username', username),
                   const SizedBox(height: 8),
-                  _infoRow('Institution', 'Trichy SRM Medical College'),
+                  _infoRow('Institution', 'SRM GROUP OF INSTITUTION TRICHY'),
                   const SizedBox(height: 8),
                   _infoRow('Campus Code', 'SRM-TRICHY-01'),
                   const SizedBox(height: 8),

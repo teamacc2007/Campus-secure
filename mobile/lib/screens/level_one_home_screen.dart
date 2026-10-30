@@ -31,7 +31,7 @@ class LevelOneHomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: TopBar(
-        title: 'TRICHY SRM MEDICAL COLLEGE',
+        title: 'SRM GROUP OF INSTITUTION TRICHY',
         subtitle: _getRoleTitle(),
       ),
       body: SingleChildScrollView(

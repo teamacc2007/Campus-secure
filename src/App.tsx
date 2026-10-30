@@ -160,7 +160,7 @@ const studentMatches: StudentMatch[] = [
     department: "General Medicine & Surgery",
     year: "II",
     batch: "2023–2028",
-    institute: "Trichy SRM Medical College",
+    institute: "SRM GROUP OF INSTITUTION TRICHY",
     similarity: 98,
     accommodationType: "Hosteller",
     hostelName: "Bharathi Hostel",
@@ -175,7 +175,7 @@ const studentMatches: StudentMatch[] = [
     department: "Medical Laboratory Technology",
     year: "II",
     batch: "2023–2027",
-    institute: "Trichy SRM Medical College",
+    institute: "SRM GROUP OF INSTITUTION TRICHY",
     similarity: 96,
     accommodationType: "Day Scholar",
     transportationType: "College Bus",
@@ -386,13 +386,12 @@ function TopBar({ title, subtitle, back, action, collegeBrand = true }: { title:
     {back ? (
       <button className="icon-btn" onClick={back} aria-label="Back"><ArrowLeft size={20} /></button>
     ) : (
-      <div className={`college-logo ${isBranded ? "" : "mini"}`}><img src="/srm-trichy-emblem.png" alt="Trichy SRM emblem" /></div>
+      <div className={`college-logo ${isBranded ? "" : "mini"}`}><img src="/srm-trichy-emblem.png" alt="SRM GROUP OF INSTITUTION TRICHY emblem" /></div>
     )}
     <div className="top-copy">
       {isBranded ? (
         <div className="inst-lockup">
-          <span className="inst-title">TRICHY SRM</span>
-          <span className="inst-sub">Medical College Hospital & Research Centre</span>
+          <span className="inst-title">SRM GROUP OF INSTITUTION TRICHY</span>
           {subtitle && <span className="inst-portal-tag">{subtitle}</span>}
         </div>
       ) : (
@@ -528,12 +527,11 @@ function Login({ enter, go }: { enter: (role: Role) => void; go: (screen: Screen
   return <main className="phone-page login-page">
     <section className="login-brand">
       <div className="login-college-emblem">
-        <img src="/srm-trichy-emblem.png" alt="Trichy SRM Medical College Emblem" />
+        <img src="/srm-trichy-emblem.png" alt="SRM GROUP OF INSTITUTION TRICHY Emblem" />
       </div>
       <div className="login-inst-text">
         <span className="inst-badge">OFFICIAL INSTITUTION PORTAL</span>
-        <h1 className="inst-title">TRICHY SRM</h1>
-        <h2 className="inst-sub">Medical College Hospital & Research Centre</h2>
+        <h1 className="inst-title">SRM GROUP OF INSTITUTION TRICHY</h1>
         <p className="app-subtitle">Campus Secure · Identity-Led Campus Access</p>
       </div>
     </section>
@@ -581,7 +579,7 @@ function LevelOneScan({ go, completeScan, role }: { go: (screen: Screen) => void
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  const location = role === "warden" ? "Bharathi Hostel · Trichy SRM" : role === "staff" ? "Block A · Trichy SRM" : "Main Gate · Trichy SRM";
+  const location = role === "warden" ? "Bharathi Hostel · SRM GROUP OF INSTITUTION TRICHY" : role === "staff" ? "Block A · SRM GROUP OF INSTITUTION TRICHY" : "Main Gate · SRM GROUP OF INSTITUTION TRICHY";
 
   useEffect(() => {
     let mounted = true;
@@ -894,7 +892,7 @@ function LevelOneScan({ go, completeScan, role }: { go: (screen: Screen) => void
           <span className="badge-count">2 Institutions</span>
         </div>
         <p className="trained-profiles-subtitle">
-          Trained faces: 1. Sur, 2. Mon, 3. Mith, 4. Thiru across Trichy SRM and Easwari. Tap to verify or upload a photo:
+          Trained faces: 1. Sur, 2. Mon, 3. Mith, 4. Thiru across SRM GROUP OF INSTITUTION TRICHY and Easwari. Tap to verify or upload a photo:
         </p>
         <div className="trained-profiles-grid">
           {studentMatches.map((student, idx) => (
@@ -942,7 +940,7 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role, c
     employeeId: "EMP-B-1042",
     designation: "Professor",
     department: "Mechanical Engineering",
-    institute: "Trichy SRM Medical College",
+    institute: "SRM GROUP OF INSTITUTION TRICHY",
   };
   const personName = staff ? staffMember.name : student.name;
   const institute = staff ? staffMember.institute : student.institute;
@@ -1014,7 +1012,7 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role, c
           <div>
             <span>{role === "warden" ? "RESIDENT IDENTITY" : "CAMPUS IDENTITY"}</span>
             <strong>Internal person recognized</strong>
-            <p>Official student of Trichy SRM Medical College. Entry permitted at {location}.</p>
+            <p>Official student of SRM GROUP OF INSTITUTION TRICHY. Entry permitted at {location}.</p>
           </div>
         </section>
       ) : (
@@ -1253,7 +1251,7 @@ function nextVisitorPassNumber(passes: VisitorPass[]) {
 function AccessSupervisorHome({ go, todayCount }: { go: (screen: Screen) => void; todayCount: number }) {
   const meta = roleMeta["access-supervisor"];
   return <>
-    <TopBar title="Trichy SRM Medical College Hospital & Research Centre" subtitle="Access Supervisor Portal" collegeBrand />
+    <TopBar title="SRM GROUP OF INSTITUTION TRICHY" subtitle="Access Supervisor Portal" collegeBrand />
     <div className="page-content access-home">
       <section className="profile-head">
         <button className="profile-avatar" onClick={() => go("profile")} aria-label="Open profile">{meta.initials}</button>
@@ -1375,9 +1373,7 @@ async function downloadVisitorPassPdf(pass: VisitorPass) {
   pdf.setTextColor(255, 255, 255);
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(11);
-  pdf.text("TRICHY SRM MEDICAL COLLEGE", 44, 11);
-  pdf.setFontSize(9);
-  pdf.text("HOSPITAL & RESEARCH CENTRE", 44, 17);
+  pdf.text("SRM GROUP OF INSTITUTION TRICHY", 44, 14);
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(8);
   pdf.text(pass.entryType === "student" ? "STUDENT ENTRY PASS" : "VISITOR PASS", 44, 24);
@@ -1858,7 +1854,7 @@ function VisitorPassDetails({ pass, title = "Visitor Pass Details", subtitle = "
         <div><span>{pass.entryType === "student" ? "STUDENT ENTRY" : "VISITOR PASS"}</span><h1>{pass.visitorName}</h1><p>{pass.studentNo || pass.passNumber} · Issued by {pass.supervisor}</p></div>
         <Status tone={passTone(pass.status)}>{pass.status}</Status>
       </section>
-      <section className="info-card pass-information"><div className="card-kicker"><img src="/srm-trichy-emblem.png" alt="" className="kicker-emblem" /><TicketCheck size={15} />TRICHY SRM MEDICAL COLLEGE · PASS INFORMATION</div><dl>
+      <section className="info-card pass-information"><div className="card-kicker"><img src="/srm-trichy-emblem.png" alt="" className="kicker-emblem" /><TicketCheck size={15} />SRM GROUP OF INSTITUTION TRICHY · PASS INFORMATION</div><dl>
         <div><dt>{pass.entryType === "student" ? "Student Name" : "Visitor Name"}</dt><dd>{pass.visitorName}</dd></div><div><dt>{pass.entryType === "student" ? "Entry Number" : "Pass Number"}</dt><dd>{pass.passNumber}</dd></div>
         <div><dt>{pass.entryType === "student" ? "Student No" : "Visitor Phone Number"}</dt><dd>{pass.studentNo || pass.phone}</dd></div>
         <div><dt>Purpose</dt><dd>{pass.purpose}</dd></div>
@@ -2294,12 +2290,11 @@ function ForgotPassword({ go }: { go: (screen: Screen) => void }) {
   return <main className="phone-page login-page">
     <section className="login-brand">
       <div className="login-college-emblem">
-        <img src="/srm-trichy-emblem.png" alt="Trichy SRM Medical College Emblem" />
+        <img src="/srm-trichy-emblem.png" alt="SRM GROUP OF INSTITUTION TRICHY Emblem" />
       </div>
       <div className="login-inst-text">
         <span className="inst-badge">PASSWORD RECOVERY</span>
-        <h1 className="inst-title">TRICHY SRM</h1>
-        <h2 className="inst-sub">Medical College Hospital & Research Centre</h2>
+        <h1 className="inst-title">SRM GROUP OF INSTITUTION TRICHY</h1>
         <p className="app-subtitle">Campus Secure · Identity Verification</p>
       </div>
     </section>
@@ -2659,12 +2654,11 @@ function Profile({ role, go, back }: { role: Role; go: (screen: Screen) => void;
     <div className="page-content">
       <div className="profile-institution-banner">
         <div className="inst-banner-logo">
-          <img src="/srm-trichy-emblem.png" alt="Trichy SRM Medical College" />
+          <img src="/srm-trichy-emblem.png" alt="SRM GROUP OF INSTITUTION TRICHY" />
         </div>
         <div className="inst-banner-copy">
           <span className="overline">AFFILIATED INSTITUTION</span>
-          <strong>Trichy SRM Medical College</strong>
-          <small>Hospital & Research Centre</small>
+          <strong>SRM GROUP OF INSTITUTION TRICHY</strong>
         </div>
       </div>
       <section className="profile-card"><div className="profile-avatar large">{meta.initials}</div><h1>{meta.name}</h1><p>{meta.label}</p><Status tone="green">Active session</Status></section>
