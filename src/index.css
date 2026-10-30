@@ -1102,3 +1102,106 @@ h1, h2, h3, p, dl, dd { margin: 0; }
 }
 
 
+
+/* Intruder photo in Security Alerts card */
+.alert-card.with-intruder-photo {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.alert-intruder-col {
+  width: 78px;
+  flex: none;
+  border-radius: 11px;
+  overflow: hidden;
+  background: #f8fafc;
+  border: 1px solid #efc2c6;
+  box-shadow: 0 2px 8px rgba(18, 52, 102, 0.08);
+  display: flex;
+}
+
+.alert-intruder-photo {
+  width: 100%;
+  height: 100%;
+  min-height: 98px;
+  max-height: 125px;
+  object-fit: cover;
+  object-position: center 20%;
+  display: block;
+}
+
+.alert-card-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.alert-heading-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 2px;
+}
+
+.alert-symbol-mini {
+  width: 17px;
+  height: 17px;
+  border-radius: 5px;
+  background: #ffe9eb;
+  color: var(--red);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.alert-symbol-mini.blue-bg {
+  background: #eaf1fb;
+  color: var(--blue);
+}
+
+.alert-intruder-card {
+  margin-bottom: 14px;
+}
+
+.alert-intruder-detail-preview {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px;
+  background: #fdf5f5;
+  border-radius: 12px;
+  border: 1px solid #fed7d7;
+  margin-top: 8px;
+}
+
+.alert-detail-photo {
+  width: 74px;
+  height: 92px;
+  border-radius: 10px;
+  object-fit: cover;
+  object-position: center;
+  border: 1px solid #fca5a5;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
+}
+
+.alert-detail-photo-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.alert-detail-photo-meta p {
+  font-size: 8.5px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0;
+}
+
+.alert-detail-photo-meta small {
+  font-size: 7.5px;
+  color: #6b7280;
+  font-family: monospace;
+}

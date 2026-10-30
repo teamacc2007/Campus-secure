@@ -43,4 +43,6 @@ class FaceVerifyResponse(BaseModel):
     liveness_details: Optional[LivenessCheckResult] = None
     candidate_scores: Optional[Dict[str, float]] = None
     landmarks: Optional[List[List[float]]] = None
+    snapshot_url: Optional[str] = None
+    log_id: Optional[str] = None
     message: str

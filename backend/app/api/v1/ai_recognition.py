@@ -1,4 +1,5 @@
 import os
+import uuid
 import base64
 import json
 import cv2
@@ -608,7 +609,24 @@ def verify_face_endpoint(
 
     else:
         # Unrecognized face (below threshold)
-        log_access_event(
+        intruder_photo_url = None
+        if probe_img is not None:
+            ts_str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            rand_hex = uuid.uuid4().hex[:6]
+            filename = f"intruder_{ts_str}_{rand_hex}.jpg"
+            upload_path = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), f"../../../../uploads/intruders/{filename}")
+            )
+            public_path = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), f"../../../../public/faces/captured/{filename}")
+            )
+            os.makedirs(os.path.dirname(upload_path), exist_ok=True)
+            os.makedirs(os.path.dirname(public_path), exist_ok=True)
+            cv2.imwrite(upload_path, probe_img)
+            cv2.imwrite(public_path, probe_img)
+            intruder_photo_url = f"/faces/captured/{filename}"
+
+        logged = log_access_event(
             db,
             AccessLogCreate(
                 person_type="Unauthorized",
@@ -620,8 +638,9 @@ def verify_face_endpoint(
                 event_type="ENTRY",
                 verification_method="Face Recognition",
                 verification_status="Unauthorized",
-                review_status="Unauthorised",
+                review_status="Pending Verification",
                 flag_reason=f"Face does not match any enrolled record above {int(settings.FACE_MATCH_THRESHOLD * 100)}% threshold",
+                snapshot_url=intruder_photo_url,
             ),
         )
         return FaceVerifyResponse(
@@ -633,6 +652,8 @@ def verify_face_endpoint(
             candidate_scores=candidate_scores,
             landmarks=landmarks,
             liveness_details=LivenessCheckResult(**liveness_res),
+            snapshot_url=intruder_photo_url,
+            log_id=logged.record_identifier,
             message=f"Face not recognized in institution database. All scores below {int(settings.FACE_MATCH_THRESHOLD * 100)}% threshold.",
         )
 

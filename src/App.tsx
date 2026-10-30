@@ -672,6 +672,9 @@ function LevelOneScan({ go, completeScan, role }: { go: (screen: Screen) => void
                     evalScores[key] = Math.round(Number(val));
                   }
                 }
+                if (!data.is_recognized && data.snapshot_url) {
+                  capturedDataUrl = data.snapshot_url;
+                }
                 if (data.is_recognized && data.matched_person) {
                   const reg = (data.matched_person.identifier || "").toUpperCase();
                   const pname = (data.matched_person.name || "").toLowerCase();
@@ -1151,8 +1154,19 @@ function Field({ label, placeholder, value, type = "text", children }: { label: 
   return <label className="field"><span>{label}</span>{children || <input type={type} placeholder={placeholder} defaultValue={value} />}</label>;
 }
 
-function UnauthorizedForm({ go, role, capturedPhoto }: { go: (screen: Screen) => void; role: "security" | "warden" | "staff"; capturedPhoto: string | null }) {
+function UnauthorizedForm({
+  go,
+  role,
+  capturedPhoto,
+  onRecordEvent,
+}: {
+  go: (screen: Screen) => void;
+  role: "security" | "warden" | "staff";
+  capturedPhoto: string | null;
+  onRecordEvent?: (photo: string | null, notes?: string) => void;
+}) {
   const [submitted, setSubmitted] = useState(false);
+  const [notes, setNotes] = useState("");
   if (submitted) return <div className="success-page"><div className="success-symbol warning-symbol"><ShieldAlert size={38} /></div><Status tone="amber">CAMPUS SUPERVISOR NOTIFIED</Status><h1>Unauthorized event recorded</h1><p>The captured image, location, time, attempted register number, and officer notes were sent to the Campus Supervisor.</p><Button onClick={() => go("scan")}>Scan next person</Button><Button variant="secondary" onClick={() => go("home")}>Return home</Button></div>;
   return <>
     <TopBar title="Unauthorized person" subtitle="Record security event" back={() => go("unrecognized")} />
@@ -1170,9 +1184,15 @@ function UnauthorizedForm({ go, role, capturedPhoto }: { go: (screen: Screen) =>
       <div className="form-intro"><h1>Record event details</h1><p>Review the captured event before notifying the Campus Supervisor.</p></div>
       <div className="form-stack">
         <Field label="Full name" placeholder="Enter name if available" />
-        <Field label={role === "warden" ? "Warden notes" : role === "staff" ? "Staff notes" : "Security notes"} placeholder="Optional operational notes" />
+        <label className="field">
+          <span>{role === "warden" ? "Warden notes" : role === "staff" ? "Staff notes" : "Security notes"}</span>
+          <input placeholder="Optional operational notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
+        </label>
       </div>
-      <Button onClick={() => setSubmitted(true)} icon={<ShieldAlert size={17} />}>Record & notify Campus Supervisor</Button>
+      <Button onClick={() => {
+        if (onRecordEvent) onRecordEvent(capturedPhoto, notes);
+        setSubmitted(true);
+      }} icon={<ShieldAlert size={17} />}>Record & notify Campus Supervisor</Button>
     </div>
   </>;
 }
@@ -1951,7 +1971,7 @@ const logRows: LogRecord[] = [
   { initials: "SK", name: "Sanjay Kumar", id: "EMP-B-1084", institution: "Institution B", department: "Mechanical", block: "Block A", time: "09:51", dateTime: "2025-06-16T09:51", event: "Exit", tone: "gray", personType: "Staff", category: "Internal · Institution B", accessCategory: "Authorized", designation: "Professor", logId: "EXT-•••-4062", guard: "Kavya Rao", guardNumber: "GRD-B-0031", decision: "Authorised" },
   { initials: "NB", name: "Nila Bose", id: "EMP-C-0912", institution: "Institution C", department: "Administration", block: "Library Block", time: "09:32", dateTime: "2025-06-16T09:32", event: "Entry", tone: "green", personType: "Staff", category: "Internal · Other institution", accessCategory: "Authorized", designation: "Administrator", logId: "ENT-•••-4055", guard: "Imran Ali", guardNumber: "GRD-B-0044", decision: "Authorised" },
   { initials: "MJ", name: "Mohit Jain", id: "21MEC0184", institution: "Institution B", department: "Mechanical", block: "Block B", time: "09:14", dateTime: "2025-06-16T09:14", event: "Entry", tone: "green", personType: "Student", category: "Internal · Institution B", accessCategory: "Authorized", year: "Year IV", residence: "Day scholar", transport: "Own Vehicle", logId: "ENT-•••-4048", guard: "Joseph Mathew", guardNumber: "GRD-B-0038", decision: "Authorised" },
-  { initials: "RG", name: "Unrecognized person", id: "Not available", institution: "Not identified", department: "Not available", block: "Main Gate", time: "08:48", dateTime: "2025-06-16T08:48", event: "Denied", tone: "red", personType: "Unauthorised", category: "Unauthorised visitor", accessCategory: "Unauthorized", logId: "DEN-•••-4039", guard: "Arun Kumar", guardNumber: "GRD-B-0017", guardNotes: "Identity could not be verified at the Main Gate.", entries: 1, decision: "Denied" },
+  { initials: "RG", name: "Unrecognized person", id: "Not available", institution: "Not identified", department: "Not available", block: "Main Gate", time: "08:48", dateTime: "2025-06-16T08:48", event: "Denied", tone: "red", personType: "Unauthorised", category: "Unauthorised visitor", accessCategory: "Unauthorized", logId: "DEN-•••-4039", guard: "Arun Kumar", guardNumber: "GRD-B-0017", guardNotes: "Identity could not be verified at the Main Gate.", entries: 1, decision: "Denied", photo: "/faces/intruder_den_4039.jpg" },
 ];
 
 const assignedGuardNumbers = new Set(["GRD-B-0017", "GRD-B-0031", "GRD-B-0038", "GRD-B-0044", "GRD-B-0052"]);
@@ -2209,14 +2229,17 @@ function Alerts({
   role,
   reviews,
   updateReview,
+  logs,
 }: {
   go: (screen: Screen) => void;
   back: () => void;
   role: Role;
   reviews: Record<string, ReviewRecord>;
   updateReview: (row: LogRecord, type: "Unauthorised" | "Revoked", reason?: string) => void;
+  logs?: LogRecord[];
 }) {
-  const alertRows = logRows.filter(row => {
+  const currentLogs = logs ?? logRows;
+  const alertRows = currentLogs.filter(row => {
     if (row.accessCategory !== "Unauthorized") return false;
     if (role === "security") return row.block === "Main Gate";
     if (role === "warden") return row.guard === roleMeta.warden.name && row.hostel === "Bharathi Hostel" && row.personType === "Unauthorised";
@@ -2258,6 +2281,19 @@ function Alerts({
           <div><h1>{selected.name}</h1>{selected.personType !== "Unauthorised" && <p>{`${selected.personType} · ${selected.id}`}</p>}</div>
           <Status tone={reviewTone(review.status)}>{review.status}</Status>
         </section>
+        {selected.photo && (
+          <section className="info-card alert-intruder-card">
+            <div className="card-kicker"><Camera size={15} />CAPTURED INTRUDER PHOTOGRAPH</div>
+            <div className="alert-intruder-detail-preview">
+              <img src={selected.photo} alt="Captured Intruder" className="alert-detail-photo" />
+              <div className="alert-detail-photo-meta">
+                <Status tone="red">LIVE CAMERA CAPTURE</Status>
+                <p>Captured during facial scan at {selected.block}</p>
+                <small>Associated Event ID: {selected.logId || "DEN-•••-4039"}</small>
+              </div>
+            </div>
+          </section>
+        )}
         <section className="info-card alert-info"><div className="card-kicker"><FileClock size={15} />ORIGINAL SECURITY RECORD</div><dl><div><dt>Original event category</dt><dd>{selected.accessCategory}</dd></div><div><dt>Event</dt><dd>{selected.event}</dd></div><div><dt>Security officer</dt><dd>{selected.guard}</dd></div><div><dt>Security number</dt><dd>{selected.guardNumber}</dd></div><div><dt>Institution</dt><dd>{knownInstitution ? selected.institution : "Institution B"}</dd></div><div><dt>Gate / Location</dt><dd>{selected.block}</dd></div><div><dt>Date & time</dt><dd>{selected.dateTime.replace("T", " ")}</dd></div><div><dt>Current verification status</dt><dd>{review.status}</dd></div></dl></section>
         <section className="info-card action-history"><div className="card-kicker"><History size={15} />ACTION HISTORY</div><div className="history-list"><div><i><Shield size={13} /></i><p><strong>Original event recorded</strong><span>{selected.guard} · {selected.guardNumber}</span><small>{selected.dateTime.replace("T", " ")} · {selected.block}</small></p></div>{review.actions.map((action, index) => <div key={`${action.timestamp}${index}`}><i className={action.type === "Unauthorised" ? "danger-history" : ""}>{action.type === "Verified" || action.type === "Revoked" ? <Check size={13} /> : <ShieldAlert size={13} />}</i><p><strong>{action.type}</strong><span>{action.actor} · {action.actorNumber}</span><small>{action.timestamp}{action.reason ? ` · Reason: ${action.reason}` : ""}</small></p></div>)}</div></section>
         {role === "supervisor" && <div className="review-actions two-actions"><Button variant="warning" onClick={() => setDialog("unauthorised")} icon={<ShieldAlert size={17} />} disabled={review.status === "Unauthorised" || review.status === "Revoked"}>Unauthorised</Button><Button onClick={() => setDialog("revoke")} icon={<ShieldCheck size={17} />} disabled={review.status === "Revoked"}>Revoke</Button></div>}
@@ -2274,7 +2310,46 @@ function Alerts({
           const review = reviewFor(reviews, row);
           const unread = !readKeys.includes(recordKey(row));
           const notificationType = role === "warden" ? "Unrecognized Hostel Entry" : review.status === "Verified" ? "Verification Completed" : review.status === "Unauthorised" ? "Marked Unauthorised" : review.status === "Revoked" ? "Unauthorized Decision Revoked" : `${row.accessCategory} Event Alert`;
-          return <article key={recordKey(row)} className={`alert-card ${row.accessCategory === "Unauthorized" ? "high" : ""} ${unread ? "unread" : "muted"}`} onClick={() => openAlert(row)}><div className={`alert-symbol ${row.accessCategory === "Authorized" ? "blue-bg" : ""}`}>{row.accessCategory === "Authorized" ? <ShieldCheck size={20} /> : <ShieldAlert size={20} />}</div><div><span>{notificationType.toUpperCase()}</span><h3>{row.name}</h3><p>{row.personType} · {row.guard} ({row.guardNumber})</p><div className="notification-location"><MapPin size={12} />{row.block} — {["Not identified", "Not available"].includes(row.institution) ? "Institution B" : row.institution}</div><div className="alert-meta"><b>{row.dateTime.replace("T", " ")}</b><Status tone={reviewTone(review.status)}>{review.status}</Status><button onClick={(event) => { event.stopPropagation(); openAlert(row); }}>Open<ChevronRight size={13} /></button></div></div></article>;
+          const hasPhoto = Boolean(row.photo);
+          return (
+            <article
+              key={recordKey(row)}
+              className={`alert-card ${row.accessCategory === "Unauthorized" ? "high" : ""} ${unread ? "unread" : "muted"} ${hasPhoto ? "with-intruder-photo" : ""}`}
+              onClick={() => openAlert(row)}
+            >
+              {hasPhoto ? (
+                <div className="alert-intruder-col">
+                  <img src={row.photo} alt="Captured Intruder" className="alert-intruder-photo" />
+                </div>
+              ) : (
+                <div className={`alert-symbol ${row.accessCategory === "Authorized" ? "blue-bg" : ""}`}>
+                  {row.accessCategory === "Authorized" ? <ShieldCheck size={20} /> : <ShieldAlert size={20} />}
+                </div>
+              )}
+              <div className="alert-card-body">
+                <div className="alert-heading-row">
+                  {hasPhoto && (
+                    <div className={`alert-symbol-mini ${row.accessCategory === "Authorized" ? "blue-bg" : ""}`}>
+                      {row.accessCategory === "Authorized" ? <ShieldCheck size={12} /> : <ShieldAlert size={12} />}
+                    </div>
+                  )}
+                  <span>{notificationType.toUpperCase()}</span>
+                </div>
+                <h3>{row.name}</h3>
+                <p>{row.personType} · {row.guard} ({row.guardNumber})</p>
+                <div className="notification-location">
+                  <MapPin size={12} />{row.block} — {["Not identified", "Not available"].includes(row.institution) ? "Institution B" : row.institution}
+                </div>
+                <div className="alert-meta">
+                  <b>{row.dateTime.replace("T", " ")}</b>
+                  <Status tone={reviewTone(review.status)}>{review.status}</Status>
+                  <button onClick={(event) => { event.stopPropagation(); openAlert(row); }}>
+                    Open<ChevronRight size={13} />
+                  </button>
+                </div>
+              </div>
+            </article>
+          );
         })}
         {role !== "warden" && <article className="alert-card muted" onClick={() => setReadKeys(current => current.includes("location-alert") ? current : [...current, "location-alert"])}><div className="alert-symbol amber-bg"><MapPin size={20} /></div><div><span>LOCATION ACCESS ALERT</span><h3>Device location unavailable</h3><p>Live device location permission is unavailable. Recorded gate locations remain available in logs.</p><div className="notification-location"><MapPin size={12} />Main Gate — Institution B</div><div className="alert-meta"><b>2025-06-16 10:45</b><Status tone="amber">Permission unavailable</Status></div></div></article>}
       </div>
@@ -2686,6 +2761,77 @@ export default function App() {
   const [scanAttempts, setScanAttempts] = useState(0);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [biometricScores, setBiometricScores] = useState<Record<string, number> | null>(null);
+  const [logs, setLogs] = useState<LogRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem("campus_secure_custom_logs");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return [...parsed, ...logRows.filter(r => !parsed.some((p: LogRecord) => p.logId === r.logId))];
+        }
+      }
+    } catch (e) {
+      console.warn("Could not read custom logs from storage", e);
+    }
+    return logRows;
+  });
+
+  const recordUnauthorizedEvent = (photo: string | null, notes?: string) => {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    const dateStr = now.toISOString().slice(0, 10);
+    const dateTimeStr = `${dateStr}T${timeStr}`;
+    const randNum = Math.floor(1000 + Math.random() * 9000);
+    const logId = `DEN-•••-${randNum}`;
+
+    const newRecord: LogRecord = {
+      initials: "UP",
+      name: "Unrecognized person",
+      id: "Not available",
+      institution: "SRM GROUP OF INSTITUTION TRICHY",
+      department: "Not available",
+      block: role === "warden" ? "Bharathi Hostel" : role === "staff" ? "Block A" : "Main Gate",
+      time: timeStr,
+      dateTime: dateTimeStr,
+      event: "Denied",
+      tone: "red",
+      personType: "Unauthorised",
+      category: "Unauthorised visitor",
+      accessCategory: "Unauthorized",
+      logId: logId,
+      guard: role === "warden" ? roleMeta.warden.name : role === "staff" ? roleMeta.staff.name : "G. Selvam",
+      guardNumber: role === "warden" ? (roleMeta.warden.supervisorNumber || "WRD-B-0011") : "GRD-B-0017",
+      guardNotes: notes || "Identity could not be verified at the Main Gate.",
+      entries: 1,
+      decision: "Denied",
+      photo: photo || undefined,
+    };
+
+    setLogs(current => {
+      const updated = [newRecord, ...current];
+      try {
+        localStorage.setItem("campus_secure_custom_logs", JSON.stringify(updated.slice(0, 30)));
+      } catch (e) {
+        console.warn("Could not save custom logs to storage", e);
+      }
+      return updated;
+    });
+
+    if (photo) {
+      fetch("http://localhost:8000/api/v1/access-logs/unauthorized", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Unrecognized person",
+          location_block: role === "warden" ? "Bharathi Hostel" : role === "staff" ? "Block A" : "Main Gate",
+          guard_name: role === "warden" ? roleMeta.warden.name : "G. Selvam",
+          notes: notes || "Identity could not be verified at the Main Gate.",
+          image_base64: photo,
+          log_id: logId,
+        }),
+      }).catch(err => console.warn("Background log save to API failed:", err));
+    }
+  };
   const [authorizedFaces, setAuthorizedFaces] = useState<AuthorizedFaceProfile[]>([]);
   const [visitorPasses, setVisitorPasses] = useState<VisitorPass[]>(initialVisitorPasses);
   const [selectedVisitorPass, setSelectedVisitorPass] = useState<VisitorPass>(blankVisitorPass);
@@ -2873,14 +3019,14 @@ export default function App() {
   else if (["users", "assign-supervisor"].includes(screen) && role !== "admin") content = <AccessDenied role={role} go={go} />;
   else if (screen === "login-logs" && role !== "admin" && role !== "cso") content = <AccessDenied role={role} go={go} />;
   else if (screen === "profile") content = <Profile role={role} go={go} back={back} />;
-  else if (screen === "alerts") content = <Alerts role={role} go={go} back={back} reviews={reviews} updateReview={updateReview} />;
+  else if (screen === "alerts") content = <Alerts role={role} go={go} back={back} reviews={reviews} updateReview={updateReview} logs={logs} />;
   else if (role === "security" || role === "warden" || role === "staff") {
     if (screen === "home") content = <LevelOneHome role={role} go={go} />;
     else if (screen === "scan") content = <LevelOneScan role={role} go={go} completeScan={completeScan} />;
     else if (screen === "logs") content = <Logs role={role} reviews={reviews} />;
     else if (screen === "unrecognized") content = <UnrecognizedResult role={role} go={go} verifyRegister={verifyRegister} capturedPhoto={capturedPhoto} biometricScores={biometricScores} />;
     else if (screen === "identity") content = <IdentityResult role={role} go={go} identityCase={identityCase} verificationMethod={verificationMethod} student={matchedStudent} capturedPhoto={capturedPhoto} />;
-    else if (screen === "unauthorised") content = <UnauthorizedForm role={role} go={go} capturedPhoto={capturedPhoto} />;
+    else if (screen === "unauthorised") content = <UnauthorizedForm role={role} go={go} capturedPhoto={capturedPhoto} onRecordEvent={recordUnauthorizedEvent} />;
     else if (screen === "success") content = <Success role={role} go={go} />;
     else content = <LevelOneHome role={role} go={go} />;
   } else if (role === "access-supervisor") {
