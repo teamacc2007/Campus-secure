@@ -15,13 +15,6 @@ from ai.liveness import LivenessEvaluator
 
 
 def run_ai_benchmarks() -> Dict[str, Any]:
-    """
-    Measures execution latency for:
-    - Face Detection with YuNet
-    - Embedding Generation with SFace
-    - Vector Matching
-    - Liveness Evaluation
-    """
     synthetic_face = np.random.randint(60, 200, (112, 112, 3), dtype=np.uint8)
 
     detector = FaceDetector()
@@ -72,13 +65,6 @@ def run_ai_benchmarks() -> Dict[str, Any]:
 
 
 def evaluate_enrolled_identities() -> Dict[str, Any]:
-    """
-    Evaluates real enrolled identities (Sur, Mon, Mith, Thiru):
-    - Genuine match rates
-    - Impostor match rates
-    - Calibration margin at 65% threshold
-    - Landmark detection accuracy
-    """
     detector = FaceDetector()
     embedder = FaceEmbedder()
     matcher = FaceMatcher(match_threshold=0.65)
@@ -92,15 +78,10 @@ def evaluate_enrolled_identities() -> Dict[str, Any]:
         crop_img = cv2.imread(f"public/faces/{name}_crop.jpg")
         full_img = cv2.imread(f"public/faces/{name}.jpg")
 
-        # Crop embedding
-        faces_c = detector.detect_faces(crop_img)
-        if faces_c:
-            enrolled_embeddings[name] = embedder.extract_embedding(crop_img, faces_c[0])
-        else:
-            enrolled_embeddings[name] = embedder.extract_embedding(crop_img)
+        faces_c = sorted(detector.detect_faces(crop_img), key=lambda f: f["box"][2] * f["box"][3], reverse=True)
+        enrolled_embeddings[name] = embedder.extract_embedding(crop_img, faces_c[0]) if faces_c else embedder.extract_embedding(crop_img)
 
-        # Full probe embedding
-        faces_f = detector.detect_faces(full_img)
+        faces_f = sorted(detector.detect_faces(full_img), key=lambda f: f["box"][2] * f["box"][3], reverse=True)
         if faces_f:
             probe_embeddings[name] = embedder.extract_embedding(full_img, faces_f[0])
             landmarks_detected[name] = len(faces_f[0]["landmarks"])
@@ -133,11 +114,33 @@ def evaluate_enrolled_identities() -> Dict[str, Any]:
         1 for sub in impostor_scores.values() for s in sub.values() if s >= threshold
     )
 
+    # Spectacles evaluation
+    spectacles_results = {}
+    for name in identities:
+        full_img = cv2.imread(f"public/faces/{name}.jpg")
+        faces_f = sorted(detector.detect_faces(full_img), key=lambda f: f["box"][2] * f["box"][3], reverse=True)
+        if faces_f:
+            f = faces_f[0]
+            lm = f["landmarks"]
+            re, le = lm[0], lm[1]
+            dist = int(np.linalg.norm(np.array(re) - np.array(le)))
+            rad = int(dist * 0.32)
+            spec_img = full_img.copy()
+            cv2.circle(spec_img, (int(re[0]), int(re[1])), rad, (30, 30, 30), 2)
+            cv2.circle(spec_img, (int(le[0]), int(le[1])), rad, (30, 30, 30), 2)
+            cv2.line(spec_img, (int(re[0]) + rad - 2, int(re[1])), (int(le[0]) - rad + 2, int(le[1])), (30, 30, 30), 2)
+            faces_s = sorted(detector.detect_faces(spec_img), key=lambda f: f["box"][2] * f["box"][3], reverse=True)
+            if faces_s:
+                emb_s = embedder.extract_embedding(spec_img, faces_s[0])
+                sim = matcher.cosine_similarity(emb_s, enrolled_embeddings[name])
+                spectacles_results[name] = round(sim, 4)
+
     return {
         "identities_evaluated": len(identities),
         "total_photographs": len(identities) * 2,
         "landmarks_detection_rate": {k: f"{v}/5 points" for k, v in landmarks_detected.items()},
         "genuine_scores": genuine_scores,
+        "spectacles_scores": spectacles_results,
         "impostor_scores": impostor_scores,
         "min_genuine_score": min_genuine,
         "max_impostor_score": max_impostor,

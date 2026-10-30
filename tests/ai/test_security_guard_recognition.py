@@ -227,3 +227,126 @@ def test_register_number_lookup():
     assert data["is_recognized"] is True
     assert data["verification_status"] == "Authorized"
     assert data["matched_person"]["name"] == "Sur"
+
+
+def test_student_details_docx_records_enrolled():
+    """13. Verify that all 10 students (22ECE1001-22ECE1010) and Staff 1 from Student_Details.docx are enrolled."""
+    db = SessionLocal()
+    try:
+        from app.models.staff import Staff
+        for i in range(1, 11):
+            reg = f"22ECE{1000 + i}"
+            s = db.query(Student).filter(Student.register_number == reg).first()
+            assert s is not None, f"Student {reg} missing from database"
+            assert s.name == f"Dummy Student {i}"
+            assert s.department == "Electronics & Communication"
+            assert s.is_active is True
+            assert s.face_embedding is not None
+
+        staff = db.query(Staff).filter(Staff.employee_id == "EEC-STF-001").first()
+        assert staff is not None
+        assert staff.name == "Dummy Staff 1"
+        assert staff.is_active is True
+    finally:
+        db.close()
+
+
+def test_student_details_photo_recognition():
+    """14. Test face recognition on student from Student_Details.docx (22ECE1001)."""
+    with open("data/student_details/student_1.jpg", "rb") as f:
+        b64 = base64.b64encode(f.read()).decode("utf-8")
+    res = client.post(
+        "/api/v1/ai/verify-face",
+        json={"image_base64": b64, "location_block": "Gate 1 Main Entrance", "guard_name": "G. Selvam"}
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["is_recognized"] is True
+    assert data["verification_status"] == "Authorized"
+    assert data["similarity_score"] >= 0.65
+    assert data["matched_person"]["identifier"] == "22ECE1001"
+    assert data["matched_person"]["name"] == "Dummy Student 1"
+
+
+def test_enrolled_person_with_spectacles():
+    """15. Test that a person wearing spectacles is recognized above 0.65 threshold."""
+    img = cv2.imread("data/student_details/student_1.jpg")
+    detector = FaceDetector()
+    faces = sorted(detector.detect_faces(img), key=lambda f: f["box"][2] * f["box"][3], reverse=True)
+    assert len(faces) >= 1
+    lm = faces[0]["landmarks"]
+    re, le = lm[0], lm[1]
+    eye_dist = int(np.linalg.norm(np.array(re) - np.array(le)))
+    glass_radius = int(eye_dist * 0.32)
+
+    # Render dark circular spectacle rims and bridge
+    cv2.circle(img, (int(re[0]), int(re[1])), glass_radius, (35, 35, 35), 2)
+    cv2.circle(img, (int(le[0]), int(le[1])), glass_radius, (35, 35, 35), 2)
+    cv2.line(img, (int(re[0]) + glass_radius - 2, int(re[1])), (int(le[0]) - glass_radius + 2, int(le[1])), (35, 35, 35), 2)
+
+    _, enc = cv2.imencode(".jpg", img)
+    b64 = base64.b64encode(enc).decode("utf-8")
+
+    res = client.post(
+        "/api/v1/ai/verify-face",
+        json={"image_base64": b64, "location_block": "Gate 1 Main Entrance", "guard_name": "G. Selvam"}
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["is_recognized"] is True
+    assert data["verification_status"] == "Authorized"
+    assert data["similarity_score"] >= 0.65
+    assert data["matched_person"]["identifier"] == "22ECE1001"
+
+
+def test_manual_register_verification_enrolls_new_photo():
+    """16. Test manual register-number verification enrolls newly captured photograph and updates reference gallery."""
+    # Create a slightly shifted probe capture of 22ECE1003
+    img = cv2.imread("data/student_details/student_3.jpg")
+    h, w = img.shape[:2]
+    M = np.float32([[1, 0, 5], [0, 1, 5]])
+    shifted = cv2.warpAffine(img, M, (w, h))
+    _, enc = cv2.imencode(".jpg", shifted)
+    b64 = base64.b64encode(enc).decode("utf-8")
+
+    # Step: Guard enters register number 22ECE1003 with the currently captured photo
+    res = client.post(
+        "/api/v1/ai/verify-face",
+        json={
+            "register_number": "22ECE1003",
+            "image_base64": b64,
+            "location_block": "Gate 1 Main Entrance",
+            "guard_name": "G. Selvam"
+        }
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["is_recognized"] is True
+    assert data["verification_status"] == "Authorized"
+    assert data["matched_person"]["identifier"] == "22ECE1003"
+    assert "captured" in data["matched_person"]["photo_url"]
+    assert "new verified face reference enrolled" in data["message"]
+
+    # Verify that future face scan using this capture directly recognizes 22ECE1003
+    res_future = client.post(
+        "/api/v1/ai/verify-face",
+        json={"image_base64": b64, "location_block": "Gate 1 Main Entrance", "guard_name": "G. Selvam"}
+    )
+    assert res_future.status_code == 200
+    data_future = res_future.json()
+    assert data_future["is_recognized"] is True
+    assert data_future["matched_person"]["identifier"] == "22ECE1003"
+    assert data_future["similarity_score"] >= 0.65
+
+
+def test_manual_register_verification_invalid_reg_fails():
+    """17. Test that manual verification with an invalid register number fails."""
+    res = client.post(
+        "/api/v1/ai/verify-face",
+        json={"register_number": "INVALID999", "location_block": "Gate 1 Main Entrance"}
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["is_recognized"] is False
+    assert data["verification_status"] == "Unauthorized"
+    assert "not found" in data["message"]

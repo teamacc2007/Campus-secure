@@ -34,7 +34,7 @@ def seed_database():
             print(f"[Seed] Warning: could not load enrolled embeddings: {e}")
 
     try:
-        # 1. Institution
+        # 1. Institutions
         inst = db.query(Institution).filter(Institution.short_code == "TSRMMCHRC").first()
         if not inst:
             inst = Institution(
@@ -47,6 +47,19 @@ def seed_database():
             db.commit()
             db.refresh(inst)
             print("[Seed] Created Institution: TSRMMCHRC")
+
+        inst_eec = db.query(Institution).filter(Institution.short_code == "EEC").first()
+        if not inst_eec:
+            inst_eec = Institution(
+                name="Easwari Engineering College",
+                short_code="EEC",
+                campus_code="SRM-EASWARI-01",
+                address="Bharathi Salai, Ramapuram, Chennai, Tamil Nadu 600089",
+            )
+            db.add(inst_eec)
+            db.commit()
+            db.refresh(inst_eec)
+            print("[Seed] Created Institution: EEC")
 
         # 2. Users (all 10 roles with password '12345')
         demo_users = [
@@ -121,23 +134,34 @@ def seed_database():
 
         # 4. Students
         students_data = [
-            ("23MED0412", "Sur", "SU", "18-05-2005", "General Medicine & Surgery", "II Year", "2023 - 2028", "Hostel", "Bharathi Hostel", "B-204", None, None, None, "/faces/sur_crop.jpg"),
-            ("23AHS0185", "Mon", "MO", "12-09-2005", "Medical Laboratory Technology", "II Year", "2023 - 2027", "Day Scholar", None, None, "Route M-14", "Trichy Central Junction", None, "/faces/mon_crop.jpg"),
-            ("22ECE0531", "Mith", "MI", "04-07-2004", "Electronics & Communication", "III Year", "2022 - 2026", "Hostel", "Cauvery Hostel", "C-312", None, None, None, "/faces/mith_crop.jpg"),
-            ("22CSE0789", "Thiru", "TH", "29-01-2004", "Computer Science & Engineering", "III Year", "2022 - 2026", "Day Scholar", None, None, None, None, "TN-09-BK-4421", "/faces/thiru_crop.jpg"),
-            ("22MBBS041", "Kavitha R", "KR", "14-05-2004", "MBBS", "III Year", "2022 - 2027", "Hostel", "Kaveri Hostel", "304", None, None, None, None),
-            ("23ECE0721", "Ananya Krishnan", "AK", "22-08-2005", "Electronics & Communication", "II Year", "2023 - 2027", "Day Scholar", None, None, "Route 12", "Central Bus Stand", None, None),
-            ("22CSE1048", "Rahul Menon", "RM", "10-11-2003", "Computer Science & Engg", "III Year", "2022 - 2026", "Day Scholar", None, None, None, None, "TN-45-AZ-9988", None),
-            ("21BPT019", "Mohammed Farhan", "MF", "05-02-2003", "Physiotherapy", "IV Year", "2021 - 2025", "Hostel", "Ponni Hostel", "112", None, None, None, None),
-            ("24NUR005", "Pooja Sundaram", "PS", "18-09-2006", "B.Sc Nursing", "I Year", "2024 - 2028", "Hostel", "Kaveri Hostel", "208", None, None, None, None),
+            ("23MED0412", "Sur", "SU", "18-05-2005", "General Medicine & Surgery", "II Year", "2023 - 2028", "Hostel", "Bharathi Hostel", "B-204", None, None, None, "/faces/sur_crop.jpg", inst.id),
+            ("23AHS0185", "Mon", "MO", "12-09-2005", "Medical Laboratory Technology", "II Year", "2023 - 2027", "Day Scholar", None, None, "Route M-14", "Trichy Central Junction", None, "/faces/mon_crop.jpg", inst.id),
+            ("22ECE0531", "Mith", "MI", "04-07-2004", "Electronics & Communication", "III Year", "2022 - 2026", "Hostel", "Cauvery Hostel", "C-312", None, None, None, "/faces/mith_crop.jpg", inst.id),
+            ("22CSE0789", "Thiru", "TH", "29-01-2004", "Computer Science & Engineering", "III Year", "2022 - 2026", "Day Scholar", None, None, None, None, "TN-09-BK-4421", "/faces/thiru_crop.jpg", inst.id),
+            ("22MBBS041", "Kavitha R", "KR", "14-05-2004", "MBBS", "III Year", "2022 - 2027", "Hostel", "Kaveri Hostel", "304", None, None, None, None, inst.id),
+            ("23ECE0721", "Ananya Krishnan", "AK", "22-08-2005", "Electronics & Communication", "II Year", "2023 - 2027", "Day Scholar", None, None, "Route 12", "Central Bus Stand", None, None, inst.id),
+            ("22CSE1048", "Rahul Menon", "RM", "10-11-2003", "Computer Science & Engg", "III Year", "2022 - 2026", "Day Scholar", None, None, None, None, "TN-45-AZ-9988", None, inst.id),
+            ("21BPT019", "Mohammed Farhan", "MF", "05-02-2003", "Physiotherapy", "IV Year", "2021 - 2025", "Hostel", "Ponni Hostel", "112", None, None, None, None, inst.id),
+            ("24NUR005", "Pooja Sundaram", "PS", "18-09-2006", "B.Sc Nursing", "I Year", "2024 - 2028", "Hostel", "Kaveri Hostel", "208", None, None, None, None, inst.id),
+            # Enrolled Students from Student_Details.docx (Easwari Engineering College)
+            ("22ECE1001", "Dummy Student 1", "D1", "10 June 2004", "Electronics & Communication", "III Year", "2022 - 2026", "Hostel", "Cauvery Hostel", "C-207", None, None, None, "/faces/student_details/22ECE1001_crop.jpg", inst_eec.id),
+            ("22ECE1002", "Dummy Student 2", "D2", "11 June 2004", "Electronics & Communication", "III Year", "2022 - 2026", "Hostel", "Ganga Hostel", "G-214", None, None, None, "/faces/student_details/22ECE1002_crop.jpg", inst_eec.id),
+            ("22ECE1003", "Dummy Student 3", "D3", "12 June 2004", "Electronics & Communication", "III Year", "2022 - 2026", "Day Scholar", None, None, "Route E-01", "Ramapuram Junction", None, "/faces/student_details/22ECE1003_crop.jpg", inst_eec.id),
+            ("22ECE1004", "Dummy Student 4", "D4", "13 June 2004", "Electronics & Communication", "III Year", "2022 - 2026", "Hostel", "Ganga Hostel", "G-228", None, None, None, "/faces/student_details/22ECE1004_crop.jpg", inst_eec.id),
+            ("22ECE1005", "Dummy Student 5", "D5", "14 June 2004", "Electronics & Communication", "III Year", "2022 - 2026", "Hostel", "Cauvery Hostel", "C-235", None, None, None, "/faces/student_details/22ECE1005_crop.jpg", inst_eec.id),
+            ("22ECE1006", "Dummy Student 6", "D6", "15 June 2004", "Electronics & Communication", "III Year", "2022 - 2026", "Day Scholar", None, None, "Route E-02", "Porur Roundabout", None, "/faces/student_details/22ECE1006_crop.jpg", inst_eec.id),
+            ("22ECE1007", "Dummy Student 7", "D7", "16 June 2004", "Electronics & Communication", "III Year", "2022 - 2026", "Hostel", "Cauvery Hostel", "C-249", None, None, None, "/faces/student_details/22ECE1007_crop.jpg", inst_eec.id),
+            ("22ECE1008", "Dummy Student 8", "D8", "17 June 2004", "Electronics & Communication", "III Year", "2022 - 2026", "Hostel", "Ganga Hostel", "G-256", None, None, None, "/faces/student_details/22ECE1008_crop.jpg", inst_eec.id),
+            ("22ECE1009", "Dummy Student 9", "D9", "18 June 2004", "Electronics & Communication", "III Year", "2022 - 2026", "Day Scholar", None, None, "Route E-03", "Guindy Bus Terminus", None, "/faces/student_details/22ECE1009_crop.jpg", inst_eec.id),
+            ("22ECE1010", "Dummy Student 10", "D10", "19 June 2004", "Electronics & Communication", "III Year", "2022 - 2026", "Hostel", "Ganga Hostel", "G-270", None, None, None, "/faces/student_details/22ECE1010_crop.jpg", inst_eec.id),
         ]
-        for reg_no, name, init, dob, dept, yr, batch, res_type, h_name, room, b_route, b_point, veh, photo in students_data:
+        for reg_no, name, init, dob, dept, yr, batch, res_type, h_name, room, b_route, b_point, veh, photo, i_id in students_data:
             existing_s = db.query(Student).filter(Student.register_number == reg_no).first()
             # Genuine embedding if enrolled, else deterministic fallback
-            if name in enrolled_embeddings:
-                emb_vec = enrolled_embeddings[name]
-            elif reg_no in enrolled_embeddings:
+            if reg_no in enrolled_embeddings:
                 emb_vec = enrolled_embeddings[reg_no]
+            elif name in enrolled_embeddings:
+                emb_vec = enrolled_embeddings[name]
             else:
                 emb_vec = [float((hash(reg_no + str(i)) % 1000) / 1000.0) for i in range(128)]
 
@@ -157,7 +181,7 @@ def seed_database():
                     bus_boarding_point=b_point,
                     vehicle_number=veh,
                     photo_url=photo,
-                    institution_id=inst.id,
+                    institution_id=i_id,
                     face_embedding=json.dumps(emb_vec),
                     is_active=True,
                 )
@@ -167,21 +191,32 @@ def seed_database():
                 # Update existing student record with verified embedding & photo
                 existing_s.face_embedding = json.dumps(emb_vec)
                 existing_s.is_active = True
+                existing_s.institution_id = i_id
                 if photo:
                     existing_s.photo_url = photo
                 print(f"[Seed] Updated Student: {reg_no} - {name} with verified embedding")
         db.commit()
 
-        # Seed biometric templates for enrolled faces
+        # Seed biometric templates for unique enrolled identities (preventing duplicates)
+        db.query(BiometricTemplate).filter(BiometricTemplate.person_identifier.in_(["22ECE1004", "22ECE1005", "22ECE1006"])).delete(synchronize_session=False)
+        db.commit()
         enrolled_faces = [
             ("student", "23MED0412", "Sur", "/faces/sur_crop.jpg"),
             ("student", "23AHS0185", "Mon", "/faces/mon_crop.jpg"),
             ("student", "22ECE0531", "Mith", "/faces/mith_crop.jpg"),
             ("student", "22CSE0789", "Thiru", "/faces/thiru_crop.jpg"),
+            ("student", "22ECE1001", "Dummy Student 1", "/faces/student_details/22ECE1001_crop.jpg"),
+            ("student", "22ECE1002", "Dummy Student 2", "/faces/student_details/22ECE1002_crop.jpg"),
+            ("student", "22ECE1003", "Dummy Student 3", "/faces/student_details/22ECE1003_crop.jpg"),
+            ("student", "22ECE1007", "Dummy Student 7", "/faces/student_details/22ECE1007_crop.jpg"),
+            ("student", "22ECE1008", "Dummy Student 8", "/faces/student_details/22ECE1008_crop.jpg"),
+            ("student", "22ECE1009", "Dummy Student 9", "/faces/student_details/22ECE1009_crop.jpg"),
+            ("student", "22ECE1010", "Dummy Student 10", "/faces/student_details/22ECE1010_crop.jpg"),
+            ("staff", "EEC-STF-001", "Dummy Staff 1", "/faces/student_details/EEC-STF-001_crop.jpg"),
         ]
         for p_type, reg_no, p_name, photo in enrolled_faces:
             existing_bt = db.query(BiometricTemplate).filter(BiometricTemplate.person_identifier == reg_no).first()
-            emb = enrolled_embeddings.get(p_name, enrolled_embeddings.get(reg_no, [float((hash(reg_no + str(i)) % 1000) / 1000.0) for i in range(128)]))
+            emb = enrolled_embeddings.get(reg_no, enrolled_embeddings.get(p_name, [float((hash(reg_no + str(i)) % 1000) / 1000.0) for i in range(128)]))
             if not existing_bt:
                 bt = BiometricTemplate(
                     person_type=p_type,
@@ -201,25 +236,41 @@ def seed_database():
 
         # 5. Staff
         staff_data = [
-            ("EMP-MED-104", "Dr. Malathi N", "Cardiology", "Associate Professor"),
-            ("EMP-SUR-208", "Dr. Arun Kumar", "General Surgery", "Professor & HOD"),
-            ("EMP-PHARM-301", "Prof. S. Venkatesh", "Pharmacology", "Associate Professor"),
+            ("EMP-MED-104", "Dr. Malathi N", "Cardiology", "Associate Professor", None, inst.id),
+            ("EMP-SUR-208", "Dr. Arun Kumar", "General Surgery", "Professor & HOD", None, inst.id),
+            ("EMP-PHARM-301", "Prof. S. Venkatesh", "Pharmacology", "Associate Professor", None, inst.id),
+            ("EEC-STF-001", "Dummy Staff 1", "Electronics & Communication", "Assistant Professor", "/faces/student_details/EEC-STF-001_crop.jpg", inst_eec.id),
         ]
-        for emp_id, name, dept, desig in staff_data:
+        for emp_id, name, dept, desig, photo, i_id in staff_data:
             existing_st = db.query(Staff).filter(Staff.employee_id == emp_id).first()
-            if not existing_st:
+            if emp_id in enrolled_embeddings:
+                emb_vec = enrolled_embeddings[emp_id]
+            elif name in enrolled_embeddings:
+                emb_vec = enrolled_embeddings[name]
+            else:
                 emb_vec = [float((hash(emp_id + str(i)) % 1000) / 1000.0) for i in range(128)]
+
+            if not existing_st:
                 st = Staff(
                     employee_id=emp_id,
                     name=name,
                     department=dept,
                     designation=desig,
-                    institution_id=inst.id,
+                    institution_id=i_id,
+                    photo_url=photo,
                     face_embedding=json.dumps(emb_vec),
                     is_active=True,
                 )
                 db.add(st)
                 print(f"[Seed] Created Staff: {emp_id} - {name}")
+            else:
+                existing_st.face_embedding = json.dumps(emb_vec)
+                existing_st.is_active = True
+                existing_st.institution_id = i_id
+                if photo:
+                    existing_st.photo_url = photo
+                print(f"[Seed] Updated Staff: {emp_id} - {name}")
+        db.commit()
         db.commit()
 
         # 6. Visitor Passes

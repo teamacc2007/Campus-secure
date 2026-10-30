@@ -212,6 +212,150 @@ const studentMatches: StudentMatch[] = [
     transportationType: "Own Vehicle",
     photo: "/faces/thiru_crop.jpg",
   },
+  {
+    initials: "D1",
+    name: "Dummy Student 1",
+    registerNumber: "22ECE1001",
+    dateOfBirth: "10 June 2004",
+    department: "Electronics & Communication",
+    year: "III",
+    batch: "2022–2026",
+    institute: "Easwari Engineering College",
+    similarity: 95,
+    accommodationType: "Hosteller",
+    hostelName: "Cauvery Hostel",
+    roomNumber: "C-207",
+    photo: "/faces/student_details/22ECE1001_crop.jpg",
+  },
+  {
+    initials: "D2",
+    name: "Dummy Student 2",
+    registerNumber: "22ECE1002",
+    dateOfBirth: "11 June 2004",
+    department: "Electronics & Communication",
+    year: "III",
+    batch: "2022–2026",
+    institute: "Easwari Engineering College",
+    similarity: 93,
+    accommodationType: "Hosteller",
+    hostelName: "Ganga Hostel",
+    roomNumber: "G-214",
+    photo: "/faces/student_details/22ECE1002_crop.jpg",
+  },
+  {
+    initials: "D3",
+    name: "Dummy Student 3",
+    registerNumber: "22ECE1003",
+    dateOfBirth: "12 June 2004",
+    department: "Electronics & Communication",
+    year: "III",
+    batch: "2022–2026",
+    institute: "Easwari Engineering College",
+    similarity: 94,
+    accommodationType: "Day Scholar",
+    photo: "/faces/student_details/22ECE1003_crop.jpg",
+  },
+  {
+    initials: "D4",
+    name: "Dummy Student 4",
+    registerNumber: "22ECE1004",
+    dateOfBirth: "13 June 2004",
+    department: "Electronics & Communication",
+    year: "III",
+    batch: "2022–2026",
+    institute: "Easwari Engineering College",
+    similarity: 96,
+    accommodationType: "Hosteller",
+    hostelName: "Ganga Hostel",
+    roomNumber: "G-228",
+    photo: "/faces/student_details/22ECE1004_crop.jpg",
+  },
+  {
+    initials: "D5",
+    name: "Dummy Student 5",
+    registerNumber: "22ECE1005",
+    dateOfBirth: "14 June 2004",
+    department: "Electronics & Communication",
+    year: "III",
+    batch: "2022–2026",
+    institute: "Easwari Engineering College",
+    similarity: 95,
+    accommodationType: "Hosteller",
+    hostelName: "Cauvery Hostel",
+    roomNumber: "C-235",
+    photo: "/faces/student_details/22ECE1005_crop.jpg",
+  },
+  {
+    initials: "D6",
+    name: "Dummy Student 6",
+    registerNumber: "22ECE1006",
+    dateOfBirth: "15 June 2004",
+    department: "Electronics & Communication",
+    year: "III",
+    batch: "2022–2026",
+    institute: "Easwari Engineering College",
+    similarity: 94,
+    accommodationType: "Day Scholar",
+    photo: "/faces/student_details/22ECE1006_crop.jpg",
+  },
+  {
+    initials: "D7",
+    name: "Dummy Student 7",
+    registerNumber: "22ECE1007",
+    dateOfBirth: "16 June 2004",
+    department: "Electronics & Communication",
+    year: "III",
+    batch: "2022–2026",
+    institute: "Easwari Engineering College",
+    similarity: 95,
+    accommodationType: "Hosteller",
+    hostelName: "Cauvery Hostel",
+    roomNumber: "C-249",
+    photo: "/faces/student_details/22ECE1007_crop.jpg",
+  },
+  {
+    initials: "D8",
+    name: "Dummy Student 8",
+    registerNumber: "22ECE1008",
+    dateOfBirth: "17 June 2004",
+    department: "Electronics & Communication",
+    year: "III",
+    batch: "2022–2026",
+    institute: "Easwari Engineering College",
+    similarity: 93,
+    accommodationType: "Hosteller",
+    hostelName: "Ganga Hostel",
+    roomNumber: "G-256",
+    photo: "/faces/student_details/22ECE1008_crop.jpg",
+  },
+  {
+    initials: "D9",
+    name: "Dummy Student 9",
+    registerNumber: "22ECE1009",
+    dateOfBirth: "18 June 2004",
+    department: "Electronics & Communication",
+    year: "III",
+    batch: "2022–2026",
+    institute: "Easwari Engineering College",
+    similarity: 95,
+    accommodationType: "Day Scholar",
+    photo: "/faces/student_details/22ECE1009_crop.jpg",
+  },
+  {
+    initials: "D10",
+    name: "Dummy Student 10",
+    registerNumber: "22ECE1010",
+    dateOfBirth: "19 June 2004",
+    department: "Electronics & Communication",
+    year: "III",
+    batch: "2022–2026",
+    institute: "Easwari Engineering College",
+    similarity: 96,
+    accommodationType: "Hosteller",
+    hostelName: "Ganga Hostel",
+    roomNumber: "G-270",
+    photo: "/faces/student_details/22ECE1010_crop.jpg",
+  },
 ];
 
 function Button({
@@ -768,7 +912,7 @@ function LevelOneScan({ go, completeScan, role }: { go: (screen: Screen) => void
   </>;
 }
 
-function IdentityResult({ go, identityCase, verificationMethod, student, role }: { go: (screen: Screen) => void; identityCase: IdentityCase; verificationMethod: VerificationMethod; student: StudentMatch; role: "security" | "warden" | "staff" }) {
+function IdentityResult({ go, identityCase, verificationMethod, student, role, capturedPhoto }: { go: (screen: Screen) => void; identityCase: IdentityCase; verificationMethod: VerificationMethod; student: StudentMatch; role: "security" | "warden" | "staff"; capturedPhoto?: string | null }) {
   const staff = identityCase === "staff";
   const registerVerified = verificationMethod === "register";
   const staffMember = {
@@ -788,8 +932,8 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role }:
       <div className="progress-line"><span className="done"><Check size={12} /></span><i className="done" /><span className="active">2</span><i /><span>3</span></div>
       <section className="identity-hero">
         <div className={`captured-photo ${staff ? "staff-photo" : ""}`}>
-          {student.photo ? (
-            <img src={student.photo} alt={personName} className="captured-real-photo" />
+          {(capturedPhoto && (verificationMethod === "register" || role === "security")) || student.photo ? (
+            <img src={(capturedPhoto && (verificationMethod === "register" || role === "security")) ? capturedPhoto : student.photo} alt={personName} className="captured-real-photo" />
           ) : (
             <CircleUserRound size={48} />
           )}
@@ -866,7 +1010,7 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role }:
   </>;
 }
 
-function UnrecognizedResult({ go, verifyRegister, role, capturedPhoto, biometricScores }: { go: (screen: Screen) => void; verifyRegister: (registerNumber: string) => boolean; role: "security" | "warden" | "staff"; capturedPhoto: string | null; biometricScores: Record<string, number> | null }) {
+function UnrecognizedResult({ go, verifyRegister, role, capturedPhoto, biometricScores }: { go: (screen: Screen) => void; verifyRegister: (registerNumber: string) => boolean | Promise<boolean>; role: "security" | "warden" | "staff"; capturedPhoto: string | null; biometricScores: Record<string, number> | null }) {
   const [registerNumber, setRegisterNumber] = useState("");
   const [notVerified, setNotVerified] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<string | null>(null);
@@ -887,8 +1031,9 @@ function UnrecognizedResult({ go, verifyRegister, role, capturedPhoto, biometric
     ? candidateList.filter(match => match.institute.includes("Trichy") && match.hostelName === "Bharathi Hostel")
     : candidateList;
 
-  const verify = () => {
-    if (verifyRegister(registerNumber)) {
+  const verify = async () => {
+    const success = await verifyRegister(registerNumber);
+    if (success) {
       return;
     }
     setNotVerified(true);
@@ -2571,12 +2716,61 @@ export default function App() {
     // Unrecognized face (e.g. arbitrary live webcam scan with no matching enrolled embedding)
     go("unrecognized");
   };
-  const verifyRegister = (registerNumber: string) => {
-    const match = studentMatches.find(person => person.registerNumber.toUpperCase() === registerNumber.trim().toUpperCase());
+  const verifyRegister = async (registerNumber: string) => {
+    const regTrimmed = registerNumber.trim().toUpperCase();
+    if (role === "security") {
+      try {
+        const resp = await fetch("http://localhost:8000/api/v1/ai/verify-face", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            register_number: regTrimmed,
+            image_base64: capturedPhoto,
+            location_block: "Gate 1 Main Entrance",
+            guard_name: "G. Selvam",
+          }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.is_recognized && data.matched_person && data.verification_status === "Authorized") {
+            const found = studentMatches.find(s => s.registerNumber.toUpperCase() === regTrimmed) || {
+              initials: data.matched_person.initials || "ST",
+              name: data.matched_person.name,
+              registerNumber: data.matched_person.identifier,
+              dateOfBirth: "10 June 2004",
+              department: data.matched_person.department,
+              year: data.matched_person.year_roman || "III",
+              batch: data.matched_person.batch || "2022–2026",
+              institute: "Easwari Engineering College",
+              similarity: 100,
+              accommodationType: (data.matched_person.residence_type as any) || "Hosteller",
+              hostelName: data.matched_person.hostel_name,
+              roomNumber: data.matched_person.room_number,
+              photo: data.matched_person.photo_url || capturedPhoto || "/faces/sur_crop.jpg",
+            };
+            setIdentityCase("student");
+            setMatchedStudent({
+              ...found,
+              photo: capturedPhoto || data.matched_person.photo_url || found.photo,
+            });
+            setVerificationMethod("register");
+            go("identity");
+            return true;
+          }
+        }
+      } catch (err) {
+        console.warn("Backend register verification error:", err);
+      }
+    }
+
+    const match = studentMatches.find(person => person.registerNumber.toUpperCase() === regTrimmed);
     if (!match) return false;
     if (role === "warden" && (!match.institute.includes("Trichy") || match.hostelName !== "Bharathi Hostel")) return false;
     setIdentityCase("student");
-    setMatchedStudent(match);
+    setMatchedStudent({
+      ...match,
+      photo: capturedPhoto || match.photo,
+    });
     setVerificationMethod("register");
     go("identity");
     return true;
@@ -2663,7 +2857,7 @@ export default function App() {
     else if (screen === "scan") content = <LevelOneScan role={role} go={go} completeScan={completeScan} />;
     else if (screen === "logs") content = <Logs role={role} reviews={reviews} />;
     else if (screen === "unrecognized") content = <UnrecognizedResult role={role} go={go} verifyRegister={verifyRegister} capturedPhoto={capturedPhoto} biometricScores={biometricScores} />;
-    else if (screen === "identity") content = <IdentityResult role={role} go={go} identityCase={identityCase} verificationMethod={verificationMethod} student={matchedStudent} />;
+    else if (screen === "identity") content = <IdentityResult role={role} go={go} identityCase={identityCase} verificationMethod={verificationMethod} student={matchedStudent} capturedPhoto={capturedPhoto} />;
     else if (screen === "unauthorised") content = <UnauthorizedForm role={role} go={go} capturedPhoto={capturedPhoto} />;
     else if (screen === "success") content = <Success role={role} go={go} />;
     else content = <LevelOneHome role={role} go={go} />;

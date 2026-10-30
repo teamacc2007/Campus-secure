@@ -22,6 +22,7 @@ class FaceMatcher:
     ) -> Tuple[Optional[Dict[str, Any]], float, str]:
         """
         Matches probe embedding against enrolled identities in the gallery.
+        Supports multi-template matching across all enrolled references per identity.
         Returns:
             (best_matched_identity, similarity_score, decision)
             decision is one of: "MATCH", "UNCERTAIN_REVIEW", "NO_MATCH"
@@ -33,16 +34,29 @@ class FaceMatcher:
         best_candidate = None
 
         for item in gallery:
-            target_emb = item.get("embedding")
-            if target_emb is None:
-                continue
-            if isinstance(target_emb, list):
-                target_emb = np.array(target_emb, dtype=np.float32)
+            # Extract list of reference embeddings for this candidate
+            embs = []
+            if "embeddings" in item and item["embeddings"]:
+                embs = item["embeddings"]
+            elif "embedding" in item and item["embedding"] is not None:
+                raw = item["embedding"]
+                if isinstance(raw, list):
+                    if len(raw) > 0 and isinstance(raw[0], (int, float)):
+                        embs = [raw]
+                    elif len(raw) > 0 and isinstance(raw[0], (list, np.ndarray)):
+                        embs = raw
+                elif isinstance(raw, np.ndarray):
+                    if raw.ndim == 1:
+                        embs = [raw]
+                    elif raw.ndim == 2:
+                        embs = list(raw)
 
-            score = self.cosine_similarity(probe_embedding, target_emb)
-            if score > best_score:
-                best_score = score
-                best_candidate = item
+            for target_emb in embs:
+                target_arr = np.array(target_emb, dtype=np.float32) if not isinstance(target_emb, np.ndarray) else target_emb
+                score = self.cosine_similarity(probe_embedding, target_arr)
+                if score > best_score:
+                    best_score = score
+                    best_candidate = item
 
         if best_score >= self.match_threshold:
             decision = "MATCH"

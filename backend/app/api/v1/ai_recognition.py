@@ -1,7 +1,9 @@
+import os
 import base64
 import json
 import cv2
 import numpy as np
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -15,6 +17,7 @@ from app.schemas.ai import (
 from app.models.student import Student
 from app.models.staff import Staff
 from app.models.access_log import AccessLog
+from app.models.biometric import BiometricTemplate
 from app.services.access_log_service import log_access_event
 from app.schemas.access_log import AccessLogCreate
 from app.api.deps import get_current_user_optional
@@ -43,6 +46,40 @@ def decode_base64_image(base64_str: str) -> np.ndarray:
     return img
 
 
+def parse_embeddings_list(raw_data: Any) -> List[List[float]]:
+    """
+    Parses single or multi-reference deep face embeddings into a list of 128-d float lists.
+    """
+    if not raw_data:
+        return []
+    try:
+        data = json.loads(raw_data) if isinstance(raw_data, str) else raw_data
+        if isinstance(data, list):
+            if len(data) == 0:
+                return []
+            if isinstance(data[0], (int, float)):
+                return [data]
+            elif isinstance(data[0], (list, np.ndarray)):
+                res = []
+                for item in data:
+                    res.append(item.tolist() if hasattr(item, "tolist") else list(item))
+                return res
+        elif isinstance(data, dict):
+            embs = []
+            if "primary" in data and isinstance(data["primary"], list):
+                embs.append(data["primary"])
+            if "references" in data and isinstance(data["references"], list):
+                for r in data["references"]:
+                    if isinstance(r, dict) and "embedding" in r:
+                        embs.append(r["embedding"])
+                    elif isinstance(r, list):
+                        embs.append(r)
+            return embs
+    except Exception:
+        pass
+    return []
+
+
 @router.post("/verify-face", response_model=FaceVerifyResponse)
 def verify_face_endpoint(
     req: FaceVerifyRequest,
@@ -51,57 +88,219 @@ def verify_face_endpoint(
 ):
     guard_display_name = req.guard_name or (current_user.full_name if current_user else "G. Selvam")
 
-    # Check if direct register_number fallback was provided
+    # =========================================================================
+    # WORKFLOW A: Manual Register Number Verification & Verified Face Enrollment
+    # =========================================================================
     if req.register_number:
-        student = db.query(Student).filter(Student.register_number == req.register_number.strip().upper()).first()
-        if student:
-            # Check student authorization
-            is_authorized = bool(student.is_active)
-            status_text = "Authorized" if is_authorized else "Unauthorized"
-            review_text = "Verified" if is_authorized else "Unauthorised"
+        reg_clean = req.register_number.strip().upper()
+        student = db.query(Student).filter(Student.register_number == reg_clean).first()
+        staff = None
+        if not student:
+            staff = db.query(Staff).filter(Staff.employee_id == reg_clean).first()
 
-            # Log access event
+        if not student and not staff:
+            # Register number not found in institution database records
             log_access_event(
                 db,
                 AccessLogCreate(
-                    person_type="Student",
-                    name=student.name,
-                    identifier_value=student.register_number,
-                    department=student.department,
+                    person_type="Unauthorized",
+                    name="Unknown Person",
+                    identifier_value=reg_clean,
+                    department="N/A",
                     location_block=req.location_block,
                     guard_name=guard_display_name,
                     event_type="ENTRY",
                     verification_method="Register ID",
-                    verification_status=status_text,
-                    review_status=review_text,
-                    student_id=student.id,
+                    verification_status="Unauthorized",
+                    review_status="Unauthorised",
+                    flag_reason="Register number not found in institution database records",
                 ),
             )
             return FaceVerifyResponse(
-                success=is_authorized,
-                is_recognized=True,
+                success=False,
+                is_recognized=False,
                 is_live=True,
-                verification_status=status_text,
-                similarity_score=1.0,
-                matched_person=MatchedPerson(
-                    person_type="student",
-                    identifier=student.register_number,
-                    name=student.name,
-                    initials=student.initials,
-                    department=student.department,
-                    year_roman=student.year_roman,
-                    batch=student.batch,
-                    residence_type=student.residence_type,
-                    hostel_name=student.hostel_name,
-                    room_number=student.room_number,
-                    photo_url=student.photo_url,
-                    similarity_score=1.0,
-                ),
-                candidate_scores={student.name: 100.0},
-                message=f"Identity verified via Register ID lookup ({status_text}).",
+                verification_status="Unauthorized",
+                similarity_score=0.0,
+                message="Register number not found in institution database records.",
             )
 
-    # Process image if provided
+        target_obj = student if student is not None else staff
+        is_student = student is not None
+        is_authorized = bool(target_obj.is_active)
+        status_text = "Authorized" if is_authorized else "Unauthorized"
+        review_text = "Verified" if is_authorized else "Unauthorised"
+
+        if not is_authorized:
+            log_access_event(
+                db,
+                AccessLogCreate(
+                    person_type="Student" if is_student else "Staff",
+                    name=target_obj.name,
+                    identifier_value=reg_clean,
+                    department=target_obj.department,
+                    location_block=req.location_block,
+                    guard_name=guard_display_name,
+                    event_type="ENTRY",
+                    verification_method="Register ID",
+                    verification_status="Unauthorized",
+                    review_status="Unauthorised",
+                    flag_reason="Person is marked as inactive or suspended in institution records",
+                    student_id=target_obj.id if is_student else None,
+                    staff_id=target_obj.id if not is_student else None,
+                ),
+            )
+            return FaceVerifyResponse(
+                success=False,
+                is_recognized=True,
+                is_live=True,
+                verification_status="Unauthorized",
+                similarity_score=1.0,
+                matched_person=MatchedPerson(
+                    person_type="student" if is_student else "staff",
+                    identifier=reg_clean,
+                    name=target_obj.name,
+                    initials=getattr(target_obj, "initials", None),
+                    department=target_obj.department,
+                    year_roman=getattr(target_obj, "year_roman", None),
+                    batch=getattr(target_obj, "batch", None),
+                    residence_type=getattr(target_obj, "residence_type", None),
+                    hostel_name=getattr(target_obj, "hostel_name", None),
+                    room_number=getattr(target_obj, "room_number", None),
+                    designation=getattr(target_obj, "designation", None),
+                    photo_url=target_obj.photo_url,
+                    similarity_score=1.0,
+                ),
+                message="Person is marked as inactive or suspended in institution records.",
+            )
+
+        # Active & Authorized student/staff verified by register number!
+        # Step: Process the retained photograph from the failed face scan session
+        new_ref_added = False
+        newly_enrolled_photo_url = target_obj.photo_url
+        if req.image_base64:
+            try:
+                probe_img = decode_base64_image(req.image_base64)
+                if probe_img is not None and probe_img.size > 0:
+                    faces = detector.detect_faces(probe_img)
+                    sig_faces = [f for f in faces if f["box"][2] >= 40 and f["box"][3] >= 40]
+                    if len(sig_faces) == 1:
+                        primary_face = sig_faces[0]
+                        landmarks = primary_face.get("landmarks", [])
+                        if len(landmarks) >= 2:
+                            aligned = detector.align_face(probe_img, primary_face)
+                            gray = cv2.cvtColor(aligned, cv2.COLOR_BGR2GRAY)
+                            blur_var = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+                            if blur_var >= 20.0:
+                                new_embedding = embedder.extract_embedding(probe_img, primary_face)
+                                new_emb_list = new_embedding.tolist() if hasattr(new_embedding, "tolist") else list(new_embedding)
+
+                                # Save newly captured photograph
+                                ts_str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+                                filename = f"{reg_clean}_{ts_str}.jpg"
+                                upload_path = os.path.abspath(
+                                    os.path.join(os.path.dirname(__file__), f"../../../../uploads/captured_faces/{filename}")
+                                )
+                                public_path = os.path.abspath(
+                                    os.path.join(os.path.dirname(__file__), f"../../../../public/faces/captured/{filename}")
+                                )
+                                os.makedirs(os.path.dirname(upload_path), exist_ok=True)
+                                os.makedirs(os.path.dirname(public_path), exist_ok=True)
+                                cv2.imwrite(upload_path, probe_img)
+                                cv2.imwrite(public_path, probe_img)
+
+                                newly_enrolled_photo_url = f"/faces/captured/{filename}"
+                                target_obj.photo_url = newly_enrolled_photo_url
+
+                                # Append to existing face reference collection
+                                existing_embs = parse_embeddings_list(target_obj.face_embedding)
+                                existing_embs.append(new_emb_list)
+                                target_obj.face_embedding = json.dumps(existing_embs)
+
+                                # Update BiometricTemplate
+                                bt = db.query(BiometricTemplate).filter(BiometricTemplate.person_identifier == reg_clean).first()
+                                if bt:
+                                    bt.embedding_data = json.dumps(existing_embs)
+                                    bt.enrolled_at = datetime.now(timezone.utc)
+                                else:
+                                    bt = BiometricTemplate(
+                                        person_type="student" if is_student else "staff",
+                                        person_identifier=reg_clean,
+                                        embedding_data=json.dumps(existing_embs),
+                                        model_version="sface-yunet-v1",
+                                        is_active=True,
+                                    )
+                                    db.add(bt)
+
+                                # Update enrolled_embeddings.json fallback
+                                emb_file = os.path.abspath(
+                                    os.path.join(os.path.dirname(__file__), "../../../../public/faces/enrolled_embeddings.json")
+                                )
+                                if os.path.exists(emb_file):
+                                    try:
+                                        with open(emb_file, "r") as ef:
+                                            all_embs = json.load(ef)
+                                        all_embs[reg_clean] = existing_embs
+                                        all_embs[target_obj.name] = existing_embs
+                                        with open(emb_file, "w") as ef:
+                                            json.dump(all_embs, ef, indent=2)
+                                    except Exception as ex:
+                                        print(f"Warning: could not update enrolled_embeddings.json: {ex}")
+
+                                db.commit()
+                                new_ref_added = True
+            except Exception as e:
+                print(f"Warning: error during manual enrollment photo processing: {e}")
+                db.rollback()
+
+        # Log access event
+        method_str = "Register ID + Verified Face Reference" if new_ref_added else "Register ID"
+        log_access_event(
+            db,
+            AccessLogCreate(
+                person_type="Student" if is_student else "Staff",
+                name=target_obj.name,
+                identifier_value=reg_clean,
+                department=target_obj.department,
+                location_block=req.location_block,
+                guard_name=guard_display_name,
+                event_type="ENTRY",
+                verification_method=method_str,
+                verification_status=status_text,
+                review_status=review_text,
+                student_id=target_obj.id if is_student else None,
+                staff_id=target_obj.id if not is_student else None,
+            ),
+        )
+
+        return FaceVerifyResponse(
+            success=True,
+            is_recognized=True,
+            is_live=True,
+            verification_status="Authorized",
+            similarity_score=1.0,
+            matched_person=MatchedPerson(
+                person_type="student" if is_student else "staff",
+                identifier=reg_clean,
+                name=target_obj.name,
+                initials=getattr(target_obj, "initials", None),
+                department=target_obj.department,
+                year_roman=getattr(target_obj, "year_roman", None),
+                batch=getattr(target_obj, "batch", None),
+                residence_type=getattr(target_obj, "residence_type", None),
+                hostel_name=getattr(target_obj, "hostel_name", None),
+                room_number=getattr(target_obj, "room_number", None),
+                designation=getattr(target_obj, "designation", None),
+                photo_url=newly_enrolled_photo_url,
+                similarity_score=1.0,
+            ),
+            candidate_scores={target_obj.name: 100.0},
+            message="Identity verified via Register ID lookup and new verified face reference enrolled." if new_ref_added else "Identity verified via Register ID lookup.",
+        )
+
+    # =========================================================================
+    # WORKFLOW B: Live Camera Face Recognition Pipeline
+    # =========================================================================
     probe_img = None
     if req.image_base64:
         try:
@@ -124,8 +323,13 @@ def verify_face_endpoint(
             message="No face detected in the camera frame.",
         )
 
+    # Filter significant faces (w >= 40, h >= 40) to eliminate tiny noise specks
+    sig_faces = [f for f in faces if f["box"][2] >= 40 and f["box"][3] >= 40]
+    if not sig_faces:
+        sig_faces = faces
+
     # Error handling: Multiple faces in single scan
-    if len(faces) > 1:
+    if len(sig_faces) > 1:
         return FaceVerifyResponse(
             success=False,
             is_recognized=False,
@@ -135,7 +339,9 @@ def verify_face_endpoint(
             message="Multiple faces detected in camera frame. Only one individual permitted per security scan.",
         )
 
-    primary_face = faces[0]
+    # Primary face sorted by area descending
+    sig_faces.sort(key=lambda f: f["box"][2] * f["box"][3], reverse=True)
+    primary_face = sig_faces[0]
     landmarks = primary_face.get("landmarks", [])
 
     # Check landmark detection
@@ -186,16 +392,11 @@ def verify_face_endpoint(
     # 4. Extract Probe Embedding using facial landmark aligned features
     probe_embedding = embedder.extract_embedding(probe_img, primary_face)
 
-    # 5. Build Gallery from enrolled Students and Staff
+    # 5. Build Gallery from enrolled Students and Staff (with multi-reference support)
     enrolled_students = db.query(Student).all()
     gallery: List[Dict[str, Any]] = []
     for s in enrolled_students:
-        emb = None
-        if s.face_embedding:
-            try:
-                emb = json.loads(s.face_embedding)
-            except Exception:
-                pass
+        embs = parse_embeddings_list(s.face_embedding)
         gallery.append({
             "type": "student",
             "id": s.id,
@@ -209,18 +410,14 @@ def verify_face_endpoint(
             "hostel_name": s.hostel_name,
             "room_number": s.room_number,
             "photo_url": s.photo_url,
-            "embedding": emb,
+            "embeddings": embs,
+            "embedding": embs[0] if embs else None,
             "is_active": s.is_active,
         })
 
     enrolled_staff = db.query(Staff).all()
     for st in enrolled_staff:
-        emb = None
-        if st.face_embedding:
-            try:
-                emb = json.loads(st.face_embedding)
-            except Exception:
-                pass
+        embs = parse_embeddings_list(st.face_embedding)
         gallery.append({
             "type": "staff",
             "id": st.id,
@@ -230,20 +427,23 @@ def verify_face_endpoint(
             "department": st.department,
             "designation": st.designation,
             "photo_url": st.photo_url,
-            "embedding": emb,
+            "embeddings": embs,
+            "embedding": embs[0] if embs else None,
             "is_active": st.is_active,
         })
 
-    # 6. Compute candidate comparison scores across gallery
+    # 6. Compute candidate comparison scores across gallery (max sim across references)
     candidate_scores: Dict[str, float] = {}
     for item in gallery:
-        target_emb = item.get("embedding")
-        if target_emb:
-            sim = matcher.cosine_similarity(probe_embedding, np.array(target_emb, dtype=np.float32))
-            score_pct = round(max(0.0, sim) * 100, 1)
-            candidate_scores[item["name"]] = score_pct
+        target_embs = item.get("embeddings") or ([item["embedding"]] if item.get("embedding") else [])
+        best_sim = 0.0
+        for e in target_embs:
+            sim = matcher.cosine_similarity(probe_embedding, np.array(e, dtype=np.float32))
+            if sim > best_sim:
+                best_sim = sim
+        candidate_scores[item["name"]] = round(max(0.0, best_sim) * 100, 1)
 
-    # 7. Vector matching
+    # 7. Vector matching across multi-reference gallery
     best_candidate, score, decision = matcher.find_best_match(probe_embedding, gallery)
 
     # 8. PostgreSQL / Database authorization verification
@@ -400,3 +600,15 @@ def verify_face_endpoint(
             liveness_details=LivenessCheckResult(**liveness_res),
             message=f"Face not recognized in institution database. All scores below {int(settings.FACE_MATCH_THRESHOLD * 100)}% threshold.",
         )
+
+
+@router.post("/evaluate")
+def evaluate_ai_pipeline(db: Session = Depends(get_db)):
+    from ai.evaluator import run_benchmark, evaluate_enrolled_dataset
+    benchmarks = run_benchmark()
+    eval_results = evaluate_enrolled_dataset()
+    return {
+        "status": "success",
+        "benchmarks": benchmarks,
+        "evaluation": eval_results,
+    }

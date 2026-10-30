@@ -1,0 +1,253 @@
+[
+  {
+    "title": "Student 1",
+    "image": "C:\\Users\\Sharan Mathav\\.gemini\\antigravity\\scratch\\Campus-secure\\data\\student_details\\student_1.jpg",
+    "image_size": [
+      360,
+      480
+    ],
+    "faces_detected": 1,
+    "landmarks_count": 5,
+    "embedding_len": 128,
+    "fields": {
+      "Name": "Dummy Student 1",
+      "Register Number": "22ECE1001",
+      "Date of Birth": "10 June 2004",
+      "Department": "Electronics & Communication",
+      "Year": "III",
+      "Batch": "2022\u20132026",
+      "Institute": "Easwari Engineering College",
+      "Accommodation Type": "Hosteller",
+      "Hostel Name": "Cauvery Hostel",
+      "Room Number": "C-207"
+    }
+  },
+  {
+    "title": "Student 2",
+    "image": "C:\\Users\\Sharan Mathav\\.gemini\\antigravity\\scratch\\Campus-secure\\data\\student_details\\student_2.jpg",
+    "image_size": [
+      360,
+      480
+    ],
+    "faces_detected": 3,
+    "landmarks_count": 5,
+    "embedding_len": 128,
+    "fields": {
+      "Name": "Dummy Student 2",
+      "Register Number": "22ECE1002",
+      "Date of Birth": "11 June 2004",
+      "Department": "Electronics & Communication",
+      "Year": "III",
+      "Batch": "2022\u20132026",
+      "Institute": "Easwari Engineering College",
+      "Accommodation Type": "Hosteller",
+      "Hostel Name": "Ganga Hostel",
+      "Room Number": "G-214"
+    }
+  },
+  {
+    "title": "Student 3",
+    "image": "C:\\Users\\Sharan Mathav\\.gemini\\antigravity\\scratch\\Campus-secure\\data\\student_details\\student_3.jpg",
+    "image_size": [
+      360,
+      480
+    ],
+    "faces_detected": 2,
+    "landmarks_count": 5,
+    "embedding_len": 128,
+    "fields": {
+      "Name": "Dummy Student 3",
+      "Register Number": "22ECE1003",
+      "Date of Birth": "12 June 2004",
+      "Department": "Electronics & Communication",
+      "Year": "III",
+      "Batch": "2022\u20132026",
+      "Institute": "Easwari Engineering College",
+      "Accommodation Type": "Day Scholar",
+      "Hostel Name": "-",
+      "Room Number": "-"
+    }
+  },
+  {
+    "title": "Student 4",
+    "image": "C:\\Users\\Sharan Mathav\\.gemini\\antigravity\\scratch\\Campus-secure\\data\\student_details\\student_4.jpg",
+    "image_size": [
+      360,
+      480
+    ],
+    "faces_detected": 1,
+    "landmarks_count": 5,
+    "embedding_len": 128,
+    "fields": {
+      "Name": "Dummy Student 4",
+      "Register Number": "22ECE1004",
+      "Date of Birth": "13 June 2004",
+      "Department": "Electronics & Communication",
+      "Year": "III",
+      "Batch": "2022\u20132026",
+      "Institute": "Easwari Engineering College",
+      "Accommodation Type": "Hosteller",
+      "Hostel Name": "Ganga Hostel",
+      "Room Number": "G-228"
+    }
+  },
+  {
+    "title": "Student 5",
+    "image": "C:\\Users\\Sharan Mathav\\.gemini\\antigravity\\scratch\\Campus-secure\\data\\student_details\\student_5.jpg",
+    "image_size": [
+      360,
+      480
+    ],
+    "faces_detected": 1,
+    "landmarks_count": 5,
+    "embedding_len": 128,
+    "fields": {
+      "Name": "Dummy Student 5",
+      "Register Number": "22ECE1005",
+      "Date of Birth": "14 June 2004",
+      "Department": "Electronics & Communication",
+      "Year": "III",
+      "Batch": "2022\u20132026",
+      "Institute": "Easwari Engineering College",
+      "Accommodation Type": "Hosteller",
+      "Hostel Name": "Cauvery Hostel",
+      "Room Number": "C-235"
+    }
+  },
+  {
+    "title": "Student 6",
+    "image": "C:\\Users\\Sharan Mathav\\.gemini\\antigravity\\scratch\\Campus-secure\\data\\student_details\\student_6.jpg",
+    "image_size": [
+      360,
+      480
+    ],
+    "faces_detected": 1,
+    "landmarks_count": 5,
+    "embedding_len": 128,
+    "fields": {
+      "Name": "Dummy Student 6",
+      "Register Number": "22ECE1006",
+      "Date of Birth": "15 June 2004",
+      "Department": "Electronics & Communication",
+      "Year": "III",
+      "Batch": "2022\u20132026",
+      "Institute": "Easwari Engineering College",
+      "Accommodation Type": "Day Scholar",
+      "Hostel Name": "-",
+      "Room Number": "-"
+    }
+  },
+  {
+    "title": "Student 7",
+    "image": "C:\\Users\\Sharan Mathav\\.gemini\\antigravity\\scratch\\Campus-secure\\data\\student_details\\student_7.jpg",
+    "image_size": [
+      360,
+      480
+    ],
+    "faces_detected": 1,
+    "landmarks_count": 5,
+    "embedding_len": 128,
+    "fields": {
+      "Name": "Dummy Student 7",
+      "Register Number": "22ECE1007",
+      "Date of Birth": "16 June 2004",
+      "Department": "Electronics & Communication",
+      "Year": "III",
+      "Batch": "2022\u20132026",
+      "Institute": "Easwari Engineering College",
+      "Accommodation Type": "Hosteller",
+      "Hostel Name": "Cauvery Hostel",
+      "Room Number": "C-249"
+    }
+  },
+  {
+    "title": "Student 8",
+    "image": "C:\\Users\\Sharan Mathav\\.gemini\\antigravity\\scratch\\Campus-secure\\data\\student_details\\student_8.jpg",
+    "image_size": [
+      360,
+      480
+    ],
+    "faces_detected": 1,
+    "landmarks_count": 5,
+    "embedding_len": 128,
+    "fields": {
+      "Name": "Dummy Student 8",
+      "Register Number": "22ECE1008",
+      "Date of Birth": "17 June 2004",
+      "Department": "Electronics & Communication",
+      "Year": "III",
+      "Batch": "2022\u20132026",
+      "Institute": "Easwari Engineering College",
+      "Accommodation Type": "Hosteller",
+      "Hostel Name": "Ganga Hostel",
+      "Room Number": "G-256"
+    }
+  },
+  {
+    "title": "Student 9",
+    "image": "C:\\Users\\Sharan Mathav\\.gemini\\antigravity\\scratch\\Campus-secure\\data\\student_details\\student_9.jpg",
+    "image_size": [
+      360,
+      480
+    ],
+    "faces_detected": 3,
+    "landmarks_count": 5,
+    "embedding_len": 128,
+    "fields": {
+      "Name": "Dummy Student 9",
+      "Register Number": "22ECE1009",
+      "Date of Birth": "18 June 2004",
+      "Department": "Electronics & Communication",
+      "Year": "III",
+      "Batch": "2022\u20132026",
+      "Institute": "Easwari Engineering College",
+      "Accommodation Type": "Day Scholar",
+      "Hostel Name": "-",
+      "Room Number": "-"
+    }
+  },
+  {
+    "title": "Student 10",
+    "image": "C:\\Users\\Sharan Mathav\\.gemini\\antigravity\\scratch\\Campus-secure\\data\\student_details\\student_10.jpg",
+    "image_size": [
+      360,
+      480
+    ],
+    "faces_detected": 1,
+    "landmarks_count": 5,
+    "embedding_len": 128,
+    "fields": {
+      "Name": "Dummy Student 10",
+      "Register Number": "22ECE1010",
+      "Date of Birth": "19 June 2004",
+      "Department": "Electronics & Communication",
+      "Year": "III",
+      "Batch": "2022\u20132026",
+      "Institute": "Easwari Engineering College",
+      "Accommodation Type": "Hosteller",
+      "Hostel Name": "Ganga Hostel",
+      "Room Number": "G-270"
+    }
+  },
+  {
+    "title": "Staff 1",
+    "image": "C:\\Users\\Sharan Mathav\\.gemini\\antigravity\\scratch\\Campus-secure\\data\\student_details\\staff_1.jpg",
+    "image_size": [
+      360,
+      480
+    ],
+    "faces_detected": 1,
+    "landmarks_count": 5,
+    "embedding_len": 128,
+    "fields": {
+      "Name": "Dummy Staff 1",
+      "Employee ID": "EEC-STF-001",
+      "Date of Birth": "15 March 1990",
+      "Department": "Electronics & Communication",
+      "Designation": "Assistant Professor",
+      "Institute": "Easwari Engineering College",
+      "Phone Number": "+91 90000 00001",
+      "Email": "dummy.staff1@example.com"
+    }
+  }
+]
