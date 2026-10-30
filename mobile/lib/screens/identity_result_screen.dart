@@ -21,8 +21,9 @@ class IdentityResultScreen extends StatelessWidget {
     final name = person['name'] ?? 'Kavitha R';
     final regNo = person['identifier'] ?? person['register_number'] ?? '22MBBS041';
     final dept = person['department'] ?? 'MBBS';
-    final year = person['year_roman'] ?? 'III Year';
-    final batch = person['batch'] ?? '2022 - 2027';
+    final year = person['year_roman'] ?? person['year'] ?? 'II';
+    final formattedYear = year.toString().toLowerCase().startsWith('year') ? year.toString() : 'Year $year';
+    final batch = person['batch'] ?? '2023–2028';
     final residence = person['residence_type'] ?? 'Hostel';
     final hostel = person['hostel_name'] ?? 'Kaveri Hostel';
     final room = person['room_number'] ?? '304';
@@ -96,7 +97,7 @@ class IdentityResultScreen extends StatelessWidget {
                       gradient: const LinearGradient(
                         colors: [Color(0xFF2D72E6), Color(0xFF153C72)],
                         begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+                        end: Alignment.endBottomRight,
                       ),
                       borderRadius: BorderRadius.circular(22),
                       boxShadow: [
@@ -121,15 +122,26 @@ class IdentityResultScreen extends StatelessWidget {
                     style: const TextStyle(color: AppColors.text, fontSize: 18, fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 4),
+                  if (isStudent)
+                    Text(
+                      'Student · $formattedYear · Batch $batch',
+                      style: const TextStyle(color: Color(0xFF45546B), fontSize: 12, fontWeight: FontWeight.w600),
+                    )
+                  else
+                    const Text(
+                      'Staff',
+                      style: TextStyle(color: Color(0xFF45546B), fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                  const SizedBox(height: 4),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: AppColors.blueLight,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text(
-                      regNo,
-                      style: const TextStyle(color: AppColors.blue, fontSize: 12, fontWeight: FontWeight.w700),
+                    child: const Text(
+                      'SRM GROUP OF INSTITUTION TRICHY',
+                      style: TextStyle(color: AppColors.blue, fontSize: 11, fontWeight: FontWeight.w700),
                     ),
                   ),
                   const SizedBox(height: 18),
@@ -137,9 +149,13 @@ class IdentityResultScreen extends StatelessWidget {
                   const SizedBox(height: 12),
 
                   // Detail Rows
+                  _buildDetailRow('Name', name),
+                  const SizedBox(height: 8),
+                  _buildDetailRow('Register Number', regNo),
+                  const SizedBox(height: 8),
                   _buildDetailRow('Department', dept),
                   const SizedBox(height: 8),
-                  _buildDetailRow('Academic Year', year),
+                  _buildDetailRow('Academic Year', formattedYear),
                   const SizedBox(height: 8),
                   _buildDetailRow('Batch', batch),
                   const SizedBox(height: 8),

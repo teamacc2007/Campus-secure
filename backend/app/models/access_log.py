@@ -12,6 +12,7 @@ class AccessLog(Base):
     person_type = Column(String(50), nullable=False, index=True)  # Student, Staff, Visitor, Unauthorized
     name = Column(String(255), nullable=False, index=True)
     identifier_value = Column(String(100), nullable=False, index=True)  # Reg No, Emp ID, or Pass No
+    phone_number = Column(String(50), nullable=True)
     department = Column(String(150), nullable=True)
 
     # Location & Guard

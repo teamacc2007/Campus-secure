@@ -969,7 +969,14 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role, c
           {registerVerified ? "Register number verified" : `${student.similarity}% face match`}
         </div>
         <h1>{personName}</h1>
-        <p>{staff ? "Staff" : "Student"} · <span className={`inst-pill ${isTrichySRM ? "pill-trichy" : "pill-easwari"}`}>{institute}</span></p>
+        {staff ? (
+          <p>Staff · <span className={`inst-pill ${isTrichySRM ? "pill-trichy" : "pill-easwari"}`}>{institute}</span></p>
+        ) : (
+          <>
+            <p>Student · {student.year.toLowerCase().startsWith("year") ? student.year : `Year ${student.year}`} · Batch {student.batch}</p>
+            <p><span className={`inst-pill ${isTrichySRM ? "pill-trichy" : "pill-easwari"}`}>{institute}</span></p>
+          </>
+        )}
       </section>
       <section className="info-card">
         <div className="card-kicker">
@@ -1154,6 +1161,16 @@ function Field({ label, placeholder, value, type = "text", children }: { label: 
   return <label className="field"><span>{label}</span>{children || <input type={type} placeholder={placeholder} defaultValue={value} />}</label>;
 }
 
+function isValidPhoneNumber(phone: string): boolean {
+  const trimmed = phone.trim();
+  if (!trimmed) return false;
+  const cleaned = trimmed.replace(/[\s\-()]/g, "");
+  const indianRegex = /^(\+91|91|0)?[6-9]\d{9}$/;
+  const intlRegex = /^\+[1-9]\d{6,14}$/;
+  const genericRegex = /^\d{10,15}$/;
+  return indianRegex.test(cleaned) || intlRegex.test(cleaned) || genericRegex.test(cleaned);
+}
+
 function UnauthorizedForm({
   go,
   role,
@@ -1163,11 +1180,30 @@ function UnauthorizedForm({
   go: (screen: Screen) => void;
   role: "security" | "warden" | "staff";
   capturedPhoto: string | null;
-  onRecordEvent?: (photo: string | null, notes?: string) => void;
+  onRecordEvent?: (photo: string | null, notes?: string, phoneNumber?: string, fullName?: string) => void;
 }) {
   const [submitted, setSubmitted] = useState(false);
+  const [fullName, setFullName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [phoneError, setPhoneError] = useState("");
   const [notes, setNotes] = useState("");
-  if (submitted) return <div className="success-page"><div className="success-symbol warning-symbol"><ShieldAlert size={38} /></div><Status tone="amber">CAMPUS SUPERVISOR NOTIFIED</Status><h1>Unauthorized event recorded</h1><p>The captured image, location, time, attempted register number, and officer notes were sent to the Campus Supervisor.</p><Button onClick={() => go("scan")}>Scan next person</Button><Button variant="secondary" onClick={() => go("home")}>Return home</Button></div>;
+
+  const handleSubmit = () => {
+    const trimmedPhone = phoneNumber.trim();
+    if (!trimmedPhone) {
+      setPhoneError("Phone number is required.");
+      return;
+    }
+    if (!isValidPhoneNumber(trimmedPhone)) {
+      setPhoneError("Please enter a valid phone number (e.g. +91 9876543210 or 9876543210).");
+      return;
+    }
+    setPhoneError("");
+    if (onRecordEvent) onRecordEvent(capturedPhoto, notes.trim() || undefined, trimmedPhone, fullName.trim() || undefined);
+    setSubmitted(true);
+  };
+
+  if (submitted) return <div className="success-page"><div className="success-symbol warning-symbol"><ShieldAlert size={38} /></div><Status tone="amber">CAMPUS SUPERVISOR NOTIFIED</Status><h1>Unauthorized event recorded</h1><p>The captured image, location, time, attempted register number, contact number, and officer notes were sent to the Campus Supervisor.</p><Button onClick={() => go("scan")}>Scan next person</Button><Button variant="secondary" onClick={() => go("home")}>Return home</Button></div>;
   return <>
     <TopBar title="Unauthorized person" subtitle="Record security event" back={() => go("unrecognized")} />
     <div className="page-content form-page">
@@ -1183,16 +1219,29 @@ function UnauthorizedForm({
       <Status tone="amber">SUPERVISOR WILL BE NOTIFIED</Status>
       <div className="form-intro"><h1>Record event details</h1><p>Review the captured event before notifying the Campus Supervisor.</p></div>
       <div className="form-stack">
-        <Field label="Full name" placeholder="Enter name if available" />
+        <label className="field">
+          <span>Full Name</span>
+          <input placeholder="Enter name if available" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+        </label>
+        <label className="field">
+          <span>Phone Number</span>
+          <input
+            type="tel"
+            placeholder="Enter phone number"
+            value={phoneNumber}
+            onChange={(e) => {
+              setPhoneNumber(e.target.value);
+              if (phoneError) setPhoneError("");
+            }}
+          />
+          {phoneError && <small className="field-error" style={{ color: "#ef4444", fontSize: "12px", marginTop: "4px", display: "block" }}>{phoneError}</small>}
+        </label>
         <label className="field">
           <span>{role === "warden" ? "Warden notes" : role === "staff" ? "Staff notes" : "Security notes"}</span>
           <input placeholder="Optional operational notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
         </label>
       </div>
-      <Button onClick={() => {
-        if (onRecordEvent) onRecordEvent(capturedPhoto, notes);
-        setSubmitted(true);
-      }} icon={<ShieldAlert size={17} />}>Record & notify Campus Supervisor</Button>
+      <Button onClick={handleSubmit} icon={<ShieldAlert size={17} />}>Record & notify Campus Supervisor</Button>
     </div>
   </>;
 }
@@ -2294,7 +2343,7 @@ function Alerts({
             </div>
           </section>
         )}
-        <section className="info-card alert-info"><div className="card-kicker"><FileClock size={15} />ORIGINAL SECURITY RECORD</div><dl><div><dt>Original event category</dt><dd>{selected.accessCategory}</dd></div><div><dt>Event</dt><dd>{selected.event}</dd></div><div><dt>Security officer</dt><dd>{selected.guard}</dd></div><div><dt>Security number</dt><dd>{selected.guardNumber}</dd></div><div><dt>Institution</dt><dd>{knownInstitution ? selected.institution : "Institution B"}</dd></div><div><dt>Gate / Location</dt><dd>{selected.block}</dd></div><div><dt>Date & time</dt><dd>{selected.dateTime.replace("T", " ")}</dd></div><div><dt>Current verification status</dt><dd>{review.status}</dd></div></dl></section>
+        <section className="info-card alert-info"><div className="card-kicker"><FileClock size={15} />ORIGINAL SECURITY RECORD</div><dl><div><dt>Original event category</dt><dd>{selected.accessCategory}</dd></div><div><dt>Event</dt><dd>{selected.event}</dd></div>{selected.phoneNumber && <div><dt>Phone number</dt><dd>{selected.phoneNumber}</dd></div>}<div><dt>Security officer</dt><dd>{selected.guard}</dd></div><div><dt>Security number</dt><dd>{selected.guardNumber}</dd></div><div><dt>Institution</dt><dd>{knownInstitution ? selected.institution : "Institution B"}</dd></div><div><dt>Gate / Location</dt><dd>{selected.block}</dd></div><div><dt>Date & time</dt><dd>{selected.dateTime.replace("T", " ")}</dd></div><div><dt>Current verification status</dt><dd>{review.status}</dd></div></dl></section>
         <section className="info-card action-history"><div className="card-kicker"><History size={15} />ACTION HISTORY</div><div className="history-list"><div><i><Shield size={13} /></i><p><strong>Original event recorded</strong><span>{selected.guard} · {selected.guardNumber}</span><small>{selected.dateTime.replace("T", " ")} · {selected.block}</small></p></div>{review.actions.map((action, index) => <div key={`${action.timestamp}${index}`}><i className={action.type === "Unauthorised" ? "danger-history" : ""}>{action.type === "Verified" || action.type === "Revoked" ? <Check size={13} /> : <ShieldAlert size={13} />}</i><p><strong>{action.type}</strong><span>{action.actor} · {action.actorNumber}</span><small>{action.timestamp}{action.reason ? ` · Reason: ${action.reason}` : ""}</small></p></div>)}</div></section>
         {role === "supervisor" && <div className="review-actions two-actions"><Button variant="warning" onClick={() => setDialog("unauthorised")} icon={<ShieldAlert size={17} />} disabled={review.status === "Unauthorised" || review.status === "Revoked"}>Unauthorised</Button><Button onClick={() => setDialog("revoke")} icon={<ShieldCheck size={17} />} disabled={review.status === "Revoked"}>Revoke</Button></div>}
       </div>
@@ -2776,17 +2825,19 @@ export default function App() {
     return logRows;
   });
 
-  const recordUnauthorizedEvent = (photo: string | null, notes?: string) => {
+  const recordUnauthorizedEvent = (photo: string | null, notes?: string, phoneNumber?: string, fullName?: string) => {
     const now = new Date();
     const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
     const dateStr = now.toISOString().slice(0, 10);
     const dateTimeStr = `${dateStr}T${timeStr}`;
     const randNum = Math.floor(1000 + Math.random() * 9000);
     const logId = `DEN-•••-${randNum}`;
+    const personName = fullName?.trim() || "Unrecognized person";
+    const initials = fullName?.trim() ? (fullName.trim().split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase() || "UP") : "UP";
 
     const newRecord: LogRecord = {
-      initials: "UP",
-      name: "Unrecognized person",
+      initials: initials,
+      name: personName,
       id: "Not available",
       institution: "SRM GROUP OF INSTITUTION TRICHY",
       department: "Not available",
@@ -2799,9 +2850,10 @@ export default function App() {
       category: "Unauthorised visitor",
       accessCategory: "Unauthorized",
       logId: logId,
+      phoneNumber: phoneNumber,
       guard: role === "warden" ? roleMeta.warden.name : role === "staff" ? roleMeta.staff.name : "G. Selvam",
       guardNumber: role === "warden" ? (roleMeta.warden.supervisorNumber || "WRD-B-0011") : "GRD-B-0017",
-      guardNotes: notes || "Identity could not be verified at the Main Gate.",
+      guardNotes: notes || (phoneNumber ? `Contact: ${phoneNumber}. Identity could not be verified at the Main Gate.` : "Identity could not be verified at the Main Gate."),
       entries: 1,
       decision: "Denied",
       photo: photo || undefined,
@@ -2817,20 +2869,19 @@ export default function App() {
       return updated;
     });
 
-    if (photo) {
-      fetch("http://localhost:8000/api/v1/access-logs/unauthorized", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: "Unrecognized person",
-          location_block: role === "warden" ? "Bharathi Hostel" : role === "staff" ? "Block A" : "Main Gate",
-          guard_name: role === "warden" ? roleMeta.warden.name : "G. Selvam",
-          notes: notes || "Identity could not be verified at the Main Gate.",
-          image_base64: photo,
-          log_id: logId,
-        }),
-      }).catch(err => console.warn("Background log save to API failed:", err));
-    }
+    fetch("http://localhost:8000/api/v1/access-logs/unauthorized", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: personName,
+        phone_number: phoneNumber,
+        location_block: role === "warden" ? "Bharathi Hostel" : role === "staff" ? "Block A" : "Main Gate",
+        guard_name: role === "warden" ? roleMeta.warden.name : "G. Selvam",
+        notes: notes || "Identity could not be verified at the Main Gate.",
+        image_base64: photo || null,
+        log_id: logId,
+      }),
+    }).catch(err => console.warn("Background log save to API failed:", err));
   };
   const [authorizedFaces, setAuthorizedFaces] = useState<AuthorizedFaceProfile[]>([]);
   const [visitorPasses, setVisitorPasses] = useState<VisitorPass[]>(initialVisitorPasses);

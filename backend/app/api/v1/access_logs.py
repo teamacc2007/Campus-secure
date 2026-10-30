@@ -89,6 +89,7 @@ def get_pending_alerts(
 
 class UnauthorizedReportRequest(BaseModel):
     name: Optional[str] = "Unrecognized Person"
+    phone_number: Optional[str] = None
     location_block: str = "Gate 1 Main Entrance"
     guard_name: str = "G. Selvam"
     notes: Optional[str] = None
@@ -127,13 +128,21 @@ def record_unauthorized_report(
         except Exception as e:
             print(f"Error saving intruder image: {e}")
 
+    flag_notes = []
+    if req.phone_number:
+        flag_notes.append(f"Phone: {req.phone_number}")
+    if req.notes:
+        flag_notes.append(req.notes)
+    flag_reason_str = ". ".join(flag_notes) if flag_notes else "Unauthorized person detected at security gate"
+
     return log_access_event(
         db,
         AccessLogCreate(
             record_identifier=req.log_id,
             person_type="Unauthorized",
             name=req.name or "Unrecognized Person",
-            identifier_value="UNREC-FACE",
+            identifier_value=req.phone_number or "UNREC-FACE",
+            phone_number=req.phone_number,
             department="N/A",
             location_block=req.location_block,
             guard_name=req.guard_name,
@@ -141,7 +150,7 @@ def record_unauthorized_report(
             verification_method="Face Recognition",
             verification_status="Unauthorized",
             review_status="Pending Verification",
-            flag_reason=req.notes or "Unauthorized person detected at security gate",
+            flag_reason=flag_reason_str,
             snapshot_url=snapshot_url,
         ),
     )

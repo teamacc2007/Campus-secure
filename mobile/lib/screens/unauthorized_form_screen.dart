@@ -33,7 +33,31 @@ class _UnauthorizedFormScreenState extends State<UnauthorizedFormScreen> {
     'Library & Admin Gate',
   ];
 
+  bool _validatePhoneNumber(String phone) {
+    if (phone.isEmpty) return false;
+    final cleaned = phone.replaceAll(RegExp(r'[\s\-()]'), '');
+    final indianRegex = RegExp(r'^(\+91|91|0)?[6-9]\d{9}$');
+    final intlRegex = RegExp(r'^\+[1-9]\d{6,14}$');
+    final genericRegex = RegExp(r'^\d{10,15}$');
+    return indianRegex.hasMatch(cleaned) || intlRegex.hasMatch(cleaned) || genericRegex.hasMatch(cleaned);
+  }
+
   Future<void> _submitUnauthorizedLog() async {
+    final phone = _phoneController.text.trim();
+    if (phone.isEmpty) {
+      setState(() {
+        _errorMessage = 'Phone Number is mandatory. Please enter a valid phone number.';
+      });
+      return;
+    }
+
+    if (!_validatePhoneNumber(phone)) {
+      setState(() {
+        _errorMessage = 'Please enter a valid phone number (e.g. +91 9876543210 or 9876543210).';
+      });
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -43,13 +67,16 @@ class _UnauthorizedFormScreenState extends State<UnauthorizedFormScreen> {
       await ApiService.logAccessEvent({
         'person_type': 'Unauthorized',
         'name': _nameController.text.trim(),
-        'identifier_value': _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : 'UNREC-ID',
+        'identifier_value': phone,
+        'phone_number': phone,
         'location_block': selectedGate,
         'event_type': 'ENTRY',
         'verification_method': 'Manual Security Flag',
         'verification_status': 'Unauthorized',
         'review_status': 'Pending Verification',
-        'flag_reason': _reasonController.text.trim(),
+        'flag_reason': _reasonController.text.trim().isNotEmpty
+            ? 'Phone: $phone. ${_reasonController.text.trim()}'
+            : 'Phone: $phone. Unauthorized person detected at security gate',
       });
       widget.onSuccess();
     } catch (e) {
@@ -103,26 +130,28 @@ class _UnauthorizedFormScreenState extends State<UnauthorizedFormScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Individual Name / Reported Identity', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF45546B))),
+                  const Text('Full Name', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF45546B))),
                   const SizedBox(height: 5),
                   TextField(
                     controller: _nameController,
                     style: const TextStyle(fontSize: 12),
                     decoration: InputDecoration(
+                      hintText: 'Enter name if available',
+                      hintStyle: const TextStyle(fontSize: 11, color: AppColors.textMuted),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(11), borderSide: const BorderSide(color: AppColors.line)),
                     ),
                   ),
                   const SizedBox(height: 12),
 
-                  const Text('Phone Number (if available)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF45546B))),
+                  const Text('Phone Number', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF45546B))),
                   const SizedBox(height: 5),
                   TextField(
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,
                     style: const TextStyle(fontSize: 12),
                     decoration: InputDecoration(
-                      hintText: 'e.g. 9876543210',
+                      hintText: 'Enter phone number',
                       hintStyle: const TextStyle(fontSize: 11, color: AppColors.textMuted),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(11), borderSide: const BorderSide(color: AppColors.line)),
@@ -144,13 +173,15 @@ class _UnauthorizedFormScreenState extends State<UnauthorizedFormScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  const Text('Reason for Flagging / Incident Note', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF45546B))),
+                  const Text('Security Notes', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF45546B))),
                   const SizedBox(height: 5),
                   TextField(
                     controller: _reasonController,
                     maxLines: 3,
                     style: const TextStyle(fontSize: 12),
                     decoration: InputDecoration(
+                      hintText: 'Optional operational notes',
+                      hintStyle: const TextStyle(fontSize: 11, color: AppColors.textMuted),
                       contentPadding: const EdgeInsets.all(12),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(11), borderSide: const BorderSide(color: AppColors.line)),
                     ),
@@ -166,7 +197,7 @@ class _UnauthorizedFormScreenState extends State<UnauthorizedFormScreen> {
             ],
 
             AppButton(
-              text: 'Log Incident & Dispatch Alert',
+              text: 'Record & notify Campus Supervisor',
               variant: ButtonVariant.danger,
               onPressed: _submitUnauthorizedLog,
               isLoading: _isLoading,

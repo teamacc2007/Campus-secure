@@ -16,6 +16,7 @@ class AccessLogCreate(BaseModel):
     person_type: str  # "Student" | "Staff" | "Visitor" | "Unauthorized"
     name: str
     identifier_value: str
+    phone_number: Optional[str] = None
     department: Optional[str] = None
     location_block: str = "Gate 1 Main Entrance"
     guard_name: Optional[str] = None
@@ -41,6 +42,7 @@ class AccessLogOut(BaseModel):
     person_type: str
     name: str
     identifier_value: str
+    phone_number: Optional[str] = None
     department: Optional[str] = None
     location_block: str
     guard_name: Optional[str] = None

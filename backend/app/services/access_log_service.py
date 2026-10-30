@@ -32,6 +32,7 @@ def log_access_event(
         person_type=log_data.person_type,
         name=log_data.name,
         identifier_value=log_data.identifier_value,
+        phone_number=log_data.phone_number,
         department=log_data.department,
         location_block=log_data.location_block,
         guard_name=log_data.guard_name,
