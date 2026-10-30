@@ -8,7 +8,7 @@ from app.services.student_service import (
     search_students,
     create_student,
 )
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_current_user_optional
 from app.models.user import User
 
 router = APIRouter(prefix="/students", tags=["Students"])
@@ -38,7 +38,7 @@ def list_students_endpoint(
 def get_student_by_register_endpoint(
     register_number: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
     student = get_student_by_register_number(db, register_number)
     if not student:

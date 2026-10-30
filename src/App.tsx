@@ -593,6 +593,19 @@ function formatScanDateTime(dateStr?: string): string {
   }
 }
 
+function formatYearBatch(yearRaw?: string, batchRaw?: string) {
+  let displayYear = "Year II";
+  if (yearRaw) {
+    const cleaned = yearRaw.replace(/year/gi, "").trim();
+    displayYear = cleaned ? `Year ${cleaned}` : yearRaw.trim();
+  }
+  let displayBatch = "2023–2028";
+  if (batchRaw) {
+    displayBatch = batchRaw.replace(/\s*[-–—]\s*/, "–").trim();
+  }
+  return { displayYear, displayBatch };
+}
+
 function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) => void; completeScan: (capturedImage: string | null, matchResult?: StudentMatch | null, scores?: Record<string, number> | null) => void; role: "security" | "warden" | "staff"; logs?: LogRecord[] }) {
   const [scanning, setScanning] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
@@ -757,8 +770,9 @@ function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) =
                   capturedDataUrl = data.snapshot_url;
                 }
                 if (data.is_recognized && data.matched_person) {
-                  const reg = (data.matched_person.identifier || "").toUpperCase();
-                  const pname = (data.matched_person.name || "").toLowerCase();
+                  const mp = data.matched_person;
+                  const reg = (mp.identifier || "").toUpperCase();
+                  const pname = (mp.name || "").toLowerCase();
                   let student = studentMatches.find(s => 
                     s.registerNumber.toUpperCase() === reg ||
                     s.name.toLowerCase() === pname ||
@@ -767,23 +781,31 @@ function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) =
                   );
                   if (!student) {
                     student = {
-                      initials: data.matched_person.initials || "ST",
-                      name: data.matched_person.name,
-                      registerNumber: data.matched_person.identifier,
+                      initials: mp.initials || "ST",
+                      name: mp.name,
+                      registerNumber: mp.identifier,
                       dateOfBirth: "01 Jan 2004",
-                      department: data.matched_person.department,
-                      year: data.matched_person.year_roman || "III",
-                      batch: data.matched_person.batch || "2022–2026",
-                      institute: "Easwari Engineering College",
+                      department: mp.department,
+                      year: mp.year_roman || "II Year",
+                      batch: mp.batch || "2023–2028",
+                      institute: "SRM GROUP OF INSTITUTION TRICHY",
                       similarity: Math.round(data.similarity_score * 100),
-                      accommodationType: (data.matched_person.residence_type as any) || "Day Scholar",
-                      photo: data.matched_person.photo_url || capturedDataUrl || "/faces/sur_crop.jpg",
+                      accommodationType: (mp.residence_type as any) || "Day Scholar",
+                      photo: mp.photo_url || capturedDataUrl || "/faces/sur_crop.jpg",
                     };
                   }
                   evalMatch = {
                     ...student,
+                    name: mp.name || student.name,
+                    registerNumber: mp.identifier || student.registerNumber,
+                    department: mp.department || student.department,
+                    year: mp.year_roman || student.year,
+                    batch: mp.batch || student.batch,
                     similarity: Math.round(data.similarity_score * 100),
-                    photo: data.matched_person.photo_url || student.photo,
+                    photo: mp.photo_url || student.photo,
+                    accommodationType: (mp.residence_type as any) || student.accommodationType,
+                    hostelName: mp.hostel_name || student.hostelName,
+                    roomNumber: mp.room_number || student.roomNumber,
                   };
                 }
               }
@@ -1072,6 +1094,40 @@ function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) =
 function IdentityResult({ go, identityCase, verificationMethod, student, role, capturedPhoto }: { go: (screen: Screen) => void; identityCase: IdentityCase; verificationMethod: VerificationMethod; student: StudentMatch; role: "security" | "warden" | "staff"; capturedPhoto?: string | null }) {
   const staff = identityCase === "staff";
   const registerVerified = verificationMethod === "register";
+
+  const [dbStudent, setDbStudent] = useState<Partial<StudentMatch> | null>(null);
+
+  useEffect(() => {
+    if (student?.registerNumber) {
+      let isMounted = true;
+      fetch(`http://localhost:8000/api/v1/students/by-register/${encodeURIComponent(student.registerNumber)}`)
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data && isMounted) {
+            setDbStudent({
+              name: data.name,
+              department: data.department,
+              year: data.year_roman,
+              batch: data.batch,
+              accommodationType: data.residence_type === "Day Scholar" ? "Day Scholar" : "Hosteller",
+              hostelName: data.hostel_name,
+              roomNumber: data.room_number,
+              boardingPoint: data.bus_boarding_point,
+              routeNumber: data.bus_route,
+              dateOfBirth: data.date_of_birth,
+            });
+          }
+        })
+        .catch(() => {});
+      return () => { isMounted = false; };
+    }
+  }, [student?.registerNumber]);
+
+  const activeStudent = {
+    ...student,
+    ...(dbStudent || {}),
+  };
+
   const staffMember = {
     name: "Pranav Sharma",
     employeeId: "EMP-B-1042",
@@ -1079,18 +1135,21 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role, c
     department: "Mechanical Engineering",
     institute: "SRM GROUP OF INSTITUTION TRICHY",
   };
-  const personName = staff ? staffMember.name : student.name;
-  const institute = staff ? staffMember.institute : student.institute;
+  const personName = staff ? staffMember.name : activeStudent.name;
+  const institute = staff ? staffMember.institute : activeStudent.institute;
   const isTrichySRM = institute.toLowerCase().includes("trichy");
   const location = role === "warden" ? "Bharathi Hostel" : role === "staff" ? "Block A" : "Main Gate";
+
+  const { displayYear, displayBatch } = formatYearBatch(activeStudent.year, activeStudent.batch);
+
   return <>
     <TopBar title="Identity verified" subtitle="Review before confirming" back={() => go(registerVerified ? "unrecognized" : "scan")} />
     <div className="page-content">
       <div className="progress-line"><span className="done"><Check size={12} /></span><i className="done" /><span className="active">2</span><i /><span>3</span></div>
       <section className="identity-hero">
         <div className={`captured-photo ${staff ? "staff-photo" : ""}`}>
-          {(capturedPhoto && (verificationMethod === "register" || role === "security")) || student.photo ? (
-            <img src={(capturedPhoto && (verificationMethod === "register" || role === "security")) ? capturedPhoto : student.photo} alt={personName} className="captured-real-photo" />
+          {(capturedPhoto && (verificationMethod === "register" || role === "security")) || activeStudent.photo ? (
+            <img src={(capturedPhoto && (verificationMethod === "register" || role === "security")) ? capturedPhoto : activeStudent.photo} alt={personName} className="captured-real-photo" />
           ) : (
             <CircleUserRound size={48} />
           )}
@@ -1098,14 +1157,14 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role, c
         </div>
         <div className="verified-badge">
           <ShieldCheck size={14} />
-          {registerVerified ? "Register number verified" : `${student.similarity}% face match`}
+          {registerVerified ? "Register number verified" : `${activeStudent.similarity}% face match`}
         </div>
         <h1>{personName}</h1>
         {staff ? (
           <p>Staff · <span className={`inst-pill ${isTrichySRM ? "pill-trichy" : "pill-easwari"}`}>{institute}</span></p>
         ) : (
           <>
-            <p>Student · {student.year.toLowerCase().startsWith("year") ? student.year : `Year ${student.year}`} · Batch {student.batch}</p>
+            <p>Student · {displayYear} · Batch {displayBatch}</p>
             <p><span className={`inst-pill ${isTrichySRM ? "pill-trichy" : "pill-easwari"}`}>{institute}</span></p>
           </>
         )}
@@ -1126,25 +1185,25 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role, c
           </dl>
         ) : (
           <dl>
-            <div><dt>Name</dt><dd>{student.name}</dd></div>
-            <div><dt>Register Number</dt><dd>{student.registerNumber}</dd></div>
-            <div><dt>Date of Birth</dt><dd>{student.dateOfBirth}</dd></div>
-            <div><dt>Department</dt><dd>{student.department}</dd></div>
-            <div><dt>Year</dt><dd>{student.year}</dd></div>
-            <div><dt>Batch</dt><dd>{student.batch}</dd></div>
-            <div><dt>Institute</dt><dd>{student.institute}</dd></div>
-            <div><dt>Accommodation Type</dt><dd>{student.accommodationType}</dd></div>
-            {student.accommodationType === "Hosteller" && (
+            <div><dt>Name</dt><dd>{activeStudent.name}</dd></div>
+            <div><dt>Register Number</dt><dd>{activeStudent.registerNumber}</dd></div>
+            <div><dt>Date of Birth</dt><dd>{activeStudent.dateOfBirth}</dd></div>
+            <div><dt>Department</dt><dd>{activeStudent.department}</dd></div>
+            <div><dt>Year</dt><dd>{displayYear}</dd></div>
+            <div><dt>Batch</dt><dd>{displayBatch}</dd></div>
+            <div><dt>Institute</dt><dd>{activeStudent.institute}</dd></div>
+            <div><dt>Accommodation Type</dt><dd>{activeStudent.accommodationType}</dd></div>
+            {activeStudent.accommodationType === "Hosteller" && (
               <>
-                <div><dt>Hostel Name</dt><dd>{student.hostelName}</dd></div>
-                <div><dt>Room Number</dt><dd>{student.roomNumber}</dd></div>
+                <div><dt>Hostel Name</dt><dd>{activeStudent.hostelName}</dd></div>
+                <div><dt>Room Number</dt><dd>{activeStudent.roomNumber}</dd></div>
               </>
             )}
-            {student.accommodationType === "Day Scholar" && (
+            {activeStudent.accommodationType === "Day Scholar" && (
               <>
-                <div><dt>Transportation Type</dt><dd>{student.transportationType}</dd></div>
-                <div><dt>Boarding Point</dt><dd>{student.boardingPoint ?? "N/A"}</dd></div>
-                <div><dt>Route Number</dt><dd>{student.routeNumber ?? "N/A"}</dd></div>
+                <div><dt>Transportation Type</dt><dd>{activeStudent.transportationType}</dd></div>
+                <div><dt>Boarding Point</dt><dd>{activeStudent.boardingPoint ?? "N/A"}</dd></div>
+                <div><dt>Route Number</dt><dd>{activeStudent.routeNumber ?? "N/A"}</dd></div>
               </>
             )}
           </dl>
@@ -3126,25 +3185,34 @@ export default function App() {
         if (resp.ok) {
           const data = await resp.json();
           if (data.is_recognized && data.matched_person && data.verification_status === "Authorized") {
+            const mp = data.matched_person;
             const found = studentMatches.find(s => s.registerNumber.toUpperCase() === regTrimmed) || {
-              initials: data.matched_person.initials || "ST",
-              name: data.matched_person.name,
-              registerNumber: data.matched_person.identifier,
+              initials: mp.initials || "ST",
+              name: mp.name,
+              registerNumber: mp.identifier,
               dateOfBirth: "10 June 2004",
-              department: data.matched_person.department,
-              year: data.matched_person.year_roman || "III",
-              batch: data.matched_person.batch || "2022–2026",
-              institute: "Easwari Engineering College",
+              department: mp.department,
+              year: mp.year_roman || "II Year",
+              batch: mp.batch || "2023–2028",
+              institute: "SRM GROUP OF INSTITUTION TRICHY",
               similarity: 100,
-              accommodationType: (data.matched_person.residence_type as any) || "Hosteller",
-              hostelName: data.matched_person.hostel_name,
-              roomNumber: data.matched_person.room_number,
-              photo: data.matched_person.photo_url || capturedPhoto || "/faces/sur_crop.jpg",
+              accommodationType: (mp.residence_type as any) || "Hosteller",
+              hostelName: mp.hostel_name,
+              roomNumber: mp.room_number,
+              photo: mp.photo_url || capturedPhoto || "/faces/sur_crop.jpg",
             };
             setIdentityCase("student");
             setMatchedStudent({
               ...found,
-              photo: capturedPhoto || data.matched_person.photo_url || found.photo,
+              name: mp.name || found.name,
+              registerNumber: mp.identifier || found.registerNumber,
+              department: mp.department || found.department,
+              year: mp.year_roman || found.year,
+              batch: mp.batch || found.batch,
+              accommodationType: (mp.residence_type as any) || found.accommodationType,
+              hostelName: mp.hostel_name || found.hostelName,
+              roomNumber: mp.room_number || found.roomNumber,
+              photo: capturedPhoto || mp.photo_url || found.photo,
             });
             setVerificationMethod("register");
             go("identity");
