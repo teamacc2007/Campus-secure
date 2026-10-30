@@ -391,7 +391,8 @@ function TopBar({ title, subtitle, back, action, collegeBrand = true }: { title:
     <div className="top-copy">
       {isBranded ? (
         <div className="inst-lockup">
-          <span className="inst-title">SRM GROUP OF INSTITUTION TRICHY</span>
+          <span className="inst-title">SRM GROUP OF INSTITUTION</span>
+          <span className="inst-sub">TRICHY</span>
           {subtitle && <span className="inst-portal-tag">{subtitle}</span>}
         </div>
       ) : (
@@ -531,7 +532,8 @@ function Login({ enter, go }: { enter: (role: Role) => void; go: (screen: Screen
       </div>
       <div className="login-inst-text">
         <span className="inst-badge">OFFICIAL INSTITUTION PORTAL</span>
-        <h1 className="inst-title">SRM GROUP OF INSTITUTION TRICHY</h1>
+        <h1 className="inst-title">SRM GROUP OF INSTITUTION</h1>
+        <h2 className="inst-sub">TRICHY</h2>
         <p className="app-subtitle">Campus Secure · Identity-Led Campus Access</p>
       </div>
     </section>
@@ -1373,7 +1375,9 @@ async function downloadVisitorPassPdf(pass: VisitorPass) {
   pdf.setTextColor(255, 255, 255);
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(11);
-  pdf.text("SRM GROUP OF INSTITUTION TRICHY", 44, 14);
+  pdf.text("SRM GROUP OF INSTITUTION", 44, 11);
+  pdf.setFontSize(9);
+  pdf.text("TRICHY", 44, 17);
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(8);
   pdf.text(pass.entryType === "student" ? "STUDENT ENTRY PASS" : "VISITOR PASS", 44, 24);
@@ -2294,7 +2298,8 @@ function ForgotPassword({ go }: { go: (screen: Screen) => void }) {
       </div>
       <div className="login-inst-text">
         <span className="inst-badge">PASSWORD RECOVERY</span>
-        <h1 className="inst-title">SRM GROUP OF INSTITUTION TRICHY</h1>
+        <h1 className="inst-title">SRM GROUP OF INSTITUTION</h1>
+        <h2 className="inst-sub">TRICHY</h2>
         <p className="app-subtitle">Campus Secure · Identity Verification</p>
       </div>
     </section>
@@ -2658,7 +2663,8 @@ function Profile({ role, go, back }: { role: Role; go: (screen: Screen) => void;
         </div>
         <div className="inst-banner-copy">
           <span className="overline">AFFILIATED INSTITUTION</span>
-          <strong>SRM GROUP OF INSTITUTION TRICHY</strong>
+          <strong>SRM GROUP OF INSTITUTION</strong>
+          <small>TRICHY</small>
         </div>
       </div>
       <section className="profile-card"><div className="profile-avatar large">{meta.initials}</div><h1>{meta.name}</h1><p>{meta.label}</p><Status tone="green">Active session</Status></section>

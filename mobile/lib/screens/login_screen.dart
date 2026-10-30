@@ -136,12 +136,21 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           SizedBox(height: 2),
                           Text(
-                            'SRM GROUP OF INSTITUTION TRICHY',
+                            'SRM GROUP OF INSTITUTION',
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: 14,
+                              fontSize: 15,
                               fontWeight: FontWeight.w800,
                               letterSpacing: -0.3,
+                            ),
+                          ),
+                          Text(
+                            'TRICHY',
+                            style: TextStyle(
+                              color: Color(0xFFD0E2FC),
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
                             ),
                           ),
                         ],
