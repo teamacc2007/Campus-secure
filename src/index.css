@@ -1205,3 +1205,142 @@ h1, h2, h3, p, dl, dd { margin: 0; }
   color: #6b7280;
   font-family: monospace;
 }
+
+
+/* Recent Scan History (Security Guard Portal) */
+.scan-history-section {
+  margin-top: 18px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 4px 16px rgba(18, 39, 70, 0.04);
+}
+
+.scan-history-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.scan-history-head h3 {
+  font-size: 14px;
+  color: var(--navy);
+  font-weight: 800;
+  margin: 0;
+  letter-spacing: -0.2px;
+}
+
+.scan-history-subtitle {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.scan-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.scan-history-card {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  background: #ffffff;
+  border: 1px solid #fee2e2;
+  border-left: 3.5px solid var(--red);
+  border-radius: 12px;
+  padding: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 8px rgba(225, 29, 72, 0.04);
+}
+
+.scan-history-card:hover {
+  background: #fffafa;
+  border-color: #fca5a5;
+  box-shadow: 0 4px 12px rgba(225, 29, 72, 0.08);
+}
+
+.scan-history-photo-col {
+  width: 76px;
+  flex: none;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f8fafc;
+  border: 1px solid #fecdd3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.scan-history-photo {
+  width: 100%;
+  height: 100%;
+  min-height: 86px;
+  max-height: 105px;
+  object-fit: cover;
+  object-position: center 20%;
+  display: block;
+}
+
+.scan-history-photo-fallback {
+  width: 100%;
+  height: 86px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  background: #f1f5f9;
+}
+
+.scan-history-card-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+}
+
+.scan-history-card-body h4 {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--navy);
+  margin: 0;
+}
+
+.scan-history-location {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #475569;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scan-history-time {
+  font-size: 10.5px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.scan-history-status-row {
+  margin-top: 2px;
+}
+
+.scan-history-empty {
+  padding: 24px 12px;
+  text-align: center;
+  background: #f8fafc;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  color: var(--muted);
+}

@@ -573,13 +573,94 @@ function LevelOneHome({ role, go }: { role: "security" | "warden" | "staff"; go:
   </>;
 }
 
-function LevelOneScan({ go, completeScan, role }: { go: (screen: Screen) => void; completeScan: (capturedImage: string | null, matchResult?: StudentMatch | null, scores?: Record<string, number> | null) => void; role: "security" | "warden" | "staff" }) {
+function formatScanDateTime(dateStr?: string): string {
+  if (!dateStr) return "Just now";
+  try {
+    const d = new Date(dateStr.includes("T") ? dateStr : dateStr.replace(" ", "T"));
+    if (isNaN(d.getTime())) return dateStr;
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    let hours = d.getHours();
+    const minutes = String(d.getMinutes()).padStart(2, "0");
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    const strHours = String(hours).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd} ${strHours}:${minutes} ${ampm}`;
+  } catch {
+    return dateStr;
+  }
+}
+
+function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) => void; completeScan: (capturedImage: string | null, matchResult?: StudentMatch | null, scores?: Record<string, number> | null) => void; role: "security" | "warden" | "staff"; logs?: LogRecord[] }) {
   const [scanning, setScanning] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  const [selectedHistoryRecord, setSelectedHistoryRecord] = useState<LogRecord | null>(null);
+  const [unrecognizedHistory, setUnrecognizedHistory] = useState<LogRecord[]>(() => {
+    const baseLogs = logs ?? logRows;
+    return baseLogs.filter(r =>
+      r.accessCategory === "Unauthorized" &&
+      r.personType === "Unauthorised" &&
+      (r.name === "Unrecognized person" || r.name === "Unrecognized Person" || r.name === "Unknown Individual" || r.name === "Unknown Person")
+    );
+  });
+
+  useEffect(() => {
+    let active = true;
+    async function loadBackendHistory() {
+      try {
+        const resp = await fetch("http://localhost:8000/api/v1/access-logs/unrecognized?limit=30");
+        if (resp.ok) {
+          const data = await resp.json();
+          if (active && Array.isArray(data) && data.length > 0) {
+            const mapped: LogRecord[] = data.map((item: any) => {
+              const dt = item.timestamp ? item.timestamp.slice(0, 19) : new Date().toISOString().slice(0, 19);
+              const timePart = dt.length >= 16 ? dt.slice(11, 16) : "10:00";
+              return {
+                initials: "UP",
+                name: "Unrecognized person",
+                id: item.identifier_value || "Not available",
+                institution: "SRM GROUP OF INSTITUTION TRICHY",
+                department: item.department || "Not available",
+                block: item.location_block || (role === "warden" ? "Bharathi Hostel" : role === "staff" ? "Block A" : "Main Gate"),
+                time: timePart,
+                dateTime: dt,
+                event: "Denied",
+                tone: "red",
+                personType: "Unauthorised",
+                category: "Unauthorised visitor",
+                accessCategory: "Unauthorized",
+                logId: item.record_identifier,
+                phoneNumber: item.phone_number,
+                guard: item.guard_name || "G. Selvam",
+                guardNumber: "GRD-B-0017",
+                guardNotes: item.flag_reason || "Face scan unrecognized at security gate.",
+                entries: 1,
+                decision: "Denied",
+                photo: item.snapshot_url || undefined,
+              };
+            });
+
+            setUnrecognizedHistory(current => {
+              const existingIds = new Set(mapped.map(m => m.logId));
+              const extras = current.filter(c => c.logId && !existingIds.has(c.logId));
+              return [...mapped, ...extras];
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("Could not load unrecognized history from backend:", err);
+      }
+    }
+    loadBackendHistory();
+    return () => { active = false; };
+  }, [role]);
 
   const location = role === "warden" ? "Bharathi Hostel · SRM GROUP OF INSTITUTION TRICHY" : role === "staff" ? "Block A · SRM GROUP OF INSTITUTION TRICHY" : "Main Gate · SRM GROUP OF INSTITUTION TRICHY";
 
@@ -845,6 +926,47 @@ function LevelOneScan({ go, completeScan, role }: { go: (screen: Screen) => void
     reader.readAsDataURL(file);
   };
 
+  if (selectedHistoryRecord) {
+    const knownInstitution = !["Not identified", "Not available"].includes(selectedHistoryRecord.institution);
+    return <>
+      <TopBar title="Alert details" subtitle={selectedHistoryRecord.logId} back={() => setSelectedHistoryRecord(null)} />
+      <div className="page-content">
+        <section className="alert-record-head">
+          <div className="alert-symbol"><ShieldAlert size={20} /></div>
+          <div><h1>{selectedHistoryRecord.name}</h1></div>
+          <Status tone="red">Unrecognized</Status>
+        </section>
+        {selectedHistoryRecord.photo && (
+          <section className="info-card alert-intruder-card">
+            <div className="card-kicker"><Camera size={15} />CAPTURED INTRUDER PHOTOGRAPH</div>
+            <div className="alert-intruder-detail-preview">
+              <img src={selectedHistoryRecord.photo} alt="Captured Intruder" className="alert-detail-photo" />
+              <div className="alert-detail-photo-meta">
+                <Status tone="red">LIVE CAMERA CAPTURE</Status>
+                <p>Captured during facial scan at {selectedHistoryRecord.block}</p>
+                <small>Associated Event ID: {selectedHistoryRecord.logId || "DEN-•••-4039"}</small>
+              </div>
+            </div>
+          </section>
+        )}
+        <section className="info-card alert-info">
+          <div className="card-kicker"><FileClock size={15} />ORIGINAL SECURITY RECORD</div>
+          <dl>
+            <div><dt>Original event category</dt><dd>{selectedHistoryRecord.accessCategory}</dd></div>
+            <div><dt>Event</dt><dd>{selectedHistoryRecord.event}</dd></div>
+            {selectedHistoryRecord.phoneNumber && <div><dt>Phone number</dt><dd>{selectedHistoryRecord.phoneNumber}</dd></div>}
+            <div><dt>Security officer</dt><dd>{selectedHistoryRecord.guard}</dd></div>
+            <div><dt>Security number</dt><dd>{selectedHistoryRecord.guardNumber}</dd></div>
+            <div><dt>Institution</dt><dd>{knownInstitution ? selectedHistoryRecord.institution : "SRM GROUP OF INSTITUTION TRICHY"}</dd></div>
+            <div><dt>Gate / Location</dt><dd>{selectedHistoryRecord.block}</dd></div>
+            <div><dt>Date & time</dt><dd>{formatScanDateTime(selectedHistoryRecord.dateTime)}</dd></div>
+            <div><dt>Current verification status</dt><dd>Unrecognized</dd></div>
+          </dl>
+        </section>
+      </div>
+    </>;
+  }
+
   return <>
     <TopBar title={role === "warden" ? "Resident verification" : "Face verification"} subtitle={location} back={() => {
       if (streamRef.current) {
@@ -888,49 +1010,59 @@ function LevelOneScan({ go, completeScan, role }: { go: (screen: Screen) => void
         {scanning ? "Analyzing face biometrics…" : "Scan face with live camera"}
       </Button>
 
-      <section className="trained-profiles-section">
-        <div className="trained-profiles-head">
-          <div>
-            <span className="overline">TRAINED PROFILES (4 ENROLLED)</span>
-            <h3>Trained Biometric Face Database</h3>
-          </div>
-          <span className="badge-count">2 Institutions</span>
+      <section className="scan-history-section">
+        <div className="scan-history-head">
+          <h3>Recent Scan History</h3>
+          <p className="scan-history-subtitle">Showing only unrecognized faces</p>
         </div>
-        <p className="trained-profiles-subtitle">
-          Trained faces: 1. Sur, 2. Mon, 3. Mith, 4. Thiru across SRM GROUP OF INSTITUTION TRICHY and Easwari. Tap to verify or upload a photo:
-        </p>
-        <div className="trained-profiles-grid">
-          {studentMatches.map((student, idx) => (
-            <div key={student.registerNumber} className="trained-profile-card">
-              <div className="trained-profile-left">
-                <span className="trained-order-badge">#{idx + 1}</span>
-                <img src={student.photo} alt={student.name} className="trained-face-thumb" />
-                <div className="trained-profile-meta">
-                  <strong>{student.name}</strong>
-                  <span className="trained-reg">{student.registerNumber} · {student.department}</span>
-                  <span className={`trained-inst-tag ${student.institute.includes("Trichy") ? "inst-trichy" : "inst-easwari"}`}>
-                    {student.institute}
-                  </span>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="test-match-btn"
-                onClick={() => handleTestProfile(student)}
-                disabled={scanning}
-              >
-                <ScanFace size={14} />
-                <span>Verify Face</span>
-              </button>
+        <div className="scan-history-list">
+          {unrecognizedHistory.length === 0 ? (
+            <div className="empty-state scan-history-empty">
+              <ShieldAlert size={26} />
+              <strong>No unrecognized face scans</strong>
+              <span>Scanned unrecognized faces will appear here.</span>
             </div>
-          ))}
-        </div>
-        <div className="upload-face-box">
-          <label className="upload-face-label">
-            <Upload size={16} />
-            <span>Upload photo to run biometric matching</span>
-            <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: "none" }} />
-          </label>
+          ) : (
+            unrecognizedHistory.map((item) => (
+              <article
+                key={item.logId || `${item.dateTime}-${item.time}`}
+                className="scan-history-card"
+                onClick={() => setSelectedHistoryRecord(item)}
+              >
+                <div className="scan-history-photo-col">
+                  {item.photo ? (
+                    <img
+                      src={item.photo}
+                      alt="Unrecognized person"
+                      className="scan-history-photo"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                        const parent = e.currentTarget.parentElement;
+                        if (parent) parent.classList.add("fallback-mode");
+                      }}
+                    />
+                  ) : (
+                    <div className="scan-history-photo-fallback">
+                      <ScanFace size={24} />
+                    </div>
+                  )}
+                </div>
+                <div className="scan-history-card-body">
+                  <h4>Unrecognized person</h4>
+                  <div className="scan-history-location">
+                    <MapPin size={12} />
+                    <span>{item.block} — {item.institution || "SRM GROUP OF INSTITUTION TRICHY"}</span>
+                  </div>
+                  <div className="scan-history-time">
+                    <span>{formatScanDateTime(item.dateTime)}</span>
+                  </div>
+                  <div className="scan-history-status-row">
+                    <Status tone="red">Unrecognized</Status>
+                  </div>
+                </div>
+              </article>
+            ))
+          )}
         </div>
       </section>
     </div>
@@ -2933,6 +3065,48 @@ export default function App() {
     }
 
     // Unrecognized face (e.g. arbitrary live webcam scan with no matching enrolled embedding)
+    if (capturedImage) {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+      const dateStr = now.toISOString().slice(0, 10);
+      const dateTimeStr = `${dateStr}T${timeStr}`;
+      const randNum = Math.floor(1000 + Math.random() * 9000);
+      const logId = `DEN-•••-${randNum}`;
+
+      const newUnrecRecord: LogRecord = {
+        initials: "UP",
+        name: "Unrecognized person",
+        id: "Not available",
+        institution: "SRM GROUP OF INSTITUTION TRICHY",
+        department: "Not available",
+        block: role === "warden" ? "Bharathi Hostel" : role === "staff" ? "Block A" : "Main Gate",
+        time: timeStr,
+        dateTime: dateTimeStr,
+        event: "Denied",
+        tone: "red",
+        personType: "Unauthorised",
+        category: "Unauthorised visitor",
+        accessCategory: "Unauthorized",
+        logId: logId,
+        guard: role === "warden" ? roleMeta.warden.name : role === "staff" ? roleMeta.staff.name : "G. Selvam",
+        guardNumber: role === "warden" ? (roleMeta.warden.supervisorNumber || "WRD-B-0011") : "GRD-B-0017",
+        guardNotes: "Face recognition score below threshold. Person unrecognized.",
+        entries: 1,
+        decision: "Denied",
+        photo: capturedImage,
+      };
+
+      setLogs(current => {
+        const updated = [newUnrecRecord, ...current.filter(c => c.logId !== logId)];
+        try {
+          localStorage.setItem("campus_secure_custom_logs", JSON.stringify(updated.slice(0, 30)));
+        } catch (e) {
+          console.warn("Could not save custom logs to storage", e);
+        }
+        return updated;
+      });
+    }
+
     go("unrecognized");
   };
   const verifyRegister = async (registerNumber: string) => {
@@ -3073,7 +3247,7 @@ export default function App() {
   else if (screen === "alerts") content = <Alerts role={role} go={go} back={back} reviews={reviews} updateReview={updateReview} logs={logs} />;
   else if (role === "security" || role === "warden" || role === "staff") {
     if (screen === "home") content = <LevelOneHome role={role} go={go} />;
-    else if (screen === "scan") content = <LevelOneScan role={role} go={go} completeScan={completeScan} />;
+    else if (screen === "scan") content = <LevelOneScan role={role} go={go} completeScan={completeScan} logs={logs} />;
     else if (screen === "logs") content = <Logs role={role} reviews={reviews} />;
     else if (screen === "unrecognized") content = <UnrecognizedResult role={role} go={go} verifyRegister={verifyRegister} capturedPhoto={capturedPhoto} biometricScores={biometricScores} />;
     else if (screen === "identity") content = <IdentityResult role={role} go={go} identityCase={identityCase} verificationMethod={verificationMethod} student={matchedStudent} capturedPhoto={capturedPhoto} />;

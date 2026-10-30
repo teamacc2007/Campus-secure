@@ -6,8 +6,10 @@ from pydantic import BaseModel
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
+from sqlalchemy import desc
 from app.core.database import get_db
 from app.schemas.access_log import AccessLogOut, AccessLogCreate, AccessLogReviewRequest
+from app.models.access_log import AccessLog
 from app.services.access_log_service import (
     log_access_event,
     list_access_logs,
@@ -84,6 +86,25 @@ def get_pending_alerts(
         role=current_user.role,
         review_status="Pending Verification",
         limit=100,
+    )
+
+
+@router.get("/unrecognized", response_model=List[AccessLogOut])
+def get_unrecognized_history(
+    limit: int = Query(50, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """Retrieve only actual unrecognized face scans from access logs, sorted newest first."""
+    return (
+        db.query(AccessLog)
+        .filter(
+            AccessLog.verification_method == "Face Recognition",
+            AccessLog.verification_status == "Unauthorized",
+            AccessLog.name.in_(["Unrecognized Person", "Unrecognized person", "Unknown Individual", "Unknown Person"]),
+        )
+        .order_by(desc(AccessLog.id))
+        .limit(limit)
+        .all()
     )
 
 
