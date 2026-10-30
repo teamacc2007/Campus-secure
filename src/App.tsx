@@ -2357,17 +2357,40 @@ function Logs({ role, reviews }: { role: Role; reviews: Record<string, ReviewRec
   </>;
 }
 
-function SupervisorHome({ go }: { go: (screen: Screen) => void }) {
+function SupervisorHome({ go, reviews, logs }: { go: (screen: Screen) => void; reviews?: Record<string, ReviewRecord>; logs?: LogRecord[] }) {
+  const currentLogs = logs ?? logRows;
+  const localCount = currentLogs.filter(row => {
+    if (row.accessCategory !== "Unauthorized") return false;
+    const rev = reviewFor(reviews ?? {}, row);
+    return rev.status === "Pending Verification";
+  }).length;
+
+  const [unauthorizedCount, setUnauthorizedCount] = useState<number>(localCount);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetch("http://localhost:8000/api/v1/access-logs/unauthorized-count")
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && typeof data.count === "number" && isMounted) {
+          setUnauthorizedCount(data.count);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setUnauthorizedCount(localCount);
+        }
+      });
+    return () => { isMounted = false; };
+  }, [localCount]);
+
   return <>
     <TopBar title="Campus Secure" subtitle="Campus Supervisor Portal" action={<Status tone="green">Live</Status>} />
     <div className="page-content"><ProfileHead role="supervisor" go={go} />
       <section className="supervisor-hero"><div><span>CAMPUS STATUS</span><strong>5 / 5</strong><p>Assigned Security</p></div><ShieldCheck size={55} /></section>
-      <div className="dashboard-stats"><div><span className="stat-icon blue-bg"><UserCog size={18} /></span><strong>8</strong><small>Security on duty</small></div><div><span className="stat-icon amber-bg"><ShieldAlert size={18} /></span><strong>3</strong><small>Alerts to review</small></div></div>
-      <div className="section-heading compact"><div><h2>Campus operations</h2></div></div>
-      <div className="admin-list">
-        <button onClick={() => go("assignments")}><span><UserCog size={21} /></span><div><strong>Security assignments</strong></div><ChevronRight size={18} /></button>
-        <button onClick={() => go("audit")}><span><FileClock size={21} /></span><div><strong>Assigned security records</strong></div><ChevronRight size={18} /></button>
-        <button onClick={() => go("alerts")}><span className="red-icon"><ShieldAlert size={21} /></span><div><strong>Access event alerts</strong></div><b>3</b><ChevronRight size={18} /></button>
+      <div className="dashboard-stats">
+        <div><span className="stat-icon blue-bg"><UserCog size={18} /></span><strong>8</strong><small>Security on duty</small></div>
+        <div><span className="stat-icon amber-bg"><ShieldAlert size={18} /></span><strong>{unauthorizedCount}</strong><small>Unauthorised</small></div>
       </div>
       <div className="section-heading compact"><div><h2>Block coverage</h2></div><button onClick={() => go("assignments")}>Manage</button></div>
       <div className="coverage-list">{["Main Gate · Arun Kumar", "Block A · Kavya Rao", "Library · Imran Ali"].map((item, i) => <div key={item}><span><MapPin size={16} /></span><div><strong>{item.split(" · ")[0]}</strong><small>{item.split(" · ")[1]}</small></div><Status tone={i === 2 ? "amber" : "green"}>{i === 2 ? "Break" : "Active"}</Status></div>)}</div>
@@ -3346,7 +3369,7 @@ export default function App() {
     if (screen === "assignments") content = <Assignments go={go} />;
     else if (screen === "create-guard") content = <CreateGuard go={go} />;
     else if (screen === "audit" || screen === "logs") content = <Audit go={go} reviews={reviews} />;
-    else content = <SupervisorHome go={go} />;
+    else content = <SupervisorHome go={go} reviews={reviews} logs={logs} />;
   } else if (role === "cso") {
     if (screen === "assignments") content = <Assignments go={go} />;
     else if (screen === "create-guard") content = <CreateGuard go={go} />;

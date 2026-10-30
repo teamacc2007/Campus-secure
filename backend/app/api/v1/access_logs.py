@@ -108,6 +108,24 @@ def get_unrecognized_history(
     )
 
 
+@router.get("/unauthorized-count")
+def get_unauthorized_count(
+    review_status: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Retrieve count of unauthorized events requiring attention according to backend status logic."""
+    target_status = review_status or "Pending Verification"
+    count = (
+        db.query(AccessLog)
+        .filter(
+            AccessLog.verification_status == "Unauthorized",
+            AccessLog.review_status == target_status,
+        )
+        .count()
+    )
+    return {"count": count, "review_status": target_status}
+
+
 class UnauthorizedReportRequest(BaseModel):
     name: Optional[str] = "Unrecognized Person"
     phone_number: Optional[str] = None

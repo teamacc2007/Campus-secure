@@ -62,3 +62,12 @@ def test_log_access_and_supervisor_review(security_token, supervisor_token):
     assert reviewed_entry["verification_status"] == "Unauthorized"
     assert len(reviewed_entry["review_actions"]) >= 1
     assert reviewed_entry["review_actions"][-1]["type"] == "Unauthorised"
+
+
+def test_unauthorized_count_endpoint():
+    res = client.get("/api/v1/access-logs/unauthorized-count")
+    assert res.status_code == 200
+    data = res.json()
+    assert "count" in data
+    assert isinstance(data["count"], int)
+    assert data["review_status"] == "Pending Verification"
