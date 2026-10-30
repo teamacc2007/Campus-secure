@@ -63,6 +63,13 @@ h1, h2, h3, p, dl, dd { margin: 0; }
 .bottom-nav button { position: relative; border: 0; background: none; color: #8a97a8; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 8px; }
 .bottom-nav button.active { color: var(--blue); font-weight: 700; }
 .bottom-nav b { position: absolute; top: -4px; right: 21px; width: 15px; height: 15px; display: grid; place-items: center; color: #fff; background: #cb3340; border-radius: 50%; font-size: 7px; }
+.bottom-nav button.scan-nav-btn { display: flex; flex-direction: column; align-items: center; gap: 3px; position: relative; cursor: pointer; }
+.bottom-nav .scan-nav-circle { width: 44px; height: 44px; margin-top: -15px; background: var(--blue); color: #ffffff; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.38); transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.bottom-nav button.scan-nav-btn:hover .scan-nav-circle { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(37, 99, 235, 0.48); }
+.bottom-nav button.scan-nav-btn:active .scan-nav-circle { transform: scale(0.94); }
+.bottom-nav button.scan-nav-btn span { color: #8a97a8; font-size: 8px; font-weight: 600; }
+.bottom-nav button.scan-nav-btn.active span { color: var(--blue); font-weight: 700; }
+.bottom-nav button.scan-nav-btn.active .scan-nav-circle { box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.22), 0 4px 14px rgba(37, 99, 235, 0.45); }
 
 .login-page { padding: 36px 18px 30px; background: linear-gradient(175deg, #0d2f60 0%, #154589 29%, #f5f7fb 29.2%); }
 .login-brand { min-height: 110px; display: flex; align-items: center; gap: 14px; color: #fff; margin-bottom: 18px; }

@@ -433,8 +433,8 @@ function BottomNav({ role, active, go }: { role: Role; active: Screen; go: (scre
     supervisor: [
       { screen: "home", label: "Overview", icon: <Shield size={20} /> },
       { screen: "assignments", label: "Security", icon: <UserCog size={20} /> },
+      { screen: "scan", label: "Scan", icon: <ScanFace size={22} /> },
       { screen: "audit", label: "Records", icon: <FileClock size={20} /> },
-      { screen: "alerts", label: "Alerts", icon: <Bell size={20} /> },
     ],
     "access-supervisor": [
       { screen: "home", label: "Overview", icon: <Shield size={20} /> },
@@ -471,7 +471,25 @@ function BottomNav({ role, active, go }: { role: Role; active: Screen; go: (scre
       { screen: "profile", label: "Profile", icon: <CircleUserRound size={20} /> },
     ],
   };
-  return <nav className={`bottom-nav ${menus[role].length === 3 ? "three-items" : menus[role].length === 2 ? "two-items" : ""}`}>{menus[role].map(item => <button key={item.label} className={active === item.screen ? "active" : ""} onClick={() => go(item.screen)}>{item.icon}<span>{item.label}</span>{item.screen === "alerts" && <b>3</b>}</button>)}</nav>;
+  return <nav className={`bottom-nav ${menus[role].length === 3 ? "three-items" : menus[role].length === 2 ? "two-items" : ""}`}>{menus[role].map(item => {
+    const isSupervisorScan = role === "supervisor" && item.screen === "scan";
+    if (isSupervisorScan) {
+      return (
+        <button
+          key={item.label}
+          className={`scan-nav-btn ${active === item.screen ? "active" : ""}`}
+          onClick={() => go(item.screen)}
+          aria-label="Scan"
+        >
+          <div className="scan-nav-circle">
+            <ScanFace size={22} />
+          </div>
+          <span>{item.label}</span>
+        </button>
+      );
+    }
+    return <button key={item.label} className={active === item.screen ? "active" : ""} onClick={() => go(item.screen)}>{item.icon}<span>{item.label}</span>{item.screen === "alerts" && <b>3</b>}</button>;
+  })}</nav>;
 }
 
 function Page({ children, nav, role, active, go }: { children: ReactNode; nav?: boolean; role: Role; active: Screen; go: (screen: Screen) => void }) {
@@ -612,7 +630,7 @@ function formatRomanYearWithSuffix(yearRaw?: string): string {
   return roman ? `${roman} Year` : yearRaw.trim();
 }
 
-function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) => void; completeScan: (capturedImage: string | null, matchResult?: StudentMatch | null, scores?: Record<string, number> | null) => void; role: "security" | "warden" | "staff"; logs?: LogRecord[] }) {
+function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) => void; completeScan: (capturedImage: string | null, matchResult?: StudentMatch | null, scores?: Record<string, number> | null) => void; role: "security" | "warden" | "staff" | "supervisor"; logs?: LogRecord[] }) {
   const [scanning, setScanning] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -647,7 +665,7 @@ function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) =
                 id: item.identifier_value || "Not available",
                 institution: "SRM GROUP OF INSTITUTION TRICHY",
                 department: item.department || "Not available",
-                block: item.location_block || (role === "warden" ? "Bharathi Hostel" : role === "staff" ? "Block A" : "Main Gate"),
+                block: item.location_block || (role === "warden" ? "Bharathi Hostel" : role === "staff" ? "Block A" : role === "supervisor" ? "Institution B Campus" : "Main Gate"),
                 time: timePart,
                 dateTime: dt,
                 event: "Denied",
@@ -657,8 +675,8 @@ function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) =
                 accessCategory: "Unauthorized",
                 logId: item.record_identifier,
                 phoneNumber: item.phone_number,
-                guard: item.guard_name || "G. Selvam",
-                guardNumber: "GRD-B-0017",
+                guard: item.guard_name || (role === "supervisor" ? roleMeta.supervisor.name : "G. Selvam"),
+                guardNumber: role === "supervisor" ? (roleMeta.supervisor.supervisorNumber || "SUP-B-0004") : "GRD-B-0017",
                 guardNotes: item.flag_reason || "Face scan unrecognized at security gate.",
                 entries: 1,
                 decision: "Denied",
@@ -681,7 +699,7 @@ function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) =
     return () => { active = false; };
   }, [role]);
 
-  const location = role === "warden" ? "Bharathi Hostel · SRM GROUP OF INSTITUTION TRICHY" : role === "staff" ? "Block A · SRM GROUP OF INSTITUTION TRICHY" : "Main Gate · SRM GROUP OF INSTITUTION TRICHY";
+  const location = role === "warden" ? "Bharathi Hostel · SRM GROUP OF INSTITUTION TRICHY" : role === "staff" ? "Block A · SRM GROUP OF INSTITUTION TRICHY" : role === "supervisor" ? "Institution B Campus · SRM GROUP OF INSTITUTION TRICHY" : "Main Gate · SRM GROUP OF INSTITUTION TRICHY";
 
   useEffect(() => {
     let mounted = true;
@@ -753,15 +771,15 @@ function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) =
           ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
           capturedDataUrl = canvas.toDataURL("image/jpeg", 0.90);
 
-          if (role === "security") {
+          if (role === "security" || role === "supervisor") {
             try {
               const resp = await fetch("http://localhost:8000/api/v1/ai/verify-face", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   image_base64: capturedDataUrl,
-                  location_block: "Gate 1 Main Entrance",
-                  guard_name: "G. Selvam",
+                  location_block: role === "supervisor" ? "Institution B Campus" : "Gate 1 Main Entrance",
+                  guard_name: role === "supervisor" ? (roleMeta.supervisor.name || "Meera Nair") : "G. Selvam",
                 }),
               });
               if (resp.ok) {
@@ -878,15 +896,15 @@ function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) =
         let match: StudentMatch | null = null;
         let scores: Record<string, number> | null = null;
 
-        if (role === "security") {
+        if (role === "security" || role === "supervisor") {
           try {
             const resp = await fetch("http://localhost:8000/api/v1/ai/verify-face", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 image_base64: dataUrl,
-                location_block: "Gate 1 Main Entrance",
-                guard_name: "G. Selvam",
+                location_block: role === "supervisor" ? "Institution B Campus" : "Gate 1 Main Entrance",
+                guard_name: role === "supervisor" ? (roleMeta.supervisor.name || "Meera Nair") : "G. Selvam",
               }),
             });
             if (resp.ok) {
@@ -1097,7 +1115,7 @@ function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) =
   </>;
 }
 
-function IdentityResult({ go, identityCase, verificationMethod, student, role, capturedPhoto }: { go: (screen: Screen) => void; identityCase: IdentityCase; verificationMethod: VerificationMethod; student: StudentMatch; role: "security" | "warden" | "staff"; capturedPhoto?: string | null }) {
+function IdentityResult({ go, identityCase, verificationMethod, student, role, capturedPhoto }: { go: (screen: Screen) => void; identityCase: IdentityCase; verificationMethod: VerificationMethod; student: StudentMatch; role: "security" | "warden" | "staff" | "supervisor"; capturedPhoto?: string | null }) {
   const staff = identityCase === "staff";
   const registerVerified = verificationMethod === "register";
 
@@ -1144,7 +1162,7 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role, c
   const personName = staff ? staffMember.name : activeStudent.name;
   const institute = staff ? staffMember.institute : activeStudent.institute;
   const isTrichySRM = institute.toLowerCase().includes("trichy");
-  const location = role === "warden" ? "Bharathi Hostel" : role === "staff" ? "Block A" : "Main Gate";
+  const location = role === "warden" ? "Bharathi Hostel" : role === "staff" ? "Block A" : role === "supervisor" ? "Institution B Campus" : "Main Gate";
 
   const { displayYear, displayBatch } = formatYearBatch(activeStudent.year, activeStudent.batch);
   const profileYear = formatRomanYearWithSuffix(activeStudent.year);
@@ -1155,8 +1173,8 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role, c
       <div className="progress-line"><span className="done"><Check size={12} /></span><i className="done" /><span className="active">2</span><i /><span>3</span></div>
       <section className="identity-hero">
         <div className={`captured-photo ${staff ? "staff-photo" : ""}`}>
-          {(capturedPhoto && (verificationMethod === "register" || role === "security")) || activeStudent.photo ? (
-            <img src={(capturedPhoto && (verificationMethod === "register" || role === "security")) ? capturedPhoto : activeStudent.photo} alt={personName} className="captured-real-photo" />
+          {(capturedPhoto && (verificationMethod === "register" || role === "security" || role === "supervisor")) || activeStudent.photo ? (
+            <img src={(capturedPhoto && (verificationMethod === "register" || role === "security" || role === "supervisor")) ? capturedPhoto : activeStudent.photo} alt={personName} className="captured-real-photo" />
           ) : (
             <CircleUserRound size={48} />
           )}
@@ -1195,7 +1213,7 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role, c
             <div><dt>Name</dt><dd>{activeStudent.name}</dd></div>
             <div><dt>Register Number</dt><dd>{activeStudent.registerNumber}</dd></div>
             <div><dt>Date of Birth</dt><dd>{activeStudent.dateOfBirth}</dd></div>
-            {role === "security" ? (
+            {role === "security" || role === "supervisor" ? (
               <div><dt>Year & Department</dt><dd>{profileYear} · {activeStudent.department}</dd></div>
             ) : (
               <>
@@ -1246,7 +1264,7 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role, c
   </>;
 }
 
-function UnrecognizedResult({ go, verifyRegister, role, capturedPhoto, biometricScores }: { go: (screen: Screen) => void; verifyRegister: (registerNumber: string) => boolean | Promise<boolean>; role: "security" | "warden" | "staff"; capturedPhoto: string | null; biometricScores: Record<string, number> | null }) {
+function UnrecognizedResult({ go, verifyRegister, role, capturedPhoto, biometricScores }: { go: (screen: Screen) => void; verifyRegister: (registerNumber: string) => boolean | Promise<boolean>; role: "security" | "warden" | "staff" | "supervisor"; capturedPhoto: string | null; biometricScores: Record<string, number> | null }) {
   const [registerNumber, setRegisterNumber] = useState("");
   const [notVerified, setNotVerified] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<string | null>(null);
@@ -1284,7 +1302,7 @@ function UnrecognizedResult({ go, verifyRegister, role, capturedPhoto, biometric
           ) : (
             <CircleUserRound size={46} />
           )}
-          <span>Captured at {role === "warden" ? "Bharathi Hostel" : "Main Gate"}</span>
+          <span>Captured at {role === "warden" ? "Bharathi Hostel" : role === "supervisor" ? "Institution B Campus" : "Main Gate"}</span>
         </div>
         <Status tone="red">UNAUTHORISED / UNRECOGNIZED</Status>
         <h1>Face Not Recognized</h1>
@@ -1382,7 +1400,7 @@ function UnauthorizedForm({
   onRecordEvent,
 }: {
   go: (screen: Screen) => void;
-  role: "security" | "warden" | "staff";
+  role: "security" | "warden" | "staff" | "supervisor";
   capturedPhoto: string | null;
   onRecordEvent?: (photo: string | null, notes?: string, phoneNumber?: string, fullName?: string) => void;
 }) {
@@ -1407,7 +1425,7 @@ function UnauthorizedForm({
     setSubmitted(true);
   };
 
-  if (submitted) return <div className="success-page"><div className="success-symbol warning-symbol"><ShieldAlert size={38} /></div><Status tone="amber">CAMPUS SUPERVISOR NOTIFIED</Status><h1>Unauthorized event recorded</h1><p>The captured image, location, time, attempted register number, contact number, and officer notes were sent to the Campus Supervisor.</p><Button onClick={() => go("scan")}>Scan next person</Button><Button variant="secondary" onClick={() => go("home")}>Return home</Button></div>;
+  if (submitted) return <div className="success-page"><div className="success-symbol warning-symbol"><ShieldAlert size={38} /></div><Status tone="amber">{role === "supervisor" ? "UNAUTHORIZED EVENT LOGGED" : "CAMPUS SUPERVISOR NOTIFIED"}</Status><h1>Unauthorized event recorded</h1><p>{role === "supervisor" ? "The captured image, location, time, contact number, and supervisor notes were saved directly to the campus audit log." : "The captured image, location, time, attempted register number, contact number, and officer notes were sent to the Campus Supervisor."}</p><Button onClick={() => go("scan")}>Scan next person</Button><Button variant="secondary" onClick={() => go("home")}>Return home</Button></div>;
   return <>
     <TopBar title="Unauthorized person" subtitle="Record security event" back={() => go("unrecognized")} />
     <div className="page-content form-page">
@@ -1420,8 +1438,8 @@ function UnauthorizedForm({
           </div>
         </div>
       )}
-      <Status tone="amber">SUPERVISOR WILL BE NOTIFIED</Status>
-      <div className="form-intro"><h1>Record event details</h1><p>Review the captured event before notifying the Campus Supervisor.</p></div>
+      <Status tone="amber">{role === "supervisor" ? "RECORDING IN AUDIT LOG" : "SUPERVISOR WILL BE NOTIFIED"}</Status>
+      <div className="form-intro"><h1>Record event details</h1><p>{role === "supervisor" ? "Review the captured event before recording in the campus audit log." : "Review the captured event before notifying the Campus Supervisor."}</p></div>
       <div className="form-stack">
         <label className="field">
           <span>Full Name</span>
@@ -1441,17 +1459,17 @@ function UnauthorizedForm({
           {phoneError && <small className="field-error" style={{ color: "#ef4444", fontSize: "12px", marginTop: "4px", display: "block" }}>{phoneError}</small>}
         </label>
         <label className="field">
-          <span>{role === "warden" ? "Warden notes" : role === "staff" ? "Staff notes" : "Security notes"}</span>
+          <span>{role === "warden" ? "Warden notes" : role === "staff" ? "Staff notes" : role === "supervisor" ? "Supervisor notes" : "Security notes"}</span>
           <input placeholder="Optional operational notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
         </label>
       </div>
-      <Button onClick={handleSubmit} icon={<ShieldAlert size={17} />}>Record & notify Campus Supervisor</Button>
+      <Button onClick={handleSubmit} icon={<ShieldAlert size={17} />}>{role === "supervisor" ? "Record unauthorized event" : "Record & notify Campus Supervisor"}</Button>
     </div>
   </>;
 }
 
-function Success({ go, role }: { go: (screen: Screen) => void; role: "security" | "warden" | "staff" }) {
-  const location = role === "warden" ? "Bharathi Hostel" : role === "staff" ? "Block A" : "Main Gate";
+function Success({ go, role }: { go: (screen: Screen) => void; role: "security" | "warden" | "staff" | "supervisor" }) {
+  const location = role === "warden" ? "Bharathi Hostel" : role === "staff" ? "Block A" : role === "supervisor" ? "Institution B Campus" : "Main Gate";
   return <div className="success-page">
     <div className="success-symbol"><Check size={39} /></div><Status tone="green">ENTRY RECORDED</Status>
     <h1>Person entered {location}</h1><p>The identity, access decision, officer confirmation, and time have been added to the audit log.</p>
@@ -3195,7 +3213,7 @@ export default function App() {
       id: "Not available",
       institution: "SRM GROUP OF INSTITUTION TRICHY",
       department: "Not available",
-      block: role === "warden" ? "Bharathi Hostel" : role === "staff" ? "Block A" : "Main Gate",
+      block: role === "warden" ? "Bharathi Hostel" : role === "staff" ? "Block A" : role === "supervisor" ? "Institution B Campus" : "Main Gate",
       time: timeStr,
       dateTime: dateTimeStr,
       event: "Denied",
@@ -3205,9 +3223,9 @@ export default function App() {
       accessCategory: "Unauthorized",
       logId: logId,
       phoneNumber: phoneNumber,
-      guard: role === "warden" ? roleMeta.warden.name : role === "staff" ? roleMeta.staff.name : "G. Selvam",
-      guardNumber: role === "warden" ? (roleMeta.warden.supervisorNumber || "WRD-B-0011") : "GRD-B-0017",
-      guardNotes: notes || (phoneNumber ? `Contact: ${phoneNumber}. Identity could not be verified at the Main Gate.` : "Identity could not be verified at the Main Gate."),
+      guard: role === "warden" ? roleMeta.warden.name : role === "staff" ? roleMeta.staff.name : role === "supervisor" ? roleMeta.supervisor.name : "G. Selvam",
+      guardNumber: role === "warden" ? (roleMeta.warden.supervisorNumber || "WRD-B-0011") : role === "supervisor" ? (roleMeta.supervisor.supervisorNumber || "SUP-B-0004") : "GRD-B-0017",
+      guardNotes: notes || (phoneNumber ? (role === "supervisor" ? `Contact: ${phoneNumber}. Identity could not be verified by supervisor.` : `Contact: ${phoneNumber}. Identity could not be verified at the Main Gate.`) : (role === "supervisor" ? "Identity could not be verified by supervisor." : "Identity could not be verified at the Main Gate.")),
       entries: 1,
       decision: "Denied",
       photo: photo || undefined,
@@ -3229,9 +3247,9 @@ export default function App() {
       body: JSON.stringify({
         name: personName,
         phone_number: phoneNumber,
-        location_block: role === "warden" ? "Bharathi Hostel" : role === "staff" ? "Block A" : "Main Gate",
-        guard_name: role === "warden" ? roleMeta.warden.name : "G. Selvam",
-        notes: notes || "Identity could not be verified at the Main Gate.",
+        location_block: role === "warden" ? "Bharathi Hostel" : role === "staff" ? "Block A" : role === "supervisor" ? "Institution B Campus" : "Main Gate",
+        guard_name: role === "warden" ? roleMeta.warden.name : role === "supervisor" ? roleMeta.supervisor.name : "G. Selvam",
+        notes: notes || (role === "supervisor" ? "Identity could not be verified by supervisor." : "Identity could not be verified at the Main Gate."),
         image_base64: photo || null,
         log_id: logId,
       }),
@@ -3301,7 +3319,7 @@ export default function App() {
         id: "Not available",
         institution: "SRM GROUP OF INSTITUTION TRICHY",
         department: "Not available",
-        block: role === "warden" ? "Bharathi Hostel" : role === "staff" ? "Block A" : "Main Gate",
+        block: role === "warden" ? "Bharathi Hostel" : role === "staff" ? "Block A" : role === "supervisor" ? "Institution B Campus" : "Main Gate",
         time: timeStr,
         dateTime: dateTimeStr,
         event: "Denied",
@@ -3310,8 +3328,8 @@ export default function App() {
         category: "Unauthorised visitor",
         accessCategory: "Unauthorized",
         logId: logId,
-        guard: role === "warden" ? roleMeta.warden.name : role === "staff" ? roleMeta.staff.name : "G. Selvam",
-        guardNumber: role === "warden" ? (roleMeta.warden.supervisorNumber || "WRD-B-0011") : "GRD-B-0017",
+        guard: role === "warden" ? roleMeta.warden.name : role === "staff" ? roleMeta.staff.name : role === "supervisor" ? roleMeta.supervisor.name : "G. Selvam",
+        guardNumber: role === "warden" ? (roleMeta.warden.supervisorNumber || "WRD-B-0011") : role === "supervisor" ? (roleMeta.supervisor.supervisorNumber || "SUP-B-0004") : "GRD-B-0017",
         guardNotes: "Face recognition score below threshold. Person unrecognized.",
         entries: 1,
         decision: "Denied",
@@ -3333,7 +3351,7 @@ export default function App() {
   };
   const verifyRegister = async (registerNumber: string) => {
     const regTrimmed = registerNumber.trim().toUpperCase();
-    if (role === "security") {
+    if (role === "security" || role === "supervisor") {
       try {
         const resp = await fetch("http://localhost:8000/api/v1/ai/verify-face", {
           method: "POST",
@@ -3341,8 +3359,8 @@ export default function App() {
           body: JSON.stringify({
             register_number: regTrimmed,
             image_base64: capturedPhoto,
-            location_block: "Gate 1 Main Entrance",
-            guard_name: "G. Selvam",
+            location_block: role === "supervisor" ? "Institution B Campus" : "Gate 1 Main Entrance",
+            guard_name: role === "supervisor" ? roleMeta.supervisor.name : "G. Selvam",
           }),
         });
         if (resp.ok) {
@@ -3493,7 +3511,12 @@ export default function App() {
     else if (screen === "access-notifications") content = <AccessNotifications passes={visitorPasses} unread={unreadPassNotifications} setUnread={setUnreadPassNotifications} openPass={pass => openVisitorPass(pass, "access-notifications")} back={back} />;
     else content = <AccessSupervisorHome go={go} todayCount={todayPassCount} />;
   } else if (role === "supervisor") {
-    if (screen === "assignments") content = <Assignments go={go} />;
+    if (screen === "scan") content = <LevelOneScan role="supervisor" go={go} completeScan={completeScan} logs={logs} />;
+    else if (screen === "unrecognized") content = <UnrecognizedResult role="supervisor" go={go} verifyRegister={verifyRegister} capturedPhoto={capturedPhoto} biometricScores={biometricScores} />;
+    else if (screen === "identity") content = <IdentityResult role="supervisor" go={go} identityCase={identityCase} verificationMethod={verificationMethod} student={matchedStudent} capturedPhoto={capturedPhoto} />;
+    else if (screen === "unauthorised") content = <UnauthorizedForm role="supervisor" go={go} capturedPhoto={capturedPhoto} onRecordEvent={recordUnauthorizedEvent} />;
+    else if (screen === "success") content = <Success role="supervisor" go={go} />;
+    else if (screen === "assignments") content = <Assignments go={go} />;
     else if (screen === "create-guard") content = <CreateGuard go={go} />;
     else if (screen === "audit" || screen === "logs") content = <Audit go={go} reviews={reviews} logs={logs} />;
     else content = <SupervisorHome go={go} reviews={reviews} logs={logs} />;
@@ -3523,7 +3546,7 @@ export default function App() {
     else content = <StudentAffairsHome go={go} />;
   }
 
-  const navScreens: Screen[] = ["home", "logs", "workload", "assignments", "audit", "users", "institution-users", "campus-entries", "login-logs", "visitor-pass", "pass-records", "welfare-logs"];
+  const navScreens: Screen[] = ["home", "scan", "logs", "workload", "assignments", "audit", "users", "institution-users", "campus-entries", "login-logs", "visitor-pass", "pass-records", "welfare-logs"];
   const showNav = screen !== "login" && (navScreens.includes(screen) || (role === "manager" && screen === "profile"));
   return <div className="app-shell"><Page role={role} active={screen} go={go} nav={showNav}>{content}</Page></div>;
 }
