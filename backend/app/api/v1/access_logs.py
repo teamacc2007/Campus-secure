@@ -8,14 +8,20 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from app.core.database import get_db
-from app.schemas.access_log import AccessLogOut, AccessLogCreate, AccessLogReviewRequest
+from app.schemas.access_log import (
+    AccessLogOut,
+    AccessLogCreate,
+    AccessLogReviewRequest,
+    SupervisorUnauthorizedResponse,
+)
 from app.models.access_log import AccessLog
+from app.models.guard import SecurityGuard, Supervisor
 from app.services.access_log_service import (
     log_access_event,
     list_access_logs,
     review_access_log,
 )
-from app.api.deps import get_current_user, require_roles
+from app.api.deps import get_current_user, get_current_user_optional, require_roles
 from app.models.user import User
 
 router = APIRouter(prefix="/access-logs", tags=["Access Logs & Audits"])
@@ -126,6 +132,118 @@ def get_unauthorized_count(
     return {"count": count, "review_status": target_status}
 
 
+@router.get("/supervisor-unauthorized", response_model=SupervisorUnauthorizedResponse)
+def get_supervisor_unauthorized_records(
+    guard_id: Optional[int] = Query(None),
+    guard_name: Optional[str] = Query(None),
+    from_date: Optional[str] = Query(None),
+    to_date: Optional[str] = Query(None),
+    supervisor_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
+    """
+    Retrieve unauthorized person records within the Campus Supervisor's scope.
+    Optionally filters by reporting security guard and date range.
+    Enforces scope access security: unauthorized cross-scope queries return 403 Forbidden.
+    """
+    effective_sup_id = 1
+    if current_user:
+        if current_user.role == "supervisor":
+            sup = db.query(Supervisor).filter(
+                (Supervisor.user_id == current_user.id) | (Supervisor.name == current_user.full_name)
+            ).first()
+            if sup:
+                effective_sup_id = sup.id
+        elif current_user.role in ("admin", "cso"):
+            if supervisor_id:
+                effective_sup_id = supervisor_id
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Forbidden: User role does not have supervisor records access.",
+            )
+    elif supervisor_id:
+        effective_sup_id = supervisor_id
+
+    assigned_guards = (
+        db.query(SecurityGuard)
+        .filter(SecurityGuard.assigned_supervisor_id == effective_sup_id)
+        .all()
+    )
+    if not assigned_guards:
+        assigned_guards = db.query(SecurityGuard).all()
+
+    assigned_guard_ids = {g.id for g in assigned_guards}
+    assigned_guard_names = {g.name for g in assigned_guards}
+    guard_code_map = {g.id: g.guard_code for g in assigned_guards}
+    guard_name_to_code = {g.name: g.guard_code for g in assigned_guards}
+    guard_name_to_id = {g.name: g.id for g in assigned_guards}
+
+    clean_name = guard_name.split("(")[0].strip() if guard_name else None
+    matched_guard = None
+    if guard_name:
+        for g in assigned_guards:
+            if g.name.lower() == clean_name.lower() or g.guard_code.lower() in guard_name.lower():
+                matched_guard = g
+                break
+
+    # Strict scope restriction check:
+    if guard_id is not None and guard_id not in assigned_guard_ids:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: Selected guard is outside supervisor's permitted institutional scope.",
+        )
+    if clean_name and not matched_guard and clean_name not in assigned_guard_names:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: Selected guard is outside supervisor's permitted institutional scope.",
+        )
+
+    q = db.query(AccessLog).filter(AccessLog.verification_status == "Unauthorized")
+
+    if guard_id is not None:
+        target_name = next((g.name for g in assigned_guards if g.id == guard_id), None)
+        q = q.filter((AccessLog.guard_id == guard_id) | (AccessLog.guard_name == target_name))
+    elif clean_name:
+        matched_target_name = matched_guard.name if matched_guard else clean_name
+        matched_target_id = matched_guard.id if matched_guard else guard_name_to_id.get(clean_name)
+        q = q.filter((AccessLog.guard_name == matched_target_name) | (AccessLog.guard_id == matched_target_id))
+    else:
+        q = q.filter(
+            (AccessLog.guard_id.in_(assigned_guard_ids))
+            | (AccessLog.guard_name.in_(assigned_guard_names))
+        )
+
+    if from_date:
+        try:
+            from_dt = datetime.strptime(from_date[:10], "%Y-%m-%d").replace(hour=0, minute=0, second=0)
+            q = q.filter(AccessLog.timestamp >= from_dt)
+        except ValueError:
+            pass
+
+    if to_date:
+        try:
+            to_dt = datetime.strptime(to_date[:10], "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+            q = q.filter(AccessLog.timestamp <= to_dt)
+        except ValueError:
+            pass
+
+    total_count = q.count()
+    logs = q.order_by(desc(AccessLog.timestamp)).all()
+
+    for log in logs:
+        if not getattr(log, "guard_code", None):
+            if log.guard_id and log.guard_id in guard_code_map:
+                log.guard_code = guard_code_map[log.guard_id]
+            elif log.guard_name and log.guard_name in guard_name_to_code:
+                log.guard_code = guard_name_to_code[log.guard_name]
+            else:
+                log.guard_code = "SG-101"
+
+    return SupervisorUnauthorizedResponse(count=total_count, records=logs)
+
+
 class UnauthorizedReportRequest(BaseModel):
     name: Optional[str] = "Unrecognized Person"
     phone_number: Optional[str] = None
@@ -174,6 +292,9 @@ def record_unauthorized_report(
         flag_notes.append(req.notes)
     flag_reason_str = ". ".join(flag_notes) if flag_notes else "Unauthorized person detected at security gate"
 
+    guard_record = db.query(SecurityGuard).filter(SecurityGuard.name == req.guard_name).first()
+    guard_id = guard_record.id if guard_record else None
+
     return log_access_event(
         db,
         AccessLogCreate(
@@ -185,6 +306,7 @@ def record_unauthorized_report(
             department="N/A",
             location_block=req.location_block,
             guard_name=req.guard_name,
+            guard_id=guard_id,
             event_type="ENTRY",
             verification_method="Face Recognition",
             verification_status="Unauthorized",

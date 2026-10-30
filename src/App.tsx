@@ -2225,9 +2225,11 @@ const logRows: LogRecord[] = [
   { initials: "NB", name: "Nila Bose", id: "EMP-C-0912", institution: "Institution C", department: "Administration", block: "Library Block", time: "09:32", dateTime: "2025-06-16T09:32", event: "Entry", tone: "green", personType: "Staff", category: "Internal · Other institution", accessCategory: "Authorized", designation: "Administrator", logId: "ENT-•••-4055", guard: "Imran Ali", guardNumber: "GRD-B-0044", decision: "Authorised" },
   { initials: "MJ", name: "Mohit Jain", id: "21MEC0184", institution: "Institution B", department: "Mechanical", block: "Block B", time: "09:14", dateTime: "2025-06-16T09:14", event: "Entry", tone: "green", personType: "Student", category: "Internal · Institution B", accessCategory: "Authorized", year: "Year IV", residence: "Day scholar", transport: "Own Vehicle", logId: "ENT-•••-4048", guard: "Joseph Mathew", guardNumber: "GRD-B-0038", decision: "Authorised" },
   { initials: "RG", name: "Unrecognized person", id: "Not available", institution: "Not identified", department: "Not available", block: "Main Gate", time: "08:48", dateTime: "2025-06-16T08:48", event: "Denied", tone: "red", personType: "Unauthorised", category: "Unauthorised visitor", accessCategory: "Unauthorized", logId: "DEN-•••-4039", guard: "Arun Kumar", guardNumber: "GRD-B-0017", guardNotes: "Identity could not be verified at the Main Gate.", entries: 1, decision: "Denied", photo: "/faces/intruder_den_4039.jpg" },
+  { initials: "UP", name: "Unrecognized person", id: "Not available", institution: "Not identified", department: "Not available", block: "Gate 1 Main Entrance", time: "08:35", dateTime: "2025-06-16T08:35", event: "Denied", tone: "red", personType: "Unauthorised", category: "Unauthorised visitor", accessCategory: "Unauthorized", logId: "DEN-•••-4042", guard: "G. Selvam", guardNumber: "SG-101", guardNotes: "Identity could not be verified at Gate 1 Main Entrance.", entries: 1, decision: "Denied" },
+  { initials: "UP", name: "Unrecognized person", id: "Not available", institution: "Not identified", department: "Not available", block: "Gate 2 Hospital Entrance", time: "09:15", dateTime: "2025-06-16T09:15", event: "Denied", tone: "red", personType: "Unauthorised", category: "Unauthorised visitor", accessCategory: "Unauthorized", logId: "DEN-•••-4050", guard: "P. Murugan", guardNumber: "SG-102", guardNotes: "Person attempted entry without valid hospital/campus credentials.", entries: 1, decision: "Denied" },
 ];
 
-const assignedGuardNumbers = new Set(["GRD-B-0017", "GRD-B-0031", "GRD-B-0038", "GRD-B-0044", "GRD-B-0052"]);
+const assignedGuardNumbers = new Set(["GRD-B-0017", "GRD-B-0031", "GRD-B-0038", "GRD-B-0044", "GRD-B-0052", "SG-101", "SG-102", "SG-103", "SG-104"]);
 const recordKey = (row: LogRecord) => row.logId ?? `${row.name}-${row.dateTime}`;
 const reviewFor = (reviews: Record<string, ReviewRecord>, row: LogRecord): ReviewRecord =>
   reviews[recordKey(row)] ?? { status: "Pending Verification", actions: [] };
@@ -2475,26 +2477,151 @@ function CreateGuard({ go }: { go: (screen: Screen) => void }) {
   </>;
 }
 
-function Audit({ go, reviews, scope = "supervisor" }: { go: (screen: Screen) => void; reviews: Record<string, ReviewRecord>; scope?: "supervisor" | "cso" }) {
+function Audit({ go, reviews, scope = "supervisor", logs }: { go: (screen: Screen) => void; reviews: Record<string, ReviewRecord>; scope?: "supervisor" | "cso"; logs?: LogRecord[] }) {
+  const [filterMode, setFilterMode] = useState<"all" | "guard">("all");
+  const [selectedGuard, setSelectedGuard] = useState("");
   const [auditFrom, setAuditFrom] = useState("2025-06-16");
   const [auditTo, setAuditTo] = useState("2025-06-16");
-  const auditRows = logRows.filter(row => {
-    if (!assignedGuardNumbers.has(row.guardNumber)) return false;
+  const [guardsList, setGuardsList] = useState<Array<{ id: number; name: string; code: string }>>([
+    { id: 1, name: "G. Selvam", code: "SG-101" },
+    { id: 2, name: "P. Murugan", code: "SG-102" },
+    { id: 3, name: "K. Suresh", code: "SG-103" },
+    { id: 4, name: "V. Anbarasu", code: "SG-104" },
+  ]);
+  const [apiRecords, setApiRecords] = useState<LogRecord[] | null>(null);
+
+  useEffect(() => {
+    fetch("http://localhost:8000/api/v1/guards/assigned")
+      .then(res => res.ok ? res.json() : Promise.reject(res))
+      .then((data: Array<{ id: number; name: string; guard_code: string }>) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setGuardsList(data.map(g => ({ id: g.id, name: g.name, code: g.guard_code })));
+        }
+      })
+      .catch(err => console.warn("Could not fetch assigned guards:", err));
+  }, []);
+
+  useEffect(() => {
+    let url = `http://localhost:8000/api/v1/access-logs/supervisor-unauthorized?from_date=${auditFrom}&to_date=${auditTo}`;
+    if (filterMode === "guard") {
+      if (!selectedGuard) {
+        setApiRecords([]);
+        return;
+      }
+      url += `&guard_name=${encodeURIComponent(selectedGuard)}`;
+    }
+
+    fetch(url)
+      .then(res => res.ok ? res.json() : Promise.reject(res))
+      .then(data => {
+        if (data && Array.isArray(data.records)) {
+          const mapped: LogRecord[] = data.records.map((r: any) => ({
+            initials: r.name ? (r.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase() || "UP") : "UP",
+            name: r.name || "Unrecognized person",
+            id: r.identifier_value || "Not available",
+            institution: "SRM GROUP OF INSTITUTION TRICHY",
+            department: r.department || "Not available",
+            block: r.location_block || "Main Gate",
+            time: r.timestamp ? new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : "00:00",
+            dateTime: r.timestamp ? (r.timestamp.includes("T") ? r.timestamp : r.timestamp.replace(" ", "T")) : "",
+            event: "Denied",
+            tone: "red",
+            personType: "Unauthorised",
+            category: "Unauthorised visitor",
+            accessCategory: "Unauthorized",
+            logId: r.record_identifier,
+            phoneNumber: r.phone_number,
+            guard: r.guard_name || "Security Guard",
+            guardNumber: r.guard_code || "SG-101",
+            guardNotes: r.flag_reason || "Identity could not be verified at the gate.",
+            entries: 1,
+            decision: "Denied",
+            photo: r.snapshot_url || undefined,
+          }));
+          setApiRecords(mapped);
+        }
+      })
+      .catch(err => {
+        console.warn("Could not fetch supervisor unauthorized records:", err);
+        setApiRecords(null);
+      });
+  }, [filterMode, selectedGuard, auditFrom, auditTo]);
+
+  const currentLogs = logs ?? logRows;
+  const fallbackRows = currentLogs.filter(row => {
     if (row.accessCategory !== "Unauthorized") return false;
     const recordDate = row.dateTime.slice(0, 10);
-    return recordDate >= auditFrom && recordDate <= auditTo;
+    if (recordDate < auditFrom || recordDate > auditTo) return false;
+    if (filterMode === "guard") {
+      if (!selectedGuard) return false;
+      const cleanSelected = selectedGuard.split("(")[0].trim().toLowerCase();
+      const rowGuard = (row.guard || "").toLowerCase();
+      const rowGuardNum = (row.guardNumber || "").toLowerCase();
+      return rowGuard.includes(cleanSelected) || cleanSelected.includes(rowGuard) || rowGuardNum === cleanSelected;
+    }
+    return assignedGuardNumbers.has(row.guardNumber) || guardsList.some(g => g.name === row.guard || g.code === row.guardNumber);
   });
+
+  const displayRows = apiRecords !== null ? apiRecords : fallbackRows;
+
   const resetAudit = () => {
+    setFilterMode("all");
+    setSelectedGuard("");
     setAuditFrom("2025-06-16");
     setAuditTo("2025-06-16");
   };
+
   return <>
     <TopBar title="Campus records" subtitle={scope === "cso" ? "Institution B · CSO scope" : "Institution B · Campus Supervisor scope"} back={() => go("home")} />
     <div className="page-content">
-      <section className="filter-panel supervisor-audit-filters"><div className="filter-panel-head"><div></div><button onClick={resetAudit}>Reset</button></div><div className="filter-fields"><Field label="From Date"><input type="date" value={auditFrom} onChange={event => setAuditFrom(event.target.value)} /></Field><Field label="To Date"><input type="date" value={auditTo} onChange={event => setAuditTo(event.target.value)} /></Field></div></section>
-      <div className="result-count"><strong>{auditRows.length} results</strong></div>
-      <SupervisorAuditTable rows={auditRows} reviews={reviews} />
-      {auditRows.length === 0 && <div className="empty-state"><FileClock size={25} /><strong>No matching records</strong><span>Reset filters or choose another date period.</span></div>}
+      <section className="filter-panel supervisor-audit-filters">
+        <div className="filter-panel-head">
+          <div className="audit-filter-row">
+            <button
+              type="button"
+              className={`audit-filter-btn ${filterMode === "all" ? "active" : ""}`}
+              onClick={() => setFilterMode("all")}
+            >
+              1 — Unauthorised persons
+            </button>
+            <button
+              type="button"
+              className={`audit-filter-btn ${filterMode === "guard" ? "active" : ""}`}
+              onClick={() => setFilterMode("guard")}
+            >
+              2 — By guard
+            </button>
+          </div>
+          <button type="button" onClick={resetAudit}>Reset</button>
+        </div>
+        <div className="filter-fields">
+          <Field label="From Date"><input type="date" value={auditFrom} onChange={event => setAuditFrom(event.target.value)} /></Field>
+          <Field label="To Date"><input type="date" value={auditTo} onChange={event => setAuditTo(event.target.value)} /></Field>
+        </div>
+        {filterMode === "guard" && (
+          <div className="supervisor-guard-dropdown">
+            <Field label="Select Guard">
+              <select value={selectedGuard} onChange={event => setSelectedGuard(event.target.value)}>
+                <option value="">Select Guard</option>
+                {guardsList.map(g => (
+                  <option key={g.code || g.id} value={g.name}>
+                    {g.name} ({g.code})
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+        )}
+      </section>
+      <div className="result-count"><strong>{displayRows.length} results</strong></div>
+      <SupervisorAuditTable rows={displayRows} reviews={reviews} />
+      {displayRows.length === 0 && (
+        <div className="empty-state">
+          <FileClock size={25} />
+          <strong>No matching records</strong>
+          <span>{filterMode === "guard" && !selectedGuard ? "Please select a security guard from the dropdown above." : "Reset filters or choose another date period."}</span>
+        </div>
+      )}
     </div>
   </>;
 }
@@ -3368,12 +3495,12 @@ export default function App() {
   } else if (role === "supervisor") {
     if (screen === "assignments") content = <Assignments go={go} />;
     else if (screen === "create-guard") content = <CreateGuard go={go} />;
-    else if (screen === "audit" || screen === "logs") content = <Audit go={go} reviews={reviews} />;
+    else if (screen === "audit" || screen === "logs") content = <Audit go={go} reviews={reviews} logs={logs} />;
     else content = <SupervisorHome go={go} reviews={reviews} logs={logs} />;
   } else if (role === "cso") {
     if (screen === "assignments") content = <Assignments go={go} />;
     else if (screen === "create-guard") content = <CreateGuard go={go} />;
-    else if (screen === "audit" || screen === "logs") content = <Audit go={go} reviews={reviews} scope="cso" />;
+    else if (screen === "audit" || screen === "logs") content = <Audit go={go} reviews={reviews} scope="cso" logs={logs} />;
     else if (screen === "campus-entries") content = <CampusEntries go={go} reviews={reviews} scope="institution" />;
     else if (screen === "login-logs") content = <Worklog go={go} scope="security-oversight" />;
     else content = <OversightHome role="cso" go={go} />;

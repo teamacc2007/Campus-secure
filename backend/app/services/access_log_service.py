@@ -27,6 +27,13 @@ def log_access_event(
             "reason": log_data.flag_reason or "Flagged at entry gate",
         })
 
+    guard_id = log_data.guard_id
+    if not guard_id and log_data.guard_name:
+        from app.models.guard import SecurityGuard
+        guard_record = db.query(SecurityGuard).filter(SecurityGuard.name == log_data.guard_name).first()
+        if guard_record:
+            guard_id = guard_record.id
+
     access_log = AccessLog(
         record_identifier=log_data.record_identifier,
         person_type=log_data.person_type,
@@ -36,6 +43,7 @@ def log_access_event(
         department=log_data.department,
         location_block=log_data.location_block,
         guard_name=log_data.guard_name,
+        guard_id=guard_id,
         event_type=log_data.event_type,
         verification_method=log_data.verification_method,
         verification_status=log_data.verification_status,

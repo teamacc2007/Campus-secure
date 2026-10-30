@@ -18,6 +18,7 @@ class AccessLog(Base):
     # Location & Guard
     location_block = Column(String(150), nullable=False, default="Gate 1 Main Entrance")
     guard_name = Column(String(100), nullable=True)
+    guard_id = Column(Integer, ForeignKey("security_guards.id", ondelete="SET NULL"), nullable=True)
     event_type = Column(String(20), nullable=False, default="ENTRY")  # ENTRY, EXIT
 
     # Verification & Review

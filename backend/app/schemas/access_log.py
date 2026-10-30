@@ -20,6 +20,7 @@ class AccessLogCreate(BaseModel):
     department: Optional[str] = None
     location_block: str = "Gate 1 Main Entrance"
     guard_name: Optional[str] = None
+    guard_id: Optional[int] = None
     event_type: str = "ENTRY"
     verification_method: str = "Face Recognition"
     verification_status: str = "Authorized"
@@ -46,6 +47,8 @@ class AccessLogOut(BaseModel):
     department: Optional[str] = None
     location_block: str
     guard_name: Optional[str] = None
+    guard_id: Optional[int] = None
+    guard_code: Optional[str] = None
     event_type: str
     verification_method: str
     verification_status: str
@@ -57,3 +60,8 @@ class AccessLogOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class SupervisorUnauthorizedResponse(BaseModel):
+    count: int
+    records: List[AccessLogOut]
