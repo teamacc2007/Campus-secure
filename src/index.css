@@ -49,6 +49,8 @@ h1, h2, h3, p, dl, dd { margin: 0; }
 .btn-secondary { color: #1d57ad; border-color: #d6dfeb; background: #fff; box-shadow: none; }
 .btn-danger { color: var(--red); border-color: #f0c7ca; background: #fff1f2; box-shadow: none; }
 .btn-warning { color: #8b5404; border-color: #ecd29f; background: #fff7e8; box-shadow: none; }
+.btn-success { color: #08744e; border-color: #a4e3c6; background: #eaf9f2; box-shadow: none; }
+.btn-success:hover:not(:disabled) { color: #065738; border-color: #72cca1; background: #d7f4e6; }
 .btn-quiet { color: var(--blue); background: transparent; }
 .btn:disabled { opacity: .48; cursor: not-allowed; }
 .status { width: fit-content; padding: 5px 8px; border-radius: 99px; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; font-size: 8px; font-weight: 700; }
@@ -506,6 +508,8 @@ h1, h2, h3, p, dl, dd { margin: 0; }
 .alert-info, .action-history { margin-top: 10px; }
 .review-actions { margin-top: 14px; display: grid; gap: 8px; }
 .review-actions.two-actions { grid-template-columns: 1fr 1fr; }
+.review-actions.three-actions { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.review-actions.three-actions .btn { min-height: 44px; padding: 0 6px; font-size: 11px; gap: 4px; white-space: nowrap; }
 .dialog-backdrop { position: fixed; z-index: 30; inset: 0; padding: 18px; display: flex; align-items: flex-end; justify-content: center; background: rgba(10, 25, 45, .5); backdrop-filter: blur(3px); }
 .confirm-dialog { width: min(357px, 100%); padding: 20px; background: #fff; border-radius: 20px; box-shadow: 0 20px 55px rgba(10, 25, 45, .25); }
 .dialog-icon { width: 45px; height: 45px; margin-bottom: 12px; display: grid; place-items: center; color: var(--green); background: #e5f7ef; border-radius: 13px; }

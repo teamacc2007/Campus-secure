@@ -119,3 +119,102 @@ def test_supervisor_unauthorized_records_filtering(supervisor_token):
     )
     assert res_forbidden.status_code == 403
     assert "Access denied" in res_forbidden.json()["detail"]
+
+
+def test_supervisor_review_authorised_action(supervisor_token, security_token):
+    # 1. Guard logs an unauthorized event with photo
+    log_payload = {
+        "person_type": "Unauthorized",
+        "name": "Unidentified Visitor",
+        "identifier_value": "UNREC-99",
+        "location_block": "Gate 1 Main Entrance",
+        "event_type": "ENTRY",
+        "verification_method": "Face Recognition",
+        "verification_status": "Unauthorized",
+        "review_status": "Pending Verification",
+        "snapshot_url": "/faces/captured/intruder_test_sample.jpg",
+        "guard_name": "G. Selvam",
+        "flag_reason": "No matched facial biometric in database",
+    }
+    sec_res = client.post("/api/v1/access-logs/", json=log_payload, headers={"Authorization": f"Bearer {security_token}"})
+    assert sec_res.status_code == 201
+    log_id = sec_res.json()["id"]
+
+    # 2. Supervisor marks as Authorised
+    sup_headers = {"Authorization": f"Bearer {supervisor_token}"}
+    res = client.post(
+        f"/api/v1/access-logs/{log_id}/review",
+        json={"action_type": "Authorised", "reason": "Host approval verified by supervisor"},
+        headers=sup_headers,
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["review_status"] == "Authorised"
+    assert data["verification_status"] == "Authorized"
+    assert data["snapshot_url"] == "/faces/captured/intruder_test_sample.jpg"
+    assert data["guard_name"] == "G. Selvam"
+    assert len(data["review_actions"]) >= 1
+
+    last_action = data["review_actions"][-1]
+    assert last_action["type"] == "Authorised"
+    assert last_action["actor"] in ("M. Rajesh", "Meera Nair")
+    assert "SUP" in last_action["actorNumber"]
+    assert last_action["previous_status"] == "Pending Verification"
+    assert last_action["updated_status"] == "Authorised"
+
+    # 3. Repeated request prevents duplicate actions
+    repeat_res = client.post(
+        f"/api/v1/access-logs/{log_id}/review",
+        json={"action_type": "Authorised"},
+        headers=sup_headers,
+    )
+    assert repeat_res.status_code == 200
+    assert len(repeat_res.json()["review_actions"]) == len(data["review_actions"])
+
+
+def test_supervisor_review_unauthorised_with_action_taken(supervisor_token, security_token):
+    # 1. Guard logs an unauthorized event
+    log_payload = {
+        "person_type": "Unauthorized",
+        "name": "Unidentified Individual",
+        "identifier_value": "UNREC-100",
+        "location_block": "Gate 1 Main Entrance",
+        "event_type": "ENTRY",
+        "verification_method": "Face Recognition",
+        "verification_status": "Unauthorized",
+        "review_status": "Pending Verification",
+        "snapshot_url": "/faces/captured/intruder_sample_2.jpg",
+        "guard_name": "G. Selvam",
+    }
+    sec_res = client.post("/api/v1/access-logs/", json=log_payload, headers={"Authorization": f"Bearer {security_token}"})
+    assert sec_res.status_code == 201
+    log_id = sec_res.json()["id"]
+
+    # 2. Supervisor marks as Unauthorised with mandatory action taken
+    sup_headers = {"Authorization": f"Bearer {supervisor_token}"}
+    action_description = "Person escorted out of the premises"
+    res = client.post(
+        f"/api/v1/access-logs/{log_id}/review",
+        json={"action_type": "Unauthorised", "reason": action_description},
+        headers=sup_headers,
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["review_status"] == "Unauthorised"
+    assert data["verification_status"] == "Unauthorized"
+    assert data["snapshot_url"] == "/faces/captured/intruder_sample_2.jpg"
+
+    last_action = data["review_actions"][-1]
+    assert last_action["type"] == "Unauthorised"
+    assert last_action["action_taken"] == action_description
+    assert last_action["reason"] == action_description
+    assert last_action["actor"] in ("M. Rajesh", "Meera Nair")
+
+    # 3. Repeated submission does not create duplicate entries
+    repeat_res = client.post(
+        f"/api/v1/access-logs/{log_id}/review",
+        json={"action_type": "Unauthorised", "reason": action_description},
+        headers=sup_headers,
+    )
+    assert repeat_res.status_code == 200
+    assert len(repeat_res.json()["review_actions"]) == len(data["review_actions"])

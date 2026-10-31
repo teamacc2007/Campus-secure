@@ -50,13 +50,22 @@ import {
 import { evaluateBiometrics } from "./biometrics";
 
 type Role = "security" | "warden" | "staff" | "supervisor" | "access-supervisor" | "students" | "welfare" | "admin" | "cso" | "manager";
-type ReviewStatus = "Pending Verification" | "Verified" | "Unauthorised" | "Revoked";
+type ReviewStatus = "Pending Verification" | "Verified" | "Authorised" | "Unauthorised" | "Revoked";
 type ReviewAction = {
-  type: "Verified" | "Unauthorised" | "Revoked";
+  type: "Verified" | "Authorised" | "Unauthorised" | "Revoked";
   actor: string;
   actorNumber: string;
   timestamp: string;
   reason?: string;
+  event_id?: string;
+  verification_status?: string;
+  decision_made_by?: string;
+  supervisor_id?: string;
+  supervisor_name?: string;
+  action_taken?: string;
+  decision_timestamp?: string;
+  previous_status?: string;
+  updated_status?: string;
 };
 type ReviewRecord = {
   status: ReviewStatus;
@@ -368,7 +377,7 @@ function Button({
 }: {
   children: ReactNode;
   onClick?: () => void;
-  variant?: "primary" | "secondary" | "danger" | "warning" | "quiet";
+  variant?: "primary" | "secondary" | "danger" | "warning" | "quiet" | "success";
   icon?: ReactNode;
   type?: "button" | "submit";
   disabled?: boolean;
@@ -2251,7 +2260,7 @@ const assignedGuardNumbers = new Set(["GRD-B-0017", "GRD-B-0031", "GRD-B-0038", 
 const recordKey = (row: LogRecord) => row.logId ?? `${row.name}-${row.dateTime}`;
 const reviewFor = (reviews: Record<string, ReviewRecord>, row: LogRecord): ReviewRecord =>
   reviews[recordKey(row)] ?? { status: "Pending Verification", actions: [] };
-const reviewTone = (status: ReviewStatus) => status === "Verified" || status === "Revoked" ? "green" : status === "Unauthorised" ? "red" : "amber";
+const reviewTone = (status: ReviewStatus) => status === "Verified" || status === "Authorised" || status === "Revoked" ? "green" : status === "Unauthorised" ? "red" : "amber";
 const recordCategory = (reviews: Record<string, ReviewRecord>, row: LogRecord) =>
   reviewFor(reviews, row).status === "Revoked" ? "Revoked" : row.accessCategory;
 const latestRevocation = (reviews: Record<string, ReviewRecord>, row: LogRecord) =>
@@ -2656,7 +2665,7 @@ function Alerts({
   back: () => void;
   role: Role;
   reviews: Record<string, ReviewRecord>;
-  updateReview: (row: LogRecord, type: "Unauthorised" | "Revoked", reason?: string) => void;
+  updateReview: (row: LogRecord, type: "Authorised" | "Unauthorised" | "Revoked", reason?: string) => void;
   logs?: LogRecord[];
 }) {
   const currentLogs = logs ?? logRows;
@@ -2673,6 +2682,8 @@ function Alerts({
   const [dialog, setDialog] = useState<"unauthorised" | "revoke" | null>(null);
   const [reason, setReason] = useState("");
   const [reasonError, setReasonError] = useState(false);
+  const [actionTaken, setActionTaken] = useState("");
+  const [actionTakenError, setActionTakenError] = useState(false);
   const markAllRead = () => setReadKeys(alertRows.map(recordKey));
   const openAlert = (row: LogRecord) => {
     const key = recordKey(row);
@@ -2680,16 +2691,33 @@ function Alerts({
     setReadKeys(current => current.includes(key) ? current : [...current, key]);
     setAlertOrder(current => [...current.filter(item => item !== key), key]);
   };
+  const handleAuthorise = () => {
+    if (!selected) return;
+    const rev = reviewFor(reviews, selected);
+    if (rev.status === "Authorised" || rev.status === "Verified" || rev.status === "Revoked") return;
+    updateReview(selected, "Authorised");
+  };
   const confirmAction = () => {
     if (!selected || !dialog) return;
-    if (dialog === "revoke" && !reason.trim()) {
-      setReasonError(true);
-      return;
+    if (dialog === "unauthorised") {
+      if (!actionTaken.trim()) {
+        setActionTakenError(true);
+        return;
+      }
+      updateReview(selected, "Unauthorised", actionTaken.trim());
+      setDialog(null);
+      setActionTaken("");
+      setActionTakenError(false);
+    } else if (dialog === "revoke") {
+      if (!reason.trim()) {
+        setReasonError(true);
+        return;
+      }
+      updateReview(selected, "Revoked", reason.trim());
+      setDialog(null);
+      setReason("");
+      setReasonError(false);
     }
-    updateReview(selected, dialog === "unauthorised" ? "Unauthorised" : "Revoked", reason.trim() || undefined);
-    setDialog(null);
-    setReason("");
-    setReasonError(false);
   };
   if (selected) {
     const review = reviewFor(reviews, selected);
@@ -2716,10 +2744,111 @@ function Alerts({
           </section>
         )}
         <section className="info-card alert-info"><div className="card-kicker"><FileClock size={15} />ORIGINAL SECURITY RECORD</div><dl><div><dt>Original event category</dt><dd>{selected.accessCategory}</dd></div><div><dt>Event</dt><dd>{selected.event}</dd></div>{selected.phoneNumber && <div><dt>Phone number</dt><dd>{selected.phoneNumber}</dd></div>}<div><dt>Security officer</dt><dd>{selected.guard}</dd></div><div><dt>Security number</dt><dd>{selected.guardNumber}</dd></div><div><dt>Institution</dt><dd>{knownInstitution ? selected.institution : "Institution B"}</dd></div><div><dt>Gate / Location</dt><dd>{selected.block}</dd></div><div><dt>Date & time</dt><dd>{selected.dateTime.replace("T", " ")}</dd></div><div><dt>Current verification status</dt><dd>{review.status}</dd></div></dl></section>
-        <section className="info-card action-history"><div className="card-kicker"><History size={15} />ACTION HISTORY</div><div className="history-list"><div><i><Shield size={13} /></i><p><strong>Original event recorded</strong><span>{selected.guard} · {selected.guardNumber}</span><small>{selected.dateTime.replace("T", " ")} · {selected.block}</small></p></div>{review.actions.map((action, index) => <div key={`${action.timestamp}${index}`}><i className={action.type === "Unauthorised" ? "danger-history" : ""}>{action.type === "Verified" || action.type === "Revoked" ? <Check size={13} /> : <ShieldAlert size={13} />}</i><p><strong>{action.type}</strong><span>{action.actor} · {action.actorNumber}</span><small>{action.timestamp}{action.reason ? ` · Reason: ${action.reason}` : ""}</small></p></div>)}</div></section>
-        {role === "supervisor" && <div className="review-actions two-actions"><Button variant="warning" onClick={() => setDialog("unauthorised")} icon={<ShieldAlert size={17} />} disabled={review.status === "Unauthorised" || review.status === "Revoked"}>Unauthorised</Button><Button onClick={() => setDialog("revoke")} icon={<ShieldCheck size={17} />} disabled={review.status === "Revoked"}>Revoke</Button></div>}
+        <section className="info-card action-history"><div className="card-kicker"><History size={15} />ACTION HISTORY</div><div className="history-list"><div><i><Shield size={13} /></i><p><strong>Original event recorded</strong><span>{selected.guard} · {selected.guardNumber}</span><small>{selected.dateTime.replace("T", " ")} · {selected.block}</small></p></div>{review.actions.map((action, index) => <div key={`${action.timestamp}${index}`}><i className={action.type === "Unauthorised" ? "danger-history" : ""}>{action.type === "Verified" || action.type === "Authorised" || action.type === "Revoked" ? <Check size={13} /> : <ShieldAlert size={13} />}</i><p><strong>{action.type}</strong><span>{action.actor} · {action.actorNumber}</span><small>{action.timestamp}{action.reason ? ` · ${action.reason}` : ""}</small></p></div>)}</div></section>
+        {role === "supervisor" && (
+          <div className="review-actions three-actions">
+            <Button
+              variant="success"
+              onClick={handleAuthorise}
+              icon={<ShieldCheck size={16} />}
+              disabled={review.status === "Authorised" || review.status === "Verified" || review.status === "Revoked"}
+            >
+              Authorised
+            </Button>
+            <Button
+              variant="warning"
+              onClick={() => {
+                setActionTaken("");
+                setActionTakenError(false);
+                setDialog("unauthorised");
+              }}
+              icon={<ShieldAlert size={16} />}
+              disabled={review.status === "Unauthorised" || review.status === "Revoked"}
+            >
+              Unauthorised
+            </Button>
+            <Button
+              onClick={() => {
+                setReason("");
+                setReasonError(false);
+                setDialog("revoke");
+              }}
+              icon={<ShieldCheck size={16} />}
+              disabled={review.status === "Revoked"}
+            >
+              Revoke
+            </Button>
+          </div>
+        )}
       </div>
-      {dialog && <div className="dialog-backdrop"><section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><div className={`dialog-icon ${dialog === "unauthorised" ? "danger" : ""}`}>{dialog === "unauthorised" ? <ShieldAlert size={23} /> : <ShieldCheck size={23} />}</div><h2 id="dialog-title">{dialog === "unauthorised" ? "Mark as unauthorised?" : "Revoke unauthorised entry?"}</h2><p>{dialog === "unauthorised" ? "This marks the entry as unauthorised and records your identity and timestamp in the audit history." : "Revoke only if this entry is valid. Provide the reason, e.g. host approval granted."}</p><div className="dialog-summary"><strong>{selected.name}</strong><span>{selected.accessCategory} · {selected.guard}</span><small>{selected.block} · {knownInstitution ? selected.institution : "Institution B"}</small></div>{dialog === "revoke" && <label className="field"><span>Reason for revocation *</span><textarea value={reason} onChange={event => { setReason(event.target.value); setReasonError(false); }} rows={3} placeholder="e.g. Host approval granted" />{reasonError && <small className="field-error">A revocation reason is required.</small>}</label>}<div className="dialog-actions"><Button variant="secondary" onClick={() => { setDialog(null); setReasonError(false); }}>Cancel</Button><Button variant={dialog === "revoke" ? "primary" : "warning"} onClick={confirmAction}>{dialog === "unauthorised" ? "Confirm unauthorised" : "Confirm revoke"}</Button></div></section></div>}
+      {dialog && (
+        <div className="dialog-backdrop">
+          <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+            <div className={`dialog-icon ${dialog === "unauthorised" ? "danger" : ""}`}>
+              {dialog === "unauthorised" ? <ShieldAlert size={23} /> : <ShieldCheck size={23} />}
+            </div>
+            <h2 id="dialog-title">{dialog === "unauthorised" ? "Mark as unauthorised?" : "Revoke unauthorised entry?"}</h2>
+            <p>
+              {dialog === "unauthorised"
+                ? "Record the action taken before confirming this unauthorized event."
+                : "Revoke only if this entry is valid. Provide the reason, e.g. host approval granted."}
+            </p>
+            <div className="dialog-summary">
+              <strong>{selected.name}</strong>
+              <span>{selected.accessCategory} · {selected.guard}</span>
+              <small>{selected.block} · {knownInstitution ? selected.institution : "Institution B"}</small>
+            </div>
+            {dialog === "unauthorised" && (
+              <label className="field">
+                <span>Action Taken *</span>
+                <textarea
+                  value={actionTaken}
+                  onChange={event => {
+                    setActionTaken(event.target.value);
+                    if (event.target.value.trim()) setActionTakenError(false);
+                  }}
+                  rows={3}
+                  placeholder="Enter the action taken..."
+                />
+                {actionTakenError && <small className="field-error">Action taken is required.</small>}
+              </label>
+            )}
+            {dialog === "revoke" && (
+              <label className="field">
+                <span>Reason for revocation *</span>
+                <textarea
+                  value={reason}
+                  onChange={event => {
+                    setReason(event.target.value);
+                    if (event.target.value.trim()) setReasonError(false);
+                  }}
+                  rows={3}
+                  placeholder="e.g. Host approval granted"
+                />
+                {reasonError && <small className="field-error">A revocation reason is required.</small>}
+              </label>
+            )}
+            <div className="dialog-actions">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setDialog(null);
+                  setActionTakenError(false);
+                  setReasonError(false);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant={dialog === "revoke" ? "primary" : "warning"}
+                onClick={confirmAction}
+              >
+                {dialog === "unauthorised" ? "Confirm Unauthorised" : "Confirm revoke"}
+              </Button>
+            </div>
+          </section>
+        </div>
+      )}
     </>;
   }
   return <>
@@ -3417,19 +3546,69 @@ export default function App() {
     go("identity");
     return true;
   };
-  const updateReview = (row: LogRecord, type: "Unauthorised" | "Revoked", reason?: string) => {
+  const updateReview = (row: LogRecord, type: "Authorised" | "Unauthorised" | "Revoked", reason?: string) => {
     const key = recordKey(row);
+    const actorName = roleMeta[role].name;
+    const actorNumber = roleMeta[role].supervisorNumber ?? "SUP-B-0004";
+    const timestamp = new Date().toLocaleString("en-GB", { hour12: false }).replace(",", "");
     const action: ReviewAction = {
       type,
-      actor: roleMeta[role].name,
-      actorNumber: roleMeta[role].supervisorNumber ?? "SUP-B-0004",
-      timestamp: new Date().toLocaleString("en-GB", { hour12: false }).replace(",", ""),
+      actor: actorName,
+      actorNumber: actorNumber,
+      timestamp,
       reason,
+      event_id: row.logId || key,
+      verification_status: type === "Authorised" ? "Authorized" : "Unauthorized",
+      decision_made_by: actorName,
+      supervisor_id: actorNumber,
+      supervisor_name: actorName,
+      action_taken: type === "Unauthorised" ? reason : undefined,
+      decision_timestamp: timestamp,
+      previous_status: reviewFor(reviews, row).status,
+      updated_status: type,
     };
     setReviews(current => {
       const existing = reviewFor(current, row);
-      if (existing.status === "Revoked" || (type === "Unauthorised" && existing.status === "Unauthorised")) return current;
+      if (
+        existing.status === "Revoked" ||
+        (type === "Unauthorised" && existing.status === "Unauthorised") ||
+        (type === "Authorised" && (existing.status === "Authorised" || existing.status === "Verified"))
+      ) {
+        return current;
+      }
       return { ...current, [key]: { status: type, actions: [...existing.actions, action] } };
+    });
+    setLogs(current =>
+      current.map(l => {
+        if (recordKey(l) === key) {
+          return {
+            ...l,
+            decision: type === "Authorised" ? "Authorised" : "Denied",
+            accessCategory: type === "Authorised" ? "Authorized" : l.accessCategory,
+          };
+        }
+        return l;
+      })
+    );
+
+    // Persist to PostgreSQL backend database
+    const targetId = row.logId || key;
+    fetch(`http://localhost:8000/api/v1/access-logs/${encodeURIComponent(targetId)}/review`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action_type: type,
+        reason,
+        supervisor_id: actorNumber,
+        supervisor_name: actorName,
+        event_id: targetId,
+        name: row.name,
+        location_block: row.block,
+        guard_name: row.guard,
+        guard_number: row.guardNumber,
+      }),
+    }).catch(err => {
+      console.warn("Could not sync supervisor review to backend:", err);
     });
   };
   const createVisitorPass = (draft: VisitorPassDraft) => {

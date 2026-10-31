@@ -110,33 +110,100 @@ def list_access_logs(
 
 def review_access_log(
     db: Session,
-    log_id: int,
+    log_id: Any,
     review: AccessLogReviewRequest,
     actor_name: str,
     actor_number: str,
+    effective_sup_id: Optional[int] = None,
 ) -> AccessLog:
-    log_entry = db.query(AccessLog).filter(AccessLog.id == log_id).first()
+    # 1. Locate existing access log by integer id, record_identifier, or review.event_id
+    log_entry = None
+    if isinstance(log_id, int) or (isinstance(log_id, str) and log_id.isdigit()):
+        log_entry = db.query(AccessLog).filter(AccessLog.id == int(log_id)).first()
+
+    if not log_entry and isinstance(log_id, str):
+        log_entry = db.query(AccessLog).filter(AccessLog.record_identifier == log_id).first()
+
+    if not log_entry and review.event_id:
+        log_entry = db.query(AccessLog).filter(AccessLog.record_identifier == review.event_id).first()
+
+    # If log_entry does not exist in DB yet (e.g. initial seeded alert like DEN-•••-4039), insert it
     if not log_entry:
-        raise ValueError("Access log entry not found.")
+        rec_id = str(log_id) if log_id else (review.event_id or f"DEN-{datetime.now().strftime('%Y%m%d%H%M%S')}")
+        log_entry = AccessLog(
+            record_identifier=rec_id,
+            person_type="Unauthorized",
+            name=review.name or "Unrecognized Person",
+            identifier_value="UNREC-FACE",
+            location_block=review.location_block or "Gate 1 Main Entrance",
+            guard_name=review.guard_name or "G. Selvam",
+            event_type="ENTRY",
+            verification_method="Face Recognition",
+            verification_status="Authorized" if review.action_type in ("Verified", "Authorised") else "Unauthorized",
+            review_status="Pending Verification",
+            review_actions=[],
+            flag_reason=review.reason or "Unauthorized person detected at security gate",
+        )
+        db.add(log_entry)
+        db.commit()
+        db.refresh(log_entry)
+
+    # 2. Scope check: verify guard is within supervisor's institutional scope if supervisor_id provided
+    if effective_sup_id:
+        from app.models.guard import SecurityGuard
+        if log_entry.guard_id:
+            guard = db.query(SecurityGuard).filter(SecurityGuard.id == log_entry.guard_id).first()
+            if guard and guard.assigned_supervisor_id and guard.assigned_supervisor_id != effective_sup_id:
+                raise PermissionError("Access denied: Event is outside supervisor's assigned institutional scope.")
+        elif log_entry.guard_name:
+            guard = db.query(SecurityGuard).filter(SecurityGuard.name == log_entry.guard_name).first()
+            if guard and guard.assigned_supervisor_id and guard.assigned_supervisor_id != effective_sup_id:
+                raise PermissionError("Access denied: Event is outside supervisor's assigned institutional scope.")
+
+    # 3. Prevent duplicate or conflicting decisions
+    current_actions = list(log_entry.review_actions or [])
+    prev_status = log_entry.review_status
+
+    # If already revoked, cannot transition
+    if prev_status == "Revoked":
+        return log_entry
+
+    # If already in the target state, check for duplicate action to prevent redundant review entries
+    if prev_status == review.action_type:
+        if current_actions and current_actions[-1].get("type") == review.action_type:
+            return log_entry
+
+    # If already Authorised/Verified and requesting Authorised/Verified
+    if prev_status in ("Authorised", "Verified") and review.action_type in ("Authorised", "Verified"):
+        return log_entry
+
+    decision_timestamp = datetime.now().strftime("%d-%m-%Y %H:%M")
+    event_id = log_entry.record_identifier or str(log_entry.id)
+    norm_status = "Authorized" if review.action_type in ("Verified", "Authorised") else "Unauthorized"
 
     action_entry = {
         "type": review.action_type,
         "actor": actor_name,
         "actorNumber": actor_number,
-        "timestamp": datetime.now().strftime("%d-%m-%Y %H:%M"),
-        "reason": review.reason or f"Action taken by {actor_name}",
+        "timestamp": decision_timestamp,
+        "reason": review.reason or (f"Action taken by {actor_name}" if review.action_type == "Unauthorised" else None),
+        "event_id": event_id,
+        "verification_status": norm_status,
+        "decision_made_by": actor_name,
+        "supervisor_id": actor_number,
+        "supervisor_name": actor_name,
+        "action_taken": review.reason if review.action_type == "Unauthorised" else None,
+        "decision_timestamp": decision_timestamp,
+        "previous_status": prev_status,
+        "updated_status": review.action_type,
     }
 
-    # Append to review_actions list
-    current_actions = list(log_entry.review_actions or [])
     current_actions.append(action_entry)
-    
     log_entry.review_actions = current_actions
     log_entry.review_status = review.action_type
-    if review.action_type == "Verified":
-        log_entry.verification_status = "Authorized"
-    elif review.action_type in ("Unauthorised", "Revoked"):
-        log_entry.verification_status = "Unauthorized"
+    log_entry.verification_status = norm_status
+    if review.action_type == "Unauthorised" and review.reason:
+        log_entry.flag_reason = review.reason
 
     db.commit()
     db.refresh(log_entry)

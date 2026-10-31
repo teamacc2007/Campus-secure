@@ -4,11 +4,20 @@ from pydantic import BaseModel, Field
 
 
 class ReviewActionSchema(BaseModel):
-    type: str  # "Verified" | "Unauthorised" | "Revoked"
+    type: str  # "Verified" | "Authorised" | "Unauthorised" | "Revoked"
     actor: str
     actorNumber: str
     timestamp: str
     reason: Optional[str] = None
+    event_id: Optional[str] = None
+    verification_status: Optional[str] = None
+    decision_made_by: Optional[str] = None
+    supervisor_id: Optional[str] = None
+    supervisor_name: Optional[str] = None
+    action_taken: Optional[str] = None
+    decision_timestamp: Optional[str] = None
+    previous_status: Optional[str] = None
+    updated_status: Optional[str] = None
 
 
 class AccessLogCreate(BaseModel):
@@ -33,8 +42,15 @@ class AccessLogCreate(BaseModel):
 
 
 class AccessLogReviewRequest(BaseModel):
-    action_type: str = Field(..., pattern="^(Verified|Unauthorised|Revoked)$")
+    action_type: str = Field(..., pattern="^(Verified|Authorised|Unauthorised|Revoked)$")
     reason: Optional[str] = None
+    supervisor_id: Optional[str] = None
+    supervisor_name: Optional[str] = None
+    event_id: Optional[str] = None
+    name: Optional[str] = None
+    location_block: Optional[str] = None
+    guard_name: Optional[str] = None
+    guard_number: Optional[str] = None
 
 
 class AccessLogOut(BaseModel):
