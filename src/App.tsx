@@ -442,7 +442,7 @@ function BottomNav({ role, active, go }: { role: Role; active: Screen; go: (scre
     supervisor: [
       { screen: "home", label: "Overview", icon: <Shield size={20} /> },
       { screen: "assignments", label: "Security", icon: <UserCog size={20} /> },
-      { screen: "scan", label: "Scan", icon: <ScanFace size={22} /> },
+      { screen: "scan", label: "Scan", icon: <ScanFace size={20} /> },
       { screen: "audit", label: "Records", icon: <FileClock size={20} /> },
     ],
     "access-supervisor": [
@@ -480,25 +480,13 @@ function BottomNav({ role, active, go }: { role: Role; active: Screen; go: (scre
       { screen: "profile", label: "Profile", icon: <CircleUserRound size={20} /> },
     ],
   };
-  return <nav className={`bottom-nav ${menus[role].length === 3 ? "three-items" : menus[role].length === 2 ? "two-items" : ""}`}>{menus[role].map(item => {
-    const isSupervisorScan = role === "supervisor" && item.screen === "scan";
-    if (isSupervisorScan) {
-      return (
-        <button
-          key={item.label}
-          className={`scan-nav-btn ${active === item.screen ? "active" : ""}`}
-          onClick={() => go(item.screen)}
-          aria-label="Scan"
-        >
-          <div className="scan-nav-circle">
-            <ScanFace size={22} />
-          </div>
-          <span>{item.label}</span>
-        </button>
-      );
-    }
-    return <button key={item.label} className={active === item.screen ? "active" : ""} onClick={() => go(item.screen)}>{item.icon}<span>{item.label}</span>{item.screen === "alerts" && <b>3</b>}</button>;
-  })}</nav>;
+  return <nav className={`bottom-nav ${menus[role].length === 3 ? "three-items" : menus[role].length === 2 ? "two-items" : ""}`}>{menus[role].map(item => (
+    <button key={item.label} className={active === item.screen ? "active" : ""} onClick={() => go(item.screen)}>
+      {item.icon}
+      <span>{item.label}</span>
+      {item.screen === "alerts" && <b>3</b>}
+    </button>
+  ))}</nav>;
 }
 
 function Page({ children, nav, role, active, go }: { children: ReactNode; nav?: boolean; role: Role; active: Screen; go: (screen: Screen) => void }) {
@@ -1315,9 +1303,6 @@ function UnrecognizedResult({ go, verifyRegister, role, capturedPhoto, biometric
         </div>
         <Status tone="red">UNAUTHORISED / UNRECOGNIZED</Status>
         <h1>Face Not Recognized</h1>
-        <p className="helper text-center mt-1">
-          Biometric face scan does not match any authorized profiles. Verify via register number or record unauthorized entry.
-        </p>
       </div>
 
       <section className="similar-matches">
@@ -1329,7 +1314,7 @@ function UnrecognizedResult({ go, verifyRegister, role, capturedPhoto, biometric
           <small>Threshold: 65%</small>
         </div>
 
-        {visibleMatches.length > 0 ? (
+        {visibleMatches.length > 0 && (
           <div className="similar-match-list">
             {visibleMatches.map(match => {
               const selected = selectedMatch === match.registerNumber;
@@ -1359,22 +1344,6 @@ function UnrecognizedResult({ go, verifyRegister, role, capturedPhoto, biometric
                 </div>}
               </article>;
             })}
-          </div>
-        ) : (
-          <div className="no-similar-matches-card">
-            <ShieldAlert size={22} className="card-alert-icon" />
-            <div>
-              <strong>No Enrolled Profile Matched (0/4)</strong>
-              <p>The scanned face does not match Sur, Mon, Mith, or Thiru. All biometric correlation scores were below the 65% threshold.</p>
-              {biometricScores && (
-                <div className="biometric-score-pill-row">
-                  <span>Sur: {biometricScores.Sur ?? 0}%</span>
-                  <span>Mon: {biometricScores.Mon ?? 0}%</span>
-                  <span>Mith: {biometricScores.Mith ?? 0}%</span>
-                  <span>Thiru: {biometricScores.Thiru ?? 0}%</span>
-                </div>
-              )}
-            </div>
           </div>
         )}
       </section>
@@ -2290,100 +2259,280 @@ function AuditTable({ rows, reviews, title = "AUDIT LOG", hideCommonInfo = false
     {!isRevoked && <div className="capture-note"><Camera size={14} />Photograph captured with this log record.</div>}</section>}</>;
 }
 
-function SupervisorAuditTable({ rows, reviews }: { rows: LogRecord[]; reviews: Record<string, ReviewRecord> }) {
-  const [selected, setSelected] = useState<LogRecord | null>(null);
-  const displayName = (row: LogRecord) => missingValues.includes(row.name.trim().toLowerCase()) || row.name === "Unrecognized person" ? "Unauthorized person" : row.name;
-  const enquiryStatus = (row: LogRecord) => reviewFor(reviews, row).status === "Revoked" ? "Verified" : "Pending Verification";
-  const entryCount = (row: LogRecord) => row.entries ?? 1;
+type WorklogDesignation = typeof adminPortalDesignations[number] | "Student Affair" | "Staff";
+
+const worklogEntries: {
+  name: string;
+  officerId: string;
+  email: string;
+  designation: WorklogDesignation;
+  institution: string;
+  entry: string;
+  exit: string;
+  durationMinutes: number;
+  day: string;
+  date: string;
+}[] = [
+  { name: "Meera Nair", officerId: "SUP-B-0004", email: "meera.nair@campus.edu", designation: "Campus Supervisor", institution: "Institution B", entry: "10:48", exit: "—", durationMinutes: 132, day: "Today", date: "2025-06-16" },
+  { name: "Daniel Thomas", officerId: "SA-B-0012", email: "daniel.thomas@campus.edu", designation: "Student Affair", institution: "Institution B", entry: "08:45", exit: "12:10", durationMinutes: 205, day: "Today", date: "2025-06-16" },
+  { name: "Karthik Rao", officerId: "SUP-A-0007", email: "karthik.rao@campus.edu", designation: "Campus Supervisor", institution: "Institution A", entry: "09:44", exit: "17:22", durationMinutes: 458, day: "Yesterday", date: "2025-06-15" },
+  { name: "Lakshmi Iyer", officerId: "WRD-B-0011", email: "lakshmi.iyer@campus.edu", designation: "Hostel Warden", institution: "Institution B", entry: "08:10", exit: "16:18", durationMinutes: 488, day: "Today", date: "2025-06-16" },
+  { name: "Vijay Nair", officerId: "STF-B-0024", email: "vijay.nair@campus.edu", designation: "Staff", institution: "Institution B", entry: "08:32", exit: "16:05", durationMinutes: 453, day: "Today", date: "2025-06-16" },
+  { name: "Arun Sharma", officerId: "ACS-B-0012", email: "arun.sharma@campus.edu", designation: "Supervisor", institution: "Institution B", entry: "08:20", exit: "16:20", durationMinutes: 480, day: "Today", date: "2025-06-16" },
+  { name: "Rohan Mehta", officerId: "CSO-0001", email: "rohan.mehta@campus.edu", designation: "CSO", institution: "Institution B", entry: "08:30", exit: "17:00", durationMinutes: 510, day: "Today", date: "2025-06-16" },
+  { name: "Kavitha Rao", officerId: "SW-B-0008", email: "kavitha.rao@campus.edu", designation: "Student Welfare", institution: "Institution B", entry: "09:00", exit: "17:00", durationMinutes: 480, day: "Today", date: "2025-06-16" },
+  { name: "Priya Raman", officerId: "MGR-B-0003", email: "priya.raman@campus.edu", designation: "Institute Manager", institution: "Institution B", entry: "08:40", exit: "16:45", durationMinutes: 485, day: "Today", date: "2025-06-16" },
+  { name: "Arun Kumar", officerId: "GRD-B-0017", email: "arun.kumar@campus.edu", designation: "Security", institution: "Institution B", entry: "08:02", exit: "16:35", durationMinutes: 513, day: "Today", date: "2025-06-16" },
+  { name: "Kavya Rao", officerId: "GRD-B-0031", email: "kavya.rao@campus.edu", designation: "Security", institution: "Institution B", entry: "07:55", exit: "16:08", durationMinutes: 493, day: "Today", date: "2025-06-16" },
+  { name: "Joseph Mathew", officerId: "GRD-B-0038", email: "joseph.mathew@campus.edu", designation: "Security", institution: "Institution B", entry: "11:52", exit: "—", durationMinutes: 288, day: "Today", date: "2025-06-16" },
+  { name: "Imran Ali", officerId: "GRD-B-0044", email: "imran.ali@campus.edu", designation: "Security", institution: "Institution B", entry: "08:04", exit: "16:12", durationMinutes: 488, day: "Today", date: "2025-06-16" },
+  { name: "Neha Singh", officerId: "GRD-B-0052", email: "neha.singh@campus.edu", designation: "Security", institution: "Institution B", entry: "15:51", exit: "—", durationMinutes: 69, day: "Today", date: "2025-06-16" },
+];
+
+function formatDuration(minutes: number) {
+  return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
+}
+
+function OfficerDetailView({
+  officer,
+  allRows,
+  allScans,
+  onBack,
+}: {
+  officer: typeof worklogEntries[number];
+  allRows: typeof worklogEntries;
+  allScans: LogRecord[];
+  onBack: () => void;
+}) {
+  const officerWorklogs = allRows.filter(item => item.name === officer.name);
+  const officerScans = allScans.filter(row => row.guard === officer.name);
+  const initials = officer.name.split(" ").map(part => part[0]).join("");
 
   return <>
-    <div className="audit-table-wrap supervisor-audit-table-wrap">
-      <table className="audit-table supervisor-audit-table">
-        <thead><tr><th>S.No</th><th>Name</th><th>Reason</th><th>Enquiry details</th><th>Entries</th></tr></thead>
-        <tbody>{rows.map((row, index) => <tr key={recordKey(row)} onClick={() => setSelected(row)}>
-          <td>{index + 1}</td>
-          <td><strong>{displayName(row)}</strong></td>
-          <td>{row.guardNotes ?? "-"}</td>
-          <td><Status tone={enquiryStatus(row) === "Verified" ? "green" : "amber"}>{enquiryStatus(row)}</Status></td>
-          <td>{entryCount(row)}</td>
-        </tr>)}</tbody>
-      </table>
+    <TopBar title="Officer details" subtitle="Worklog & scan activity" back={onBack} />
+    <div className="page-content">
+      <section className="officer-detail-head">
+        <div className="person-avatar">{initials}</div>
+        <div>
+          <span>OFFICER PROFILE</span>
+          <h1>{officer.name}</h1>
+          <p>{officer.designation} · {officer.institution}</p>
+        </div>
+        <Status tone="green">Active</Status>
+      </section>
+      <div className="officer-scan-stats">
+        <div><strong>{officerScans.length}</strong><span>Total scans performed</span></div>
+        <div><strong>{officerScans.filter(row => row.accessCategory === "Authorized").length}</strong><span>Authorized detected</span></div>
+        <div><strong>{officerScans.filter(row => row.accessCategory === "Unauthorized").length}</strong><span>Unauthorized detected</span></div>
+      </div>
+      <section className="info-card officer-info">
+        <div className="card-kicker"><IdCard size={15} />OFFICER DETAILS</div>
+        <dl>
+          <div><dt>Name</dt><dd>{officer.name}</dd></div>
+          <div><dt>Officer ID</dt><dd>{officer.officerId}</dd></div>
+          <div><dt>Designation</dt><dd>{officer.designation}</dd></div>
+          <div><dt>Institution</dt><dd>{officer.institution}</dd></div>
+          <div><dt>Email</dt><dd>{officer.email}</dd></div>
+        </dl>
+      </section>
+      <div className="list-label">WORKLOG HISTORY</div>
+      <div className="login-event-list worklog-list officer-history">
+        {officerWorklogs.map(item => (
+          <article key={`${item.name}${item.day}${item.entry}`}>
+            <div className="login-dot"><FileClock size={16} /></div>
+            <div className="worklog-person">
+              <strong>{item.day}</strong>
+              <span>{item.designation} · {item.institution}</span>
+              <small>{formatDuration(item.durationMinutes)} logged</small>
+            </div>
+            <div className="worklog-times">
+              <div><span>Entry</span><strong>{item.entry}</strong></div>
+              <div><span>Exit</span><strong>{item.exit}</strong></div>
+              <div><span>Duration</span><strong>{formatDuration(item.durationMinutes)}</strong></div>
+            </div>
+          </article>
+        ))}
+      </div>
+      <div className="list-label officer-scan-label">SCAN RECORDS</div>
+      <div className="officer-scan-list">
+        {officerScans.map(record => (
+          <article key={recordKey(record)}>
+            <div className={`scan-record-icon ${record.accessCategory === "Unauthorized" ? "danger" : ""}`}>
+              {record.accessCategory === "Unauthorized" ? <ShieldAlert size={17} /> : <ShieldCheck size={17} />}
+            </div>
+            <div>
+              <strong>{record.name}</strong>
+              <span>{record.dateTime.replace("T", " ")} · {record.block}</span>
+              <small>{record.id === "Not available" ? "Identity unavailable" : record.id}</small>
+            </div>
+            <Status tone={record.accessCategory === "Unauthorized" ? "red" : record.accessCategory === "Authorized" ? "green" : "amber"}>
+              {record.accessCategory}
+            </Status>
+          </article>
+        ))}
+      </div>
+      {officerScans.length === 0 && (
+        <div className="empty-state compact-empty">
+          <ScanFace size={25} />
+          <strong>No scan records</strong>
+          <span>No scans are assigned to this officer in the current records.</span>
+        </div>
+      )}
     </div>
-    {selected && <section className="audit-profile supervisor-log-details">
-      <div className="supervisor-log-details-head"><div><span>LOG DETAILS</span><h2>{displayName(selected)}</h2></div><button onClick={() => setSelected(null)} aria-label="Close log details"><X size={18} /></button></div>
-      <dl>
-        <div><dt>S.No</dt><dd>{rows.indexOf(selected) + 1}</dd></div>
-        <div><dt>Name</dt><dd>{displayName(selected)}</dd></div>
-        <div><dt>Reason</dt><dd>{selected.guardNotes ?? "-"}</dd></div>
-        <div><dt>Enquiry details</dt><dd><Status tone={enquiryStatus(selected) === "Verified" ? "green" : "amber"}>{enquiryStatus(selected)}</Status></dd></div>
-        <div><dt>Entries</dt><dd>{entryCount(selected)}</dd></div>
-      </dl>
-    </section>}
   </>;
 }
 
-function Logs({ role, reviews }: { role: Role; reviews: Record<string, ReviewRecord> }) {
-  const levelOneRole = role === "security" || role === "warden" || role === "staff";
-  const dateOnlyFilters = levelOneRole || role === "students";
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [activeType, setActiveType] = useState("All");
-  const [selectedLog, setSelectedLog] = useState<string | null>(null);
-  const [fromDate, setFromDate] = useState(dateOnlyFilters ? "2025-06-16" : "2025-06-16T08:00");
-  const [toDate, setToDate] = useState(dateOnlyFilters ? "2025-06-16" : "2025-06-16T18:00");
-  const [category, setCategory] = useState("All Categories");
-  const [institution, setInstitution] = useState("All visible institutions");
-  const [department, setDepartment] = useState("All departments");
-  const [academicYear, setAcademicYear] = useState("All years");
-  const [block, setBlock] = useState(role === "security" ? "Main Gate" : "All Institution B blocks");
-  const [exported, setExported] = useState(false);
-  const title = role === "security" ? "Entries Log" : role === "warden" ? "Hostel Entries Log" : role === "staff" ? "Assigned Entries Log" : "Campus records";
-  const types = role === "students" ? ["All", "Entry", "Exit", "Denied"] : ["All", "Entry", "Exit", "Visitor", "Denied"];
-  const scopedRows = logRows.filter(row => {
-    if (role === "security" && row.block !== "Main Gate") return false;
-    if (role === "security" && row.personType === "External") return false;
-    if (role === "warden" && (row.institution !== "Institution B" || row.hostel !== "Bharathi Hostel" || row.guard !== roleMeta.warden.name)) return false;
-    if (role === "staff" && (row.institution !== "Institution B" || row.block !== "Block A")) return false;
-    if (role === "students" && row.accessCategory === "Visitors") return false;
-    if (activeType !== "All" && row.event !== activeType && !(activeType === "Visitor" && ["Visitor", "Internal visit"].includes(row.event))) return false;
-    const comparableDate = dateOnlyFilters ? row.dateTime.slice(0, 10) : row.dateTime;
-    if (comparableDate < fromDate || comparableDate > toDate) return false;
-    if (levelOneRole && category !== "All Categories" && recordCategory(reviews, row) !== category) return false;
-    if (role === "security" && institution !== "All visible institutions" && row.institution !== institution) return false;
-    if (!levelOneRole && department !== "All departments" && row.department !== department) return false;
-    if (role === "students" && academicYear !== "All years" && row.year !== academicYear) return false;
-    if (!levelOneRole && block !== "All Institution B blocks" && row.block !== block) return false;
-    return true;
-  });
-  const resetFilters = () => {
-    setActiveType("All");
-    setFromDate(dateOnlyFilters ? "2025-06-16" : "2025-06-16T08:00");
-    setToDate(dateOnlyFilters ? "2025-06-16" : "2025-06-16T18:00");
-    setCategory("All Categories");
-    setInstitution("All visible institutions");
-    setDepartment("All departments");
-    setAcademicYear("All years");
-    setBlock(role === "security" ? "Main Gate" : "All Institution B blocks");
-  };
-  return <>
-    <TopBar title={title} subtitle={role === "security" ? "Main Gate · Assigned block only" : role === "warden" ? "Bharathi Hostel · Residents only" : role === "staff" ? "Block A · Assigned duty only" : "Organization-wide · Read-only review"} action={levelOneRole || role === "students" ? undefined : <div className="header-actions"><button className="icon-btn" onClick={() => setExported(true)} aria-label="Export visible logs"><FileClock size={18} /></button><button className={`icon-btn ${filtersOpen ? "primary" : ""}`} onClick={() => setFiltersOpen(!filtersOpen)} aria-label="Toggle filters"><Filter size={18} /></button></div>} />
-    <div className="page-content">
-      {exported && <div className="export-notice"><Check size={14} />Export prepared with {scopedRows.length} filtered records.<button onClick={() => setExported(false)}>Close</button></div>}
-      {levelOneRole ? <section className="filter-panel guard-log-filters"><div className="filter-panel-head"><div></div><button onClick={resetFilters}>Reset</button></div><Field label="Category"><select value={category} onChange={event => setCategory(event.target.value)}><option>All Categories</option><option>Authorized</option><option>Unauthorized</option><option>Revoked</option></select></Field><div className="date-filter"><label><CalendarDays size={15} /><span>{role === "warden" ? "Start Date" : "From Date"}</span><input type="date" value={fromDate} onChange={event => setFromDate(event.target.value)} /></label><span>to</span><label><Clock3 size={15} /><span>{role === "warden" ? "End Date" : "To Date"}</span><input type="date" value={toDate} onChange={event => setToDate(event.target.value)} /></label></div></section> : role === "students" ? <section className="filter-panel student-record-filters"><div className="filter-panel-head"><div><strong>Filter records</strong><span>Choose a date range and record type.</span></div><button onClick={resetFilters}>Reset</button></div><div className="date-filter"><label><CalendarDays size={15} /><span>From Date</span><input type="date" value={fromDate} onChange={event => setFromDate(event.target.value)} /></label><span>to</span><label><Clock3 size={15} /><span>To Date</span><input type="date" value={toDate} onChange={event => setToDate(event.target.value)} /></label></div><div className="filter-row">{types.map(type => <button key={type} className={activeType === type ? "active" : ""} onClick={() => setActiveType(type)}>{type}</button>)}</div></section> : <>
-      <div className="date-filter"><label><CalendarDays size={15} /><span>From</span><input type="datetime-local" value={fromDate} onChange={event => setFromDate(event.target.value)} /></label><span>to</span><label><Clock3 size={15} /><span>To</span><input type="datetime-local" value={toDate} onChange={event => setToDate(event.target.value)} /></label></div>
-      <div className="filter-row">{types.map(type => <button key={type} className={activeType === type ? "active" : ""} onClick={() => setActiveType(type)}>{type}</button>)}</div></>}
-      {!levelOneRole && filtersOpen && <section className="filter-panel"><div className="filter-panel-head"><div><strong>Filter logs</strong><span>Filters are limited to your authorised scope.</span></div><button onClick={resetFilters}>Reset</button></div>
-        <div className="filter-fields">
-          <Field label="Record scope"><select disabled><option>All campus records</option></select></Field>
-          <Field label="Department"><select value={department} onChange={event => setDepartment(event.target.value)}><option>All departments</option><option>Computer Science</option><option>Electronics</option><option>Mechanical</option></select></Field>
-          <Field label="Academic year"><select value={academicYear} onChange={event => setAcademicYear(event.target.value)}><option>All years</option><option>Year I</option><option>Year II</option><option>Year III</option><option>Year IV</option></select></Field>
-          <Field label="Block"><select value={block} onChange={event => setBlock(event.target.value)}><option>All Institution B blocks</option><option>Main Gate</option><option>Block A</option><option>Block B</option><option>Library Block</option></select></Field>
-        </div><Button onClick={() => setFiltersOpen(false)} icon={<Filter size={15} />}>Apply filters</Button>
-      </section>}
-      <div className={`log-summary ${role === "students" ? "two-column" : ""}`}>{levelOneRole || role === "students" ? <><div><strong>{scopedRows.filter(row => recordCategory(reviews, row) === "Authorized").length}</strong><span>Authorized</span></div><div><strong>{scopedRows.filter(row => recordCategory(reviews, row) === "Unauthorized").length}</strong><span>Unauthorized</span></div>{levelOneRole && <div><strong>{scopedRows.filter(row => recordCategory(reviews, row) === "Revoked").length}</strong><span>Revoked</span></div>}</> : <><div><strong>{scopedRows.filter(row => row.event === "Entry").length}</strong><span>Entries</span></div><div><strong>{scopedRows.filter(row => row.event === "Exit").length}</strong><span>Exits</span></div><div><strong>{scopedRows.filter(row => ["Visitor", "Internal visit"].includes(row.event)).length}</strong><span>Visits</span></div></>}</div>
-      <AuditTable rows={scopedRows} reviews={reviews} title={role === "warden" ? "" : levelOneRole ? "ASSIGNED SCOPE LOG" : "CAMPUS RECORDS"} plainNames={role === "students" || role === "warden"} />
-      {scopedRows.length === 0 && <div className="empty-state"><History size={25} /><strong>No matching records</strong><span>Change a filter or expand the date range.</span></div>}
+function SecurityWorklogTable({
+  rows,
+  scans,
+  onSelectOfficer,
+}: {
+  rows: typeof worklogEntries;
+  scans: LogRecord[];
+  onSelectOfficer: (name: string) => void;
+}) {
+  return (
+    <div className="worklog-table-wrap">
+      <table className="worklog-table">
+        <thead>
+          <tr>
+            <th>S.No</th>
+            <th>Name</th>
+            <th>Designation</th>
+            <th>Login</th>
+            <th>Logout</th>
+            <th>Scans</th>
+            <th>Authorized</th>
+            <th>Unauthorized</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((item, index) => {
+            const officerScans = scans.filter(row => row.guard === item.name);
+            return (
+              <tr key={`${item.name}${item.day}${index}`}>
+                <td>{index + 1}</td>
+                <td>
+                  <button className="worklog-name-button" onClick={() => onSelectOfficer(item.name)}>
+                    {item.name}
+                  </button>
+                </td>
+                <td>
+                  <span className={`designation-badge designation-${item.designation.toLowerCase().replace(" ", "-")}`}>
+                    {item.designation}
+                  </span>
+                </td>
+                <td>{item.entry}</td>
+                <td>{item.exit}</td>
+                <td><strong>{officerScans.length}</strong></td>
+                <td>
+                  <span className="worklog-count authorized">
+                    {officerScans.filter(row => row.accessCategory === "Authorized").length}
+                  </span>
+                </td>
+                <td>
+                  <span className="worklog-count unauthorized">
+                    {officerScans.filter(row => row.accessCategory === "Unauthorized").length}
+                  </span>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
-  </>;
+  );
+}
+
+function UnauthorisedEntriesTable({
+  rows,
+  reviews,
+}: {
+  rows: LogRecord[];
+  reviews: Record<string, ReviewRecord>;
+}) {
+  const [selected, setSelected] = useState<LogRecord | null>(null);
+  const displayName = (row: LogRecord) =>
+    missingValues.includes(row.name.trim().toLowerCase()) || row.name === "Unrecognized person"
+      ? "Unauthorized person"
+      : row.name;
+  const entryCount = (row: LogRecord) => row.entries ?? 1;
+
+  const getStatus = (row: LogRecord) => {
+    const rev = reviewFor(reviews, row);
+    if (rev.status === "Authorised" || row.decision === "Authorised") {
+      return { label: "Allowed", tone: "green" as const };
+    }
+    if (rev.status === "Verified") {
+      return { label: "Verified", tone: "green" as const };
+    }
+    if (rev.status === "Unauthorised" || row.decision === "Denied" || row.event === "Denied") {
+      return { label: "Denied", tone: "red" as const };
+    }
+    if (rev.status === "Pending Verification") {
+      return { label: "Pending", tone: "amber" as const };
+    }
+    if (row.event === "Flagged" || row.decision === "Flagged") {
+      return { label: "Flagged", tone: "amber" as const };
+    }
+    return { label: row.decision || row.event || "Denied", tone: (row.tone || "red") as const };
+  };
+
+  return (
+    <>
+      <div className="audit-table-wrap supervisor-audit-table-wrap">
+        <table className="audit-table supervisor-audit-table">
+          <thead>
+            <tr>
+              <th>S.No</th>
+              <th>Name</th>
+              <th>Phone No</th>
+              <th>Status</th>
+              <th>Entries</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => {
+              const statusInfo = getStatus(row);
+              return (
+                <tr key={recordKey(row)} onClick={() => setSelected(row)}>
+                  <td>{index + 1}</td>
+                  <td><strong>{displayName(row)}</strong></td>
+                  <td>{row.phoneNumber ? row.phoneNumber : "—"}</td>
+                  <td><Status tone={statusInfo.tone}>{statusInfo.label}</Status></td>
+                  <td>{entryCount(row)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {selected && (
+        <section className="audit-profile supervisor-log-details">
+          <div className="supervisor-log-details-head">
+            <div>
+              <span>UNAUTHORISED ENTRY DETAILS</span>
+              <h2>{displayName(selected)}</h2>
+            </div>
+            <button onClick={() => setSelected(null)} aria-label="Close log details">
+              <X size={18} />
+            </button>
+          </div>
+          <dl>
+            <div><dt>S.No</dt><dd>{rows.indexOf(selected) + 1}</dd></div>
+            <div><dt>Name</dt><dd>{displayName(selected)}</dd></div>
+            <div><dt>Phone No</dt><dd>{selected.phoneNumber ? selected.phoneNumber : "—"}</dd></div>
+            <div><dt>Status</dt><dd><Status tone={getStatus(selected).tone}>{getStatus(selected).label}</Status></dd></div>
+            <div><dt>Entries</dt><dd>{entryCount(selected)}</dd></div>
+            <div><dt>Location</dt><dd>{selected.block}</dd></div>
+            <div><dt>Date & time</dt><dd>{selected.dateTime.replace("T", " ")}</dd></div>
+            <div><dt>Security officer</dt><dd>{selected.guard} ({selected.guardNumber})</dd></div>
+            <div><dt>Reason / Notes</dt><dd>{selected.guardNotes ?? "—"}</dd></div>
+          </dl>
+        </section>
+      )}
+    </>
+  );
 }
 
 function SupervisorHome({ go, reviews, logs }: { go: (screen: Screen) => void; reviews?: Record<string, ReviewRecord>; logs?: LogRecord[] }) {
@@ -2504,52 +2653,46 @@ function CreateGuard({ go }: { go: (screen: Screen) => void }) {
   </>;
 }
 
-function Audit({ go, reviews, scope = "supervisor", logs }: { go: (screen: Screen) => void; reviews: Record<string, ReviewRecord>; scope?: "supervisor" | "cso"; logs?: LogRecord[] }) {
-  const [filterMode, setFilterMode] = useState<"all" | "guard">("all");
-  const [selectedGuard, setSelectedGuard] = useState("");
+function Audit({
+  go,
+  reviews,
+  scope = "supervisor",
+  logs,
+}: {
+  go: (screen: Screen) => void;
+  reviews: Record<string, ReviewRecord>;
+  scope?: "supervisor" | "cso";
+  logs?: LogRecord[];
+}) {
+  const [activeTab, setActiveTab] = useState<"unauthorised" | "worklog">("unauthorised");
   const [auditFrom, setAuditFrom] = useState("2025-06-16");
   const [auditTo, setAuditTo] = useState("2025-06-16");
-  const [guardsList, setGuardsList] = useState<Array<{ id: number; name: string; code: string }>>([
-    { id: 1, name: "G. Selvam", code: "SG-101" },
-    { id: 2, name: "P. Murugan", code: "SG-102" },
-    { id: 3, name: "K. Suresh", code: "SG-103" },
-    { id: 4, name: "V. Anbarasu", code: "SG-104" },
-  ]);
+  const [selectedOfficerName, setSelectedOfficerName] = useState<string | null>(null);
   const [apiRecords, setApiRecords] = useState<LogRecord[] | null>(null);
 
-  useEffect(() => {
-    fetch("http://localhost:8000/api/v1/guards/assigned")
-      .then(res => res.ok ? res.json() : Promise.reject(res))
-      .then((data: Array<{ id: number; name: string; guard_code: string }>) => {
-        if (Array.isArray(data) && data.length > 0) {
-          setGuardsList(data.map(g => ({ id: g.id, name: g.name, code: g.guard_code })));
-        }
-      })
-      .catch(err => console.warn("Could not fetch assigned guards:", err));
-  }, []);
+  const currentLogs = logs ?? logRows;
 
   useEffect(() => {
+    let active = true;
     let url = `http://localhost:8000/api/v1/access-logs/supervisor-unauthorized?from_date=${auditFrom}&to_date=${auditTo}`;
-    if (filterMode === "guard") {
-      if (!selectedGuard) {
-        setApiRecords([]);
-        return;
-      }
-      url += `&guard_name=${encodeURIComponent(selectedGuard)}`;
-    }
 
     fetch(url)
-      .then(res => res.ok ? res.json() : Promise.reject(res))
+      .then(res => (res.ok ? res.json() : Promise.reject(res)))
       .then(data => {
+        if (!active) return;
         if (data && Array.isArray(data.records)) {
           const mapped: LogRecord[] = data.records.map((r: any) => ({
-            initials: r.name ? (r.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase() || "UP") : "UP",
+            initials: r.name
+              ? r.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase() || "UP"
+              : "UP",
             name: r.name || "Unrecognized person",
             id: r.identifier_value || "Not available",
             institution: "SRM GROUP OF INSTITUTION TRICHY",
             department: r.department || "Not available",
             block: r.location_block || "Main Gate",
-            time: r.timestamp ? new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : "00:00",
+            time: r.timestamp
+              ? new Date(r.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })
+              : "00:00",
             dateTime: r.timestamp ? (r.timestamp.includes("T") ? r.timestamp : r.timestamp.replace(" ", "T")) : "",
             event: "Denied",
             tone: "red",
@@ -2569,88 +2712,173 @@ function Audit({ go, reviews, scope = "supervisor", logs }: { go: (screen: Scree
         }
       })
       .catch(err => {
-        console.warn("Could not fetch supervisor unauthorized records:", err);
-        setApiRecords(null);
+        if (active) {
+          console.warn("Could not fetch supervisor unauthorized records:", err);
+          setApiRecords(null);
+        }
       });
-  }, [filterMode, selectedGuard, auditFrom, auditTo]);
 
-  const currentLogs = logs ?? logRows;
-  const fallbackRows = currentLogs.filter(row => {
+    return () => {
+      active = false;
+    };
+  }, [auditFrom, auditTo]);
+
+  // Fallback for Tab 1 (Unauthorised Entries)
+  const fallbackUnauthRows = currentLogs.filter(row => {
     if (row.accessCategory !== "Unauthorized") return false;
     const recordDate = row.dateTime.slice(0, 10);
     if (recordDate < auditFrom || recordDate > auditTo) return false;
-    if (filterMode === "guard") {
-      if (!selectedGuard) return false;
-      const cleanSelected = selectedGuard.split("(")[0].trim().toLowerCase();
-      const rowGuard = (row.guard || "").toLowerCase();
-      const rowGuardNum = (row.guardNumber || "").toLowerCase();
-      return rowGuard.includes(cleanSelected) || cleanSelected.includes(rowGuard) || rowGuardNum === cleanSelected;
-    }
-    return assignedGuardNumbers.has(row.guardNumber) || guardsList.some(g => g.name === row.guard || g.code === row.guardNumber);
+    return assignedGuardNumbers.has(row.guardNumber) || (row.guard && row.guard.includes("Selvam"));
   });
 
-  const displayRows = apiRecords !== null ? apiRecords : fallbackRows;
+  const unauthRows = apiRecords !== null ? apiRecords : fallbackUnauthRows;
 
-  const resetAudit = () => {
-    setFilterMode("all");
-    setSelectedGuard("");
-    setAuditFrom("2025-06-16");
-    setAuditTo("2025-06-16");
+  // Tab 2 (Security Worklog) data for Campus Supervisor (Institution B security personnel)
+  const supervisorWorklogEntries = worklogEntries.filter(
+    item => item.institution === "Institution B" && ["Security", "Campus Supervisor"].includes(item.designation)
+  );
+
+  const worklogRows = supervisorWorklogEntries.filter(
+    item => item.date >= auditFrom && item.date <= auditTo
+  );
+
+  const totalMinutes = worklogRows.reduce((total, item) => total + item.durationMinutes, 0);
+
+  const handleFromDateChange = (val: string) => {
+    setAuditFrom(val);
+    if (auditTo && val > auditTo) {
+      setAuditTo(val);
+    }
   };
 
-  return <>
-    <TopBar title="Campus records" subtitle={scope === "cso" ? "Institution B · CSO scope" : "Institution B · Campus Supervisor scope"} back={() => go("home")} />
-    <div className="page-content">
-      <section className="filter-panel supervisor-audit-filters">
-        <div className="filter-panel-head">
-          <div className="audit-filter-row">
-            <button
-              type="button"
-              className={`audit-filter-btn ${filterMode === "all" ? "active" : ""}`}
-              onClick={() => setFilterMode("all")}
-            >
-              1 — Unauthorised persons
-            </button>
-            <button
-              type="button"
-              className={`audit-filter-btn ${filterMode === "guard" ? "active" : ""}`}
-              onClick={() => setFilterMode("guard")}
-            >
-              2 — By guard
-            </button>
+  const handleToDateChange = (val: string) => {
+    setAuditTo(val);
+    if (auditFrom && val < auditFrom) {
+      setAuditFrom(val);
+    }
+  };
+
+  const resetAudit = () => {
+    setAuditFrom("2025-06-16");
+    setAuditTo("2025-06-16");
+    setSelectedOfficerName(null);
+  };
+
+  const selectedOfficer = worklogRows.find(item => item.name === selectedOfficerName);
+
+  if (activeTab === "worklog" && selectedOfficer) {
+    return (
+      <OfficerDetailView
+        officer={selectedOfficer}
+        allRows={worklogRows}
+        allScans={currentLogs}
+        onBack={() => setSelectedOfficerName(null)}
+      />
+    );
+  }
+
+  return (
+    <>
+      <TopBar
+        title="Campus records"
+        subtitle={scope === "cso" ? "Institution B · CSO scope" : "Institution B · Campus Supervisor scope"}
+        back={() => go("home")}
+      />
+      <div className="page-content">
+        <section className="filter-panel supervisor-audit-filters">
+          <div className="filter-panel-head">
+            <div className="audit-filter-row">
+              <button
+                type="button"
+                className={`audit-filter-btn ${activeTab === "unauthorised" ? "active" : ""}`}
+                onClick={() => {
+                  setActiveTab("unauthorised");
+                  setSelectedOfficerName(null);
+                }}
+              >
+                Unauthorised Entries
+              </button>
+              <button
+                type="button"
+                className={`audit-filter-btn ${activeTab === "worklog" ? "active" : ""}`}
+                onClick={() => {
+                  setActiveTab("worklog");
+                  setSelectedOfficerName(null);
+                }}
+              >
+                Security Worklog
+              </button>
+            </div>
+            <button type="button" onClick={resetAudit}>Reset</button>
           </div>
-          <button type="button" onClick={resetAudit}>Reset</button>
-        </div>
-        <div className="filter-fields">
-          <Field label="From Date"><input type="date" value={auditFrom} onChange={event => setAuditFrom(event.target.value)} /></Field>
-          <Field label="To Date"><input type="date" value={auditTo} onChange={event => setAuditTo(event.target.value)} /></Field>
-        </div>
-        {filterMode === "guard" && (
-          <div className="supervisor-guard-dropdown">
-            <Field label="Select Guard">
-              <select value={selectedGuard} onChange={event => setSelectedGuard(event.target.value)}>
-                <option value="">Select Guard</option>
-                {guardsList.map(g => (
-                  <option key={g.code || g.id} value={g.name}>
-                    {g.name} ({g.code})
-                  </option>
-                ))}
-              </select>
+          <div className="filter-fields">
+            <Field label="From Date">
+              <input
+                type="date"
+                value={auditFrom}
+                max={auditTo || undefined}
+                onChange={event => handleFromDateChange(event.target.value)}
+              />
+            </Field>
+            <Field label="To Date">
+              <input
+                type="date"
+                value={auditTo}
+                min={auditFrom || undefined}
+                onChange={event => handleToDateChange(event.target.value)}
+              />
             </Field>
           </div>
+        </section>
+
+        {activeTab === "unauthorised" && (
+          <>
+            <div className="result-count">
+              <strong>{unauthRows.length} results</strong>
+            </div>
+            <UnauthorisedEntriesTable rows={unauthRows} reviews={reviews} />
+            {unauthRows.length === 0 && (
+              <div className="empty-state">
+                <FileClock size={25} />
+                <strong>No matching records</strong>
+                <span>Reset filters or choose another date period.</span>
+              </div>
+            )}
+          </>
         )}
-      </section>
-      <div className="result-count"><strong>{displayRows.length} results</strong></div>
-      <SupervisorAuditTable rows={displayRows} reviews={reviews} />
-      {displayRows.length === 0 && (
-        <div className="empty-state">
-          <FileClock size={25} />
-          <strong>No matching records</strong>
-          <span>{filterMode === "guard" && !selectedGuard ? "Please select a security guard from the dropdown above." : "Reset filters or choose another date period."}</span>
-        </div>
-      )}
-    </div>
-  </>;
+
+        {activeTab === "worklog" && (
+          <>
+            <div className="login-summary">
+              <div>
+                <strong>{worklogRows.length}</strong>
+                <span>Worklog sessions</span>
+              </div>
+              <div>
+                <strong>{formatDuration(totalMinutes)}</strong>
+                <span>Total logged time</span>
+              </div>
+            </div>
+            <div className="result-count">
+              <strong>{worklogRows.length} results</strong>
+            </div>
+            <SecurityWorklogTable
+              rows={worklogRows}
+              scans={currentLogs}
+              onSelectOfficer={name => setSelectedOfficerName(name)}
+            />
+            {worklogRows.length === 0 && (
+              <div className="empty-state">
+                <FileClock size={25} />
+                <strong>No matching records</strong>
+                <span>Reset filters or choose another date period.</span>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </>
+  );
 }
 
 function Alerts({
@@ -2660,6 +2888,7 @@ function Alerts({
   reviews,
   updateReview,
   logs,
+  deleteLog,
 }: {
   go: (screen: Screen) => void;
   back: () => void;
@@ -2667,6 +2896,7 @@ function Alerts({
   reviews: Record<string, ReviewRecord>;
   updateReview: (row: LogRecord, type: "Authorised" | "Unauthorised" | "Revoked", reason?: string) => void;
   logs?: LogRecord[];
+  deleteLog?: (row: LogRecord) => void;
 }) {
   const currentLogs = logs ?? logRows;
   const alertRows = currentLogs.filter(row => {
@@ -2893,6 +3123,29 @@ function Alerts({
                 <div className="alert-meta">
                   <b>{row.dateTime.replace("T", " ")}</b>
                   <Status tone={reviewTone(review.status)}>{review.status}</Status>
+                  {deleteLog && (
+                    <button
+                      type="button"
+                      title="Remove alert"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        deleteLog(row);
+                      }}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#ef4444',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '4px',
+                      }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                   <button onClick={(event) => { event.stopPropagation(); openAlert(row); }}>
                     Open<ChevronRight size={13} />
                   </button>
@@ -3083,39 +3336,7 @@ function UserAdministration({ go }: { go: (screen: Screen) => void }) {
   </>;
 }
 
-type WorklogDesignation = typeof adminPortalDesignations[number] | "Student Affair" | "Staff";
-
-const worklogEntries: {
-  name: string;
-  officerId: string;
-  email: string;
-  designation: WorklogDesignation;
-  institution: string;
-  entry: string;
-  exit: string;
-  durationMinutes: number;
-  day: string;
-  date: string;
-}[] = [
-  { name: "Meera Nair", officerId: "SUP-B-0004", email: "meera.nair@campus.edu", designation: "Campus Supervisor", institution: "Institution B", entry: "10:48", exit: "—", durationMinutes: 132, day: "Today", date: "2025-06-16" },
-  { name: "Daniel Thomas", officerId: "SA-B-0012", email: "daniel.thomas@campus.edu", designation: "Student Affair", institution: "Institution B", entry: "08:45", exit: "12:10", durationMinutes: 205, day: "Today", date: "2025-06-16" },
-  { name: "Karthik Rao", officerId: "SUP-A-0007", email: "karthik.rao@campus.edu", designation: "Campus Supervisor", institution: "Institution A", entry: "09:44", exit: "17:22", durationMinutes: 458, day: "Yesterday", date: "2025-06-15" },
-  { name: "Lakshmi Iyer", officerId: "WRD-B-0011", email: "lakshmi.iyer@campus.edu", designation: "Hostel Warden", institution: "Institution B", entry: "08:10", exit: "16:18", durationMinutes: 488, day: "Today", date: "2025-06-16" },
-  { name: "Vijay Nair", officerId: "STF-B-0024", email: "vijay.nair@campus.edu", designation: "Staff", institution: "Institution B", entry: "08:32", exit: "16:05", durationMinutes: 453, day: "Today", date: "2025-06-16" },
-  { name: "Arun Sharma", officerId: "ACS-B-0012", email: "arun.sharma@campus.edu", designation: "Supervisor", institution: "Institution B", entry: "08:20", exit: "16:20", durationMinutes: 480, day: "Today", date: "2025-06-16" },
-  { name: "Rohan Mehta", officerId: "CSO-0001", email: "rohan.mehta@campus.edu", designation: "CSO", institution: "Institution B", entry: "08:30", exit: "17:00", durationMinutes: 510, day: "Today", date: "2025-06-16" },
-  { name: "Kavitha Rao", officerId: "SW-B-0008", email: "kavitha.rao@campus.edu", designation: "Student Welfare", institution: "Institution B", entry: "09:00", exit: "17:00", durationMinutes: 480, day: "Today", date: "2025-06-16" },
-  { name: "Priya Raman", officerId: "MGR-B-0003", email: "priya.raman@campus.edu", designation: "Institute Manager", institution: "Institution B", entry: "08:40", exit: "16:45", durationMinutes: 485, day: "Today", date: "2025-06-16" },
-  { name: "Arun Kumar", officerId: "GRD-B-0017", email: "arun.kumar@campus.edu", designation: "Security", institution: "Institution B", entry: "08:02", exit: "16:35", durationMinutes: 513, day: "Today", date: "2025-06-16" },
-  { name: "Kavya Rao", officerId: "GRD-B-0031", email: "kavya.rao@campus.edu", designation: "Security", institution: "Institution B", entry: "07:55", exit: "16:08", durationMinutes: 493, day: "Today", date: "2025-06-16" },
-  { name: "Joseph Mathew", officerId: "GRD-B-0038", email: "joseph.mathew@campus.edu", designation: "Security", institution: "Institution B", entry: "11:52", exit: "—", durationMinutes: 288, day: "Today", date: "2025-06-16" },
-  { name: "Imran Ali", officerId: "GRD-B-0044", email: "imran.ali@campus.edu", designation: "Security", institution: "Institution B", entry: "08:04", exit: "16:12", durationMinutes: 488, day: "Today", date: "2025-06-16" },
-  { name: "Neha Singh", officerId: "GRD-B-0052", email: "neha.singh@campus.edu", designation: "Security", institution: "Institution B", entry: "15:51", exit: "—", durationMinutes: 69, day: "Today", date: "2025-06-16" },
-];
-
-function formatDuration(minutes: number) {
-  return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
-}
+// (worklogEntries & formatDuration hoisted above Audit for reuse)
 
 function Worklog({ go, scope = "admin" }: { go: (screen: Screen) => void; scope?: "admin" | "student-affairs" | "security-oversight" }) {
   const studentAffairsScope = scope === "student-affairs";
@@ -3125,12 +3346,28 @@ function Worklog({ go, scope = "admin" }: { go: (screen: Screen) => void; scope?
   const [fromDate, setFromDate] = useState("2025-06-16");
   const [toDate, setToDate] = useState("2025-06-16");
   const [selectedOfficerName, setSelectedOfficerName] = useState<string | null>(null);
-  const accessibleEntries = worklogEntries.filter(item => securityOversightScope ? item.institution === "Institution B" && ["Campus Supervisor", "Hostel Warden", "Staff", "Security"].includes(item.designation) : studentAffairsScope ? ["Campus Supervisor", "Security"].includes(item.designation) : adminPortalDesignations.includes(item.designation as typeof adminPortalDesignations[number]));
-  const rows = accessibleEntries.filter(item => (roleFilter === "All designations" || item.designation === roleFilter) && (securityOversightScope || institutionFilter === "All institutions" || item.institution === institutionFilter) && item.date >= fromDate && item.date <= toDate);
+
+  const accessibleEntries = worklogEntries.filter(item =>
+    securityOversightScope
+      ? item.institution === "Institution B" && ["Campus Supervisor", "Hostel Warden", "Staff", "Security"].includes(item.designation)
+      : studentAffairsScope
+      ? ["Campus Supervisor", "Security"].includes(item.designation)
+      : adminPortalDesignations.includes(item.designation as typeof adminPortalDesignations[number])
+  );
+
+  const rows = accessibleEntries.filter(
+    item =>
+      (roleFilter === "All designations" || item.designation === roleFilter) &&
+      (securityOversightScope || institutionFilter === "All institutions" || item.institution === institutionFilter) &&
+      item.date >= fromDate &&
+      item.date <= toDate
+  );
+
   const totalMinutes = rows.reduce((total, item) => total + item.durationMinutes, 0);
   const todayDate = "2025-06-16";
   const todayUsers = new Set(accessibleEntries.filter(item => item.date === todayDate).map(item => item.officerId)).size;
   const todayScans = logRows.filter(row => row.dateTime.slice(0, 10) === todayDate);
+
   const dayTiles = [
     { label: "Users", value: todayUsers, tone: "users" },
     { label: "Scans", value: todayScans.length, tone: "scans" },
@@ -3138,29 +3375,107 @@ function Worklog({ go, scope = "admin" }: { go: (screen: Screen) => void; scope?
     { label: "Unauthorized", value: todayScans.filter(row => row.accessCategory === "Unauthorized").length, tone: "unauthorized" },
     { label: "Visitors", value: todayScans.filter(row => row.accessCategory === "Visitors").length, tone: "visitors" },
   ];
+
   const selectedOfficer = rows.find(item => item.name === selectedOfficerName);
   if (selectedOfficer) {
-    const officerWorklogs = rows.filter(item => item.name === selectedOfficer.name);
-    const officerScans = logRows.filter(row => row.guard === selectedOfficer.name);
-    const initials = selectedOfficer.name.split(" ").map(part => part[0]).join("");
-    return <>
-      <TopBar title="Officer details" subtitle="Worklog & scan activity" back={() => setSelectedOfficerName(null)} />
-      <div className="page-content">
-        <section className="officer-detail-head"><div className="person-avatar">{initials}</div><div><span>OFFICER PROFILE</span><h1>{selectedOfficer.name}</h1><p>{selectedOfficer.designation} · {selectedOfficer.institution}</p></div><Status tone="green">Active</Status></section>
-        <div className="officer-scan-stats"><div><strong>{officerScans.length}</strong><span>Total scans performed</span></div><div><strong>{officerScans.filter(row => row.accessCategory === "Authorized").length}</strong><span>Authorized detected</span></div><div><strong>{officerScans.filter(row => row.accessCategory === "Unauthorized").length}</strong><span>Unauthorized detected</span></div></div>
-        <section className="info-card officer-info"><div className="card-kicker"><IdCard size={15} />OFFICER DETAILS</div><dl><div><dt>Name</dt><dd>{selectedOfficer.name}</dd></div><div><dt>Officer ID</dt><dd>{selectedOfficer.officerId}</dd></div><div><dt>Designation</dt><dd>{selectedOfficer.designation}</dd></div><div><dt>Institution</dt><dd>{selectedOfficer.institution}</dd></div><div><dt>Email</dt><dd>{selectedOfficer.email}</dd></div></dl></section>
-        <div className="list-label">WORKLOG HISTORY</div>
-        <div className="login-event-list worklog-list officer-history">{officerWorklogs.map(item => <article key={`${item.name}${item.day}`}><div className="login-dot"><FileClock size={16} /></div><div className="worklog-person"><strong>{item.day}</strong><span>{item.designation} · {item.institution}</span><small>{formatDuration(item.durationMinutes)} logged</small></div><div className="worklog-times"><div><span>Entry</span><strong>{item.entry}</strong></div><div><span>Exit</span><strong>{item.exit}</strong></div><div><span>Duration</span><strong>{formatDuration(item.durationMinutes)}</strong></div></div></article>)}</div>
-        <div className="list-label officer-scan-label">SCAN RECORDS</div>
-        <div className="officer-scan-list">{officerScans.map(record => <article key={recordKey(record)}><div className={`scan-record-icon ${record.accessCategory === "Unauthorized" ? "danger" : ""}`}>{record.accessCategory === "Unauthorized" ? <ShieldAlert size={17} /> : <ShieldCheck size={17} />}</div><div><strong>{record.name}</strong><span>{record.dateTime.replace("T", " ")} · {record.block}</span><small>{record.id === "Not available" ? "Identity unavailable" : record.id}</small></div><Status tone={record.accessCategory === "Unauthorized" ? "red" : record.accessCategory === "Authorized" ? "green" : "amber"}>{record.accessCategory}</Status></article>)}</div>
-        {officerScans.length === 0 && <div className="empty-state compact-empty"><ScanFace size={25} /><strong>No scan records</strong><span>No scans are assigned to this officer in the current records.</span></div>}
-      </div>
-    </>;
+    return (
+      <OfficerDetailView
+        officer={selectedOfficer}
+        allRows={rows}
+        allScans={logRows}
+        onBack={() => setSelectedOfficerName(null)}
+      />
+    );
   }
-  return <>
-    <TopBar title={studentAffairsScope ? "Officer workload" : securityOversightScope ? "Worklog" : "User worklog"} subtitle={studentAffairsScope ? "Campus Supervisors & security" : securityOversightScope ? "Institution B · Security personnel" : "Entries & timing"} back={() => go("home")} />
-    <div className="page-content">{scope === "admin" && <section className="day-tiles" aria-label="Today's activity"><div className="day-tiles-head"><strong>Today</strong><span>16 Jun 2025</span></div><div className="day-tiles-grid">{dayTiles.map(tile => <div key={tile.label} className={`day-tile ${tile.tone}`}><strong>{tile.value}</strong><span>{tile.label}</span></div>)}</div></section>}{scope !== "admin" && <div className="login-summary"><div><strong>{rows.length}</strong><span>{securityOversightScope ? "Worklog sessions" : studentAffairsScope ? "Officer entries" : "User entries"}</span></div><div><strong>{formatDuration(totalMinutes)}</strong><span>Total logged time</span></div></div>}<section className="filter-panel login-filter worklog-filter"><div className={`filter-fields ${securityOversightScope ? "single-field" : ""}`}><Field label="Designation"><select value={roleFilter} onChange={event => setRoleFilter(event.target.value)}><option>All designations</option>{securityOversightScope ? <><option>Campus Supervisor</option><option>Hostel Warden</option><option>Staff</option><option>Security</option></> : studentAffairsScope ? <><option>Campus Supervisor</option><option>Security</option></> : adminPortalDesignations.map(item => <option key={item}>{item}</option>)}</select></Field>{!securityOversightScope && <Field label="Institution"><select value={institutionFilter} onChange={event => setInstitutionFilter(event.target.value)}><option>All institutions</option>{institutions.map(item => <option key={item}>{item}</option>)}</select></Field>}</div><div className="date-filter worklog-date-range"><label><CalendarDays size={15} /><span>From Date</span><input type="date" value={fromDate} onChange={event => setFromDate(event.target.value)} /></label><span>to</span><label><CalendarDays size={15} /><span>To Date</span><input type="date" value={toDate} onChange={event => setToDate(event.target.value)} /></label></div></section><div className="worklog-section-head"></div><div className="worklog-table-wrap"><table className="worklog-table"><thead><tr><th>S.No</th><th>Name</th><th>Designation</th><th>Login</th><th>Logout</th><th>Scans</th><th>Authorized</th><th>Unauthorized</th></tr></thead><tbody>{rows.map((item, index) => { const scans = logRows.filter(row => row.guard === item.name); return <tr key={`${item.name}${item.day}`}><td>{index + 1}</td><td><button className="worklog-name-button" onClick={() => setSelectedOfficerName(item.name)}>{item.name}</button></td><td><span className={`designation-badge designation-${item.designation.toLowerCase().replace(" ", "-")}`}>{item.designation}</span></td><td>{item.entry}</td><td>{item.exit}</td><td><strong>{scans.length}</strong></td><td><span className="worklog-count authorized">{scans.filter(row => row.accessCategory === "Authorized").length}</span></td><td><span className="worklog-count unauthorized">{scans.filter(row => row.accessCategory === "Unauthorized").length}</span></td></tr>; })}</tbody></table></div>{rows.length === 0 && <div className="empty-state"><FileClock size={25} /><strong>No worklog entries</strong><span>Change one or more filters.</span></div>}</div>
-  </>;
+
+  return (
+    <>
+      <TopBar
+        title={studentAffairsScope ? "Officer workload" : securityOversightScope ? "Worklog" : "User worklog"}
+        subtitle={studentAffairsScope ? "Campus Supervisors & security" : securityOversightScope ? "Institution B · Security personnel" : "Entries & timing"}
+        back={() => go("home")}
+      />
+      <div className="page-content">
+        {scope === "admin" && (
+          <section className="day-tiles" aria-label="Today's activity">
+            <div className="day-tiles-head"><strong>Today</strong><span>16 Jun 2025</span></div>
+            <div className="day-tiles-grid">
+              {dayTiles.map(tile => (
+                <div key={tile.label} className={`day-tile ${tile.tone}`}>
+                  <strong>{tile.value}</strong>
+                  <span>{tile.label}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+        {scope !== "admin" && (
+          <div className="login-summary">
+            <div><strong>{rows.length}</strong><span>{securityOversightScope ? "Worklog sessions" : studentAffairsScope ? "Officer entries" : "User entries"}</span></div>
+            <div><strong>{formatDuration(totalMinutes)}</strong><span>Total logged time</span></div>
+          </div>
+        )}
+        <section className="filter-panel login-filter worklog-filter">
+          <div className={`filter-fields ${securityOversightScope ? "single-field" : ""}`}>
+            <Field label="Designation">
+              <select value={roleFilter} onChange={event => setRoleFilter(event.target.value)}>
+                <option>All designations</option>
+                {securityOversightScope ? (
+                  <>
+                    <option>Campus Supervisor</option>
+                    <option>Hostel Warden</option>
+                    <option>Staff</option>
+                    <option>Security</option>
+                  </>
+                ) : studentAffairsScope ? (
+                  <>
+                    <option>Campus Supervisor</option>
+                    <option>Security</option>
+                  </>
+                ) : (
+                  adminPortalDesignations.map(item => <option key={item}>{item}</option>)
+                )}
+              </select>
+            </Field>
+            {!securityOversightScope && (
+              <Field label="Institution">
+                <select value={institutionFilter} onChange={event => setInstitutionFilter(event.target.value)}>
+                  <option>All institutions</option>
+                  {institutions.map(item => <option key={item}>{item}</option>)}
+                </select>
+              </Field>
+            )}
+          </div>
+          <div className="date-filter worklog-date-range">
+            <label>
+              <CalendarDays size={15} />
+              <span>From Date</span>
+              <input type="date" value={fromDate} onChange={event => setFromDate(event.target.value)} />
+            </label>
+            <span>to</span>
+            <label>
+              <CalendarDays size={15} />
+              <span>To Date</span>
+              <input type="date" value={toDate} onChange={event => setToDate(event.target.value)} />
+            </label>
+          </div>
+        </section>
+        <div className="worklog-section-head"></div>
+        <SecurityWorklogTable
+          rows={rows}
+          scans={logRows}
+          onSelectOfficer={name => setSelectedOfficerName(name)}
+        />
+        {rows.length === 0 && (
+          <div className="empty-state">
+            <FileClock size={25} />
+            <strong>No worklog entries</strong>
+            <span>Change one or more filters.</span>
+          </div>
+        )}
+      </div>
+    </>
+  );
 }
 
 function CampusEntries({ go, reviews, scope = "admin" }: { go: (screen: Screen) => void; reviews: Record<string, ReviewRecord>; scope?: "admin" | "institution" }) {
@@ -3317,7 +3632,14 @@ export default function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return [...parsed, ...logRows.filter(r => !parsed.some((p: LogRecord) => p.logId === r.logId))];
+          const filtered = parsed.filter((p: any) => {
+            if (!p || typeof p !== "object") return false;
+            const hasIntruderPhoto = typeof p.photo === "string" && (p.photo.includes("intruder_20261101") || p.photo.startsWith("data:image"));
+            const isTodayTest = typeof p.dateTime === "string" && p.dateTime.startsWith("2026-11-01") && p.name === "Unrecognized person";
+            return !hasIntruderPhoto && !isTodayTest;
+          });
+          localStorage.setItem("campus_secure_custom_logs", JSON.stringify(filtered));
+          return [...filtered, ...logRows.filter(r => !filtered.some((p: LogRecord) => p.logId === r.logId))];
         }
       }
     } catch (e) {
@@ -3325,6 +3647,22 @@ export default function App() {
     }
     return logRows;
   });
+
+  const deleteLog = (rowToDelete: LogRecord) => {
+    const keyToDelete = recordKey(rowToDelete);
+    setLogs(current => {
+      const updated = current.filter(r => recordKey(r) !== keyToDelete);
+      try {
+        const saved = localStorage.getItem("campus_secure_custom_logs");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          const filtered = parsed.filter((p: LogRecord) => recordKey(p) !== keyToDelete);
+          localStorage.setItem("campus_secure_custom_logs", JSON.stringify(filtered));
+        }
+      } catch (e) {}
+      return updated;
+    });
+  };
 
   const recordUnauthorizedEvent = (photo: string | null, notes?: string, phoneNumber?: string, fullName?: string) => {
     const now = new Date();
@@ -3672,7 +4010,7 @@ export default function App() {
   else if (["users", "assign-supervisor"].includes(screen) && role !== "admin") content = <AccessDenied role={role} go={go} />;
   else if (screen === "login-logs" && role !== "admin" && role !== "cso") content = <AccessDenied role={role} go={go} />;
   else if (screen === "profile") content = <Profile role={role} go={go} back={back} />;
-  else if (screen === "alerts") content = <Alerts role={role} go={go} back={back} reviews={reviews} updateReview={updateReview} logs={logs} />;
+  else if (screen === "alerts") content = <Alerts role={role} go={go} back={back} reviews={reviews} updateReview={updateReview} logs={logs} deleteLog={deleteLog} />;
   else if (role === "security" || role === "warden" || role === "staff") {
     if (screen === "home") content = <LevelOneHome role={role} go={go} />;
     else if (screen === "scan") content = <LevelOneScan role={role} go={go} completeScan={completeScan} logs={logs} />;
