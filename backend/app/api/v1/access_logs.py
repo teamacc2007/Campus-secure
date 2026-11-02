@@ -129,6 +129,40 @@ def review_event_endpoint(
     )
 
 
+@router.get("/locations", response_model=List[str])
+def get_campus_locations(db: Session = Depends(get_db)):
+    """Retrieve actual available college locations from application config and database."""
+    locations = set()
+    try:
+        db_locs = [r[0] for r in db.query(AccessLog.location_block).distinct().all() if r[0]]
+        guard_locs = [r[0] for r in db.query(SecurityGuard.current_gate).distinct().all() if r[0]]
+        for loc in db_locs + guard_locs:
+            locations.add(loc.strip())
+    except Exception:
+        pass
+
+    defaults = [
+        "Main Gate",
+        "Main Block",
+        "Medical College",
+        "Hospital",
+        "Administrative Block",
+        "Library",
+        "Hostel",
+        "Parking Area",
+        "Gate 1 Main Entrance",
+        "Gate 2 Hospital Entrance",
+        "Block A",
+        "Block B",
+        "Library Block",
+        "Bharathi Hostel",
+        "Auditorium",
+    ]
+    for loc in defaults:
+        locations.add(loc)
+    return sorted(list(locations))
+
+
 @router.get("/alerts", response_model=List[AccessLogOut])
 def get_pending_alerts(
     db: Session = Depends(get_db),

@@ -66,7 +66,43 @@ type ReviewAction = {
   decision_timestamp?: string;
   previous_status?: string;
   updated_status?: string;
+  full_name?: string;
+  address?: string;
+  contact_number?: string;
+  vehicle_number?: string;
+  location?: string;
+  incident_date?: string;
+  incident_time?: string;
+  incident_datetime?: string;
 };
+
+type IncidentData = {
+  fullName: string;
+  address: string;
+  contactNumber: string;
+  vehicleNumber?: string;
+  location: string;
+  dateTime: string;
+  actionTaken: string;
+};
+
+const defaultCampusLocations = [
+  "Main Gate",
+  "Main Block",
+  "Medical College",
+  "Hospital",
+  "Administrative Block",
+  "Library",
+  "Hostel",
+  "Parking Area",
+  "Gate 1 Main Entrance",
+  "Gate 2 Hospital Entrance",
+  "Block A",
+  "Block B",
+  "Library Block",
+  "Bharathi Hostel",
+  "Auditorium",
+];
 type ReviewRecord = {
   status: ReviewStatus;
   actions: ReviewAction[];
@@ -2894,7 +2930,7 @@ function Alerts({
   back: () => void;
   role: Role;
   reviews: Record<string, ReviewRecord>;
-  updateReview: (row: LogRecord, type: "Authorised" | "Unauthorised" | "Revoked", reason?: string) => void;
+  updateReview: (row: LogRecord, type: "Authorised" | "Unauthorised" | "Revoked", reason?: string, incidentData?: IncidentData) => void;
   logs?: LogRecord[];
   deleteLog?: (row: LogRecord) => void;
 }) {
@@ -2912,8 +2948,29 @@ function Alerts({
   const [dialog, setDialog] = useState<"unauthorised" | "revoke" | null>(null);
   const [reason, setReason] = useState("");
   const [reasonError, setReasonError] = useState(false);
+  const [campusLocations, setCampusLocations] = useState<string[]>(defaultCampusLocations);
+
+  // Form fields for expanded unauthorised confirmation
+  const [unauthFullName, setUnauthFullName] = useState("");
+  const [unauthAddress, setUnauthAddress] = useState("");
+  const [unauthContactNumber, setUnauthContactNumber] = useState("");
+  const [unauthVehicleNumber, setUnauthVehicleNumber] = useState("");
+  const [unauthLocation, setUnauthLocation] = useState("");
+  const [unauthDateTime, setUnauthDateTime] = useState("");
   const [actionTaken, setActionTaken] = useState("");
-  const [actionTakenError, setActionTakenError] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    fetch("http://localhost:8000/api/v1/access-logs/locations")
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setCampusLocations(data);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const markAllRead = () => setReadKeys(alertRows.map(recordKey));
   const openAlert = (row: LogRecord) => {
     const key = recordKey(row);
@@ -2927,17 +2984,74 @@ function Alerts({
     if (rev.status === "Authorised" || rev.status === "Verified" || rev.status === "Revoked") return;
     updateReview(selected, "Authorised");
   };
+
+  const openUnauthDialog = () => {
+    if (!selected) return;
+    const now = new Date();
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    const localIso = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    setUnauthDateTime(localIso);
+    setUnauthFullName(
+      selected.name && !missingValues.includes(selected.name.trim().toLowerCase()) && selected.name !== "Unrecognized person" && selected.name !== "Unknown Person"
+        ? selected.name
+        : ""
+    );
+    setUnauthAddress("");
+    setUnauthContactNumber(selected.phoneNumber || "");
+    setUnauthVehicleNumber(selected.vehicleNumber || "");
+    setUnauthLocation(selected.block && (campusLocations.includes(selected.block) || defaultCampusLocations.includes(selected.block)) ? selected.block : "");
+    setActionTaken("");
+    setFormErrors({});
+    setDialog("unauthorised");
+  };
+
   const confirmAction = () => {
     if (!selected || !dialog) return;
     if (dialog === "unauthorised") {
+      const errors: Record<string, string> = {};
+      if (!unauthFullName.trim()) {
+        errors.fullName = "Full name is required.";
+      }
+      if (!unauthAddress.trim()) {
+        errors.address = "Address is required.";
+      }
+      if (!unauthContactNumber.trim()) {
+        errors.contactNumber = "Contact number is required.";
+      } else {
+        const cleanPhone = unauthContactNumber.trim().replace(/[\s-]/g, "");
+        const isValidPhone = /^(?:\+?91)?[6-9]\d{9}$/.test(cleanPhone) || /^\+?[1-9]\d{9,14}$/.test(cleanPhone);
+        if (!isValidPhone) {
+          errors.contactNumber = "Please enter a valid 10-digit mobile or international number.";
+        }
+      }
+      if (!unauthLocation || unauthLocation === "Select college location") {
+        errors.location = "Please select a college location.";
+      }
+      if (!unauthDateTime) {
+        errors.dateTime = "Date and time is required.";
+      }
       if (!actionTaken.trim()) {
-        setActionTakenError(true);
+        errors.actionTaken = "Action taken is required.";
+      }
+
+      if (Object.keys(errors).length > 0) {
+        setFormErrors(errors);
         return;
       }
-      updateReview(selected, "Unauthorised", actionTaken.trim());
+
+      const incidentData: IncidentData = {
+        fullName: unauthFullName.trim(),
+        address: unauthAddress.trim(),
+        contactNumber: unauthContactNumber.trim(),
+        vehicleNumber: unauthVehicleNumber.trim() || undefined,
+        location: unauthLocation,
+        dateTime: unauthDateTime,
+        actionTaken: actionTaken.trim(),
+      };
+
+      updateReview(selected, "Unauthorised", actionTaken.trim(), incidentData);
       setDialog(null);
-      setActionTaken("");
-      setActionTakenError(false);
+      setFormErrors({});
     } else if (dialog === "revoke") {
       if (!reason.trim()) {
         setReasonError(true);
@@ -2974,7 +3088,26 @@ function Alerts({
           </section>
         )}
         <section className="info-card alert-info"><div className="card-kicker"><FileClock size={15} />ORIGINAL SECURITY RECORD</div><dl><div><dt>Original event category</dt><dd>{selected.accessCategory}</dd></div><div><dt>Event</dt><dd>{selected.event}</dd></div>{selected.phoneNumber && <div><dt>Phone number</dt><dd>{selected.phoneNumber}</dd></div>}<div><dt>Security officer</dt><dd>{selected.guard}</dd></div><div><dt>Security number</dt><dd>{selected.guardNumber}</dd></div><div><dt>Institution</dt><dd>{knownInstitution ? selected.institution : "Institution B"}</dd></div><div><dt>Gate / Location</dt><dd>{selected.block}</dd></div><div><dt>Date & time</dt><dd>{selected.dateTime.replace("T", " ")}</dd></div><div><dt>Current verification status</dt><dd>{review.status}</dd></div></dl></section>
-        <section className="info-card action-history"><div className="card-kicker"><History size={15} />ACTION HISTORY</div><div className="history-list"><div><i><Shield size={13} /></i><p><strong>Original event recorded</strong><span>{selected.guard} · {selected.guardNumber}</span><small>{selected.dateTime.replace("T", " ")} · {selected.block}</small></p></div>{review.actions.map((action, index) => <div key={`${action.timestamp}${index}`}><i className={action.type === "Unauthorised" ? "danger-history" : ""}>{action.type === "Verified" || action.type === "Authorised" || action.type === "Revoked" ? <Check size={13} /> : <ShieldAlert size={13} />}</i><p><strong>{action.type}</strong><span>{action.actor} · {action.actorNumber}</span><small>{action.timestamp}{action.reason ? ` · ${action.reason}` : ""}</small></p></div>)}</div></section>
+        {(() => {
+          const latestUnauth = [...review.actions].reverse().find(a => a.type === "Unauthorised" && (a.full_name || a.action_taken || a.address));
+          if (!latestUnauth) return null;
+          return (
+            <section className="info-card alert-info supervisor-incident-card">
+              <div className="card-kicker"><ShieldAlert size={15} />SUPERVISOR INCIDENT DETAILS</div>
+              <dl>
+                <div><dt>Full name</dt><dd>{latestUnauth.full_name || selected.name}</dd></div>
+                {latestUnauth.address && <div><dt>Address</dt><dd>{latestUnauth.address}</dd></div>}
+                {latestUnauth.contact_number && <div><dt>Contact number</dt><dd>{latestUnauth.contact_number}</dd></div>}
+                {latestUnauth.vehicle_number && <div><dt>Vehicle number</dt><dd>{latestUnauth.vehicle_number}</dd></div>}
+                <div><dt>Incident location</dt><dd>{latestUnauth.location || selected.block}</dd></div>
+                <div><dt>Incident date & time</dt><dd>{latestUnauth.incident_datetime ? latestUnauth.incident_datetime.replace("T", " ") : selected.dateTime.replace("T", " ")}</dd></div>
+                <div><dt>Action taken</dt><dd>{latestUnauth.action_taken || latestUnauth.reason}</dd></div>
+                <div><dt>Decision recorded by</dt><dd>{latestUnauth.actor} · {latestUnauth.actorNumber}</dd></div>
+              </dl>
+            </section>
+          );
+        })()}
+        <section className="info-card action-history"><div className="card-kicker"><History size={15} />ACTION HISTORY</div><div className="history-list"><div><i><Shield size={13} /></i><p><strong>Original event recorded</strong><span>{selected.guard} · {selected.guardNumber}</span><small>{selected.dateTime.replace("T", " ")} · {selected.block}</small></p></div>{review.actions.map((action, index) => <div key={`${action.timestamp}${index}`}><i className={action.type === "Unauthorised" ? "danger-history" : ""}>{action.type === "Verified" || action.type === "Authorised" || action.type === "Revoked" ? <Check size={13} /> : <ShieldAlert size={13} />}</i><p><strong>{action.type}</strong><span>{action.actor} · {action.actorNumber}</span><small>{action.timestamp}{action.reason ? ` · ${action.reason}` : ""}</small>{action.full_name && <small className="action-history-details">Name: {action.full_name} · Contact: {action.contact_number || "N/A"} · Location: {action.location || "N/A"}{action.vehicle_number ? ` · Vehicle: ${action.vehicle_number}` : ""}</small>}</p></div>)}</div></section>
         {role === "supervisor" && (
           <div className="review-actions three-actions">
             <Button
@@ -2987,11 +3120,7 @@ function Alerts({
             </Button>
             <Button
               variant="warning"
-              onClick={() => {
-                setActionTaken("");
-                setActionTakenError(false);
-                setDialog("unauthorised");
-              }}
+              onClick={openUnauthDialog}
               icon={<ShieldAlert size={16} />}
               disabled={review.status === "Unauthorised" || review.status === "Revoked"}
             >
@@ -3029,19 +3158,103 @@ function Alerts({
               <small>{selected.block} · {knownInstitution ? selected.institution : "Institution B"}</small>
             </div>
             {dialog === "unauthorised" && (
-              <label className="field">
-                <span>Action Taken *</span>
-                <textarea
-                  value={actionTaken}
-                  onChange={event => {
-                    setActionTaken(event.target.value);
-                    if (event.target.value.trim()) setActionTakenError(false);
-                  }}
-                  rows={3}
-                  placeholder="Enter the action taken..."
-                />
-                {actionTakenError && <small className="field-error">Action taken is required.</small>}
-              </label>
+              <div className="unauth-form-fields">
+                <label className="field">
+                  <span>Full Name *</span>
+                  <input
+                    type="text"
+                    value={unauthFullName}
+                    onChange={e => {
+                      setUnauthFullName(e.target.value);
+                      if (e.target.value.trim()) setFormErrors(prev => ({ ...prev, fullName: "" }));
+                    }}
+                    placeholder="Enter full name"
+                  />
+                  {formErrors.fullName && <small className="field-error">{formErrors.fullName}</small>}
+                </label>
+
+                <label className="field">
+                  <span>Address *</span>
+                  <textarea
+                    value={unauthAddress}
+                    onChange={e => {
+                      setUnauthAddress(e.target.value);
+                      if (e.target.value.trim()) setFormErrors(prev => ({ ...prev, address: "" }));
+                    }}
+                    rows={2}
+                    placeholder="Enter complete address"
+                  />
+                  {formErrors.address && <small className="field-error">{formErrors.address}</small>}
+                </label>
+
+                <label className="field">
+                  <span>Contact Number *</span>
+                  <input
+                    type="tel"
+                    value={unauthContactNumber}
+                    onChange={e => {
+                      setUnauthContactNumber(e.target.value);
+                      if (e.target.value.trim()) setFormErrors(prev => ({ ...prev, contactNumber: "" }));
+                    }}
+                    placeholder="Enter contact number"
+                  />
+                  {formErrors.contactNumber && <small className="field-error">{formErrors.contactNumber}</small>}
+                </label>
+
+                <label className="field">
+                  <span>Vehicle Number</span>
+                  <input
+                    type="text"
+                    value={unauthVehicleNumber}
+                    onChange={e => setUnauthVehicleNumber(e.target.value)}
+                    placeholder="Enter vehicle registration number"
+                  />
+                </label>
+
+                <label className="field">
+                  <span>Location *</span>
+                  <select
+                    value={unauthLocation}
+                    onChange={e => {
+                      setUnauthLocation(e.target.value);
+                      if (e.target.value) setFormErrors(prev => ({ ...prev, location: "" }));
+                    }}
+                  >
+                    <option value="">Select college location</option>
+                    {campusLocations.map(loc => (
+                      <option key={loc} value={loc}>{loc}</option>
+                    ))}
+                  </select>
+                  {formErrors.location && <small className="field-error">{formErrors.location}</small>}
+                </label>
+
+                <label className="field">
+                  <span>Date and Time *</span>
+                  <input
+                    type="datetime-local"
+                    value={unauthDateTime}
+                    onChange={e => {
+                      setUnauthDateTime(e.target.value);
+                      if (e.target.value) setFormErrors(prev => ({ ...prev, dateTime: "" }));
+                    }}
+                  />
+                  {formErrors.dateTime && <small className="field-error">{formErrors.dateTime}</small>}
+                </label>
+
+                <label className="field">
+                  <span>Action Taken *</span>
+                  <textarea
+                    value={actionTaken}
+                    onChange={e => {
+                      setActionTaken(e.target.value);
+                      if (e.target.value.trim()) setFormErrors(prev => ({ ...prev, actionTaken: "" }));
+                    }}
+                    rows={2}
+                    placeholder="Enter the action taken..."
+                  />
+                  {formErrors.actionTaken && <small className="field-error">{formErrors.actionTaken}</small>}
+                </label>
+              </div>
             )}
             {dialog === "revoke" && (
               <label className="field">
@@ -3063,7 +3276,7 @@ function Alerts({
                 variant="secondary"
                 onClick={() => {
                   setDialog(null);
-                  setActionTakenError(false);
+                  setFormErrors({});
                   setReasonError(false);
                 }}
               >
@@ -3884,26 +4097,42 @@ export default function App() {
     go("identity");
     return true;
   };
-  const updateReview = (row: LogRecord, type: "Authorised" | "Unauthorised" | "Revoked", reason?: string) => {
+  const updateReview = (
+    row: LogRecord,
+    type: "Authorised" | "Unauthorised" | "Revoked",
+    reason?: string,
+    incidentData?: IncidentData
+  ) => {
     const key = recordKey(row);
     const actorName = roleMeta[role].name;
     const actorNumber = roleMeta[role].supervisorNumber ?? "SUP-B-0004";
     const timestamp = new Date().toLocaleString("en-GB", { hour12: false }).replace(",", "");
+    const incDate = incidentData?.dateTime ? incidentData.dateTime.split("T")[0] : undefined;
+    const incTime = incidentData?.dateTime ? incidentData.dateTime.split("T")[1] : undefined;
+
     const action: ReviewAction = {
       type,
       actor: actorName,
       actorNumber: actorNumber,
       timestamp,
-      reason,
+      reason: reason || incidentData?.actionTaken,
       event_id: row.logId || key,
       verification_status: type === "Authorised" ? "Authorized" : "Unauthorized",
       decision_made_by: actorName,
       supervisor_id: actorNumber,
       supervisor_name: actorName,
-      action_taken: type === "Unauthorised" ? reason : undefined,
+      action_taken: type === "Unauthorised" ? (incidentData?.actionTaken || reason) : undefined,
       decision_timestamp: timestamp,
       previous_status: reviewFor(reviews, row).status,
       updated_status: type,
+      full_name: incidentData?.fullName,
+      address: incidentData?.address,
+      contact_number: incidentData?.contactNumber,
+      vehicle_number: incidentData?.vehicleNumber,
+      location: incidentData?.location,
+      incident_date: incDate,
+      incident_time: incTime,
+      incident_datetime: incidentData?.dateTime,
     };
     setReviews(current => {
       const existing = reviewFor(current, row);
@@ -3921,6 +4150,9 @@ export default function App() {
         if (recordKey(l) === key) {
           return {
             ...l,
+            name: incidentData?.fullName || l.name,
+            phoneNumber: incidentData?.contactNumber || l.phoneNumber,
+            vehicleNumber: incidentData?.vehicleNumber || l.vehicleNumber,
             decision: type === "Authorised" ? "Authorised" : "Denied",
             accessCategory: type === "Authorised" ? "Authorized" : l.accessCategory,
           };
@@ -3936,7 +4168,16 @@ export default function App() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action_type: type,
-        reason,
+        reason: reason || incidentData?.actionTaken,
+        action_taken: incidentData?.actionTaken || reason,
+        full_name: incidentData?.fullName,
+        address: incidentData?.address,
+        contact_number: incidentData?.contactNumber,
+        vehicle_number: incidentData?.vehicleNumber,
+        location: incidentData?.location,
+        incident_date: incDate,
+        incident_time: incTime,
+        incident_datetime: incidentData?.dateTime,
         supervisor_id: actorNumber,
         supervisor_name: actorName,
         event_id: targetId,

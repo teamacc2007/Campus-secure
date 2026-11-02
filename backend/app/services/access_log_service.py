@@ -180,30 +180,47 @@ def review_access_log(
     decision_timestamp = datetime.now().strftime("%d-%m-%Y %H:%M")
     event_id = log_entry.record_identifier or str(log_entry.id)
     norm_status = "Authorized" if review.action_type in ("Verified", "Authorised") else "Unauthorized"
+    action_taken_desc = review.action_taken or review.reason or (f"Action taken by {actor_name}" if review.action_type == "Unauthorised" else None)
+
+    inc_date = review.incident_date
+    inc_time = review.incident_time
+    if review.incident_datetime:
+        parts = review.incident_datetime.split("T")
+        if len(parts) == 2:
+            inc_date = inc_date or parts[0]
+            inc_time = inc_time or parts[1]
 
     action_entry = {
         "type": review.action_type,
         "actor": actor_name,
         "actorNumber": actor_number,
         "timestamp": decision_timestamp,
-        "reason": review.reason or (f"Action taken by {actor_name}" if review.action_type == "Unauthorised" else None),
+        "reason": action_taken_desc,
         "event_id": event_id,
         "verification_status": norm_status,
         "decision_made_by": actor_name,
         "supervisor_id": actor_number,
         "supervisor_name": actor_name,
-        "action_taken": review.reason if review.action_type == "Unauthorised" else None,
+        "action_taken": action_taken_desc if review.action_type == "Unauthorised" else None,
         "decision_timestamp": decision_timestamp,
         "previous_status": prev_status,
         "updated_status": review.action_type,
+        "full_name": review.full_name or (review.name if review.name and "unrecognized" not in review.name.lower() else None),
+        "address": review.address,
+        "contact_number": review.contact_number,
+        "vehicle_number": review.vehicle_number,
+        "location": review.location or review.location_block,
+        "incident_date": inc_date,
+        "incident_time": inc_time,
+        "incident_datetime": review.incident_datetime,
     }
 
     current_actions.append(action_entry)
     log_entry.review_actions = current_actions
     log_entry.review_status = review.action_type
     log_entry.verification_status = norm_status
-    if review.action_type == "Unauthorised" and review.reason:
-        log_entry.flag_reason = review.reason
+    if review.action_type == "Unauthorised" and action_taken_desc:
+        log_entry.flag_reason = action_taken_desc
 
     db.commit()
     db.refresh(log_entry)

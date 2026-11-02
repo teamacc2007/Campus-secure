@@ -505,7 +505,17 @@ h1, h2, h3, p, dl, dd { margin: 0; }
 .review-actions.three-actions { grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .review-actions.three-actions .btn { min-height: 44px; padding: 0 6px; font-size: 11px; gap: 4px; white-space: nowrap; }
 .dialog-backdrop { position: fixed; z-index: 30; inset: 0; padding: 18px; display: flex; align-items: flex-end; justify-content: center; background: rgba(10, 25, 45, .5); backdrop-filter: blur(3px); }
-.confirm-dialog { width: min(357px, 100%); padding: 20px; background: #fff; border-radius: 20px; box-shadow: 0 20px 55px rgba(10, 25, 45, .25); }
+.confirm-dialog { width: min(357px, 100%); max-height: 88vh; overflow-y: auto; padding: 20px; background: #fff; border-radius: 20px; box-shadow: 0 20px 55px rgba(10, 25, 45, .25); }
+.unauth-form-fields { display: grid; gap: 9px; margin: 14px 0 16px; }
+.unauth-form-fields .field { display: grid; gap: 4px; }
+.unauth-form-fields .field span { font-size: 11px; font-weight: 600; color: #1e293b; }
+.unauth-form-fields input,
+.unauth-form-fields textarea,
+.unauth-form-fields select { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; font-size: 11px; font-family: inherit; color: #17243a; }
+.unauth-form-fields textarea { resize: vertical; }
+.unauth-form-fields .field-error { color: var(--red); font-size: 10px; font-weight: 500; }
+.action-history-details { display: block; margin-top: 3px; color: #1e3a8a; font-size: 8px; font-weight: 600; }
+.supervisor-incident-card { border-left: 3px solid var(--red); }
 .dialog-icon { width: 45px; height: 45px; margin-bottom: 12px; display: grid; place-items: center; color: var(--green); background: #e5f7ef; border-radius: 13px; }
 .dialog-icon.danger { color: var(--red); background: #ffe9eb; }
 .confirm-dialog h2 { font-size: 17px; }

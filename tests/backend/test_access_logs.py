@@ -218,3 +218,110 @@ def test_supervisor_review_unauthorised_with_action_taken(supervisor_token, secu
     )
     assert repeat_res.status_code == 200
     assert len(repeat_res.json()["review_actions"]) == len(data["review_actions"])
+
+
+def test_get_campus_locations():
+    res = client.get("/api/v1/access-logs/locations")
+    assert res.status_code == 200
+    locations = res.json()
+    assert isinstance(locations, list)
+    assert "Main Gate" in locations
+    assert "Hospital" in locations
+    assert "Gate 1 Main Entrance" in locations
+
+
+def test_unauthorised_with_full_incident_details(supervisor_token, security_token):
+    # 1. Guard logs an unauthorized event with original security data
+    log_payload = {
+        "person_type": "Unauthorized",
+        "name": "Unidentified Person",
+        "identifier_value": "UNREC-202",
+        "location_block": "Gate 1 Main Entrance",
+        "event_type": "ENTRY",
+        "verification_method": "Face Recognition",
+        "verification_status": "Unauthorized",
+        "review_status": "Pending Verification",
+        "snapshot_url": "/faces/captured/intruder_incident_photo.jpg",
+        "guard_name": "G. Selvam",
+    }
+    sec_res = client.post("/api/v1/access-logs/", json=log_payload, headers={"Authorization": f"Bearer {security_token}"})
+    assert sec_res.status_code == 201
+    log_id = sec_res.json()["id"]
+
+    # 2. Supervisor confirms Unauthorised with all incident details
+    sup_headers = {"Authorization": f"Bearer {supervisor_token}"}
+    incident_payload = {
+        "action_type": "Unauthorised",
+        "full_name": "Karthik Subramanian",
+        "address": "12, College Road, Trichy, Tamil Nadu 620001",
+        "contact_number": "+91 98450 12345",
+        "vehicle_number": "TN 45 AX 1234",
+        "location": "Main Gate",
+        "incident_datetime": "2026-11-02T11:45",
+        "action_taken": "Person referred to Campus Security after failed verification",
+    }
+    res = client.post(f"/api/v1/access-logs/{log_id}/review", json=incident_payload, headers=sup_headers)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["review_status"] == "Unauthorised"
+    assert data["verification_status"] == "Unauthorized"
+    # Verify original security data and photo are preserved
+    assert data["snapshot_url"] == "/faces/captured/intruder_incident_photo.jpg"
+    assert data["location_block"] == "Gate 1 Main Entrance"
+    assert data["guard_name"] == "G. Selvam"
+
+    # Verify incident details in Action History
+    last_action = data["review_actions"][-1]
+    assert last_action["type"] == "Unauthorised"
+    assert last_action["full_name"] == "Karthik Subramanian"
+    assert last_action["address"] == "12, College Road, Trichy, Tamil Nadu 620001"
+    assert last_action["contact_number"] == "+91 98450 12345"
+    assert last_action["vehicle_number"] == "TN 45 AX 1234"
+    assert last_action["location"] == "Main Gate"
+    assert last_action["incident_date"] == "2026-11-02"
+    assert last_action["incident_time"] == "11:45"
+    assert "Campus Security" in last_action["action_taken"]
+    assert last_action["actor"] in ("M. Rajesh", "Meera Nair")
+    assert "decision_timestamp" in last_action
+
+
+def test_unauthorised_without_optional_vehicle(supervisor_token, security_token):
+    # Guard logs unauthorized event
+    sec_res = client.post(
+        "/api/v1/access-logs/",
+        json={
+            "person_type": "Unauthorized",
+            "name": "Unknown Visitor",
+            "identifier_value": "UNREC-203",
+            "location_block": "Gate 2 Hospital Entrance",
+            "event_type": "ENTRY",
+            "verification_method": "Face Recognition",
+            "verification_status": "Unauthorized",
+            "review_status": "Pending Verification",
+            "snapshot_url": "/faces/captured/pedestrian_intruder.jpg",
+            "guard_name": "P. Murugan",
+        },
+        headers={"Authorization": f"Bearer {security_token}"},
+    )
+    assert sec_res.status_code == 201
+    log_id = sec_res.json()["id"]
+
+    # Supervisor confirms Unauthorised without vehicle number (pedestrian)
+    sup_headers = {"Authorization": f"Bearer {supervisor_token}"}
+    incident_payload = {
+        "action_type": "Unauthorised",
+        "full_name": "Suresh Raina",
+        "address": "5, Temple View St, Trichy",
+        "contact_number": "9876543210",
+        "location": "Hospital",
+        "incident_datetime": "2026-11-02T10:15",
+        "action_taken": "Person escorted out of the premises",
+    }
+    res = client.post(f"/api/v1/access-logs/{log_id}/review", json=incident_payload, headers=sup_headers)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["review_status"] == "Unauthorised"
+    last_action = data["review_actions"][-1]
+    assert last_action["full_name"] == "Suresh Raina"
+    assert last_action["vehicle_number"] is None
+    assert last_action["location"] == "Hospital"

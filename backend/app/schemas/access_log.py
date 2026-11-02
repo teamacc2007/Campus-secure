@@ -18,6 +18,14 @@ class ReviewActionSchema(BaseModel):
     decision_timestamp: Optional[str] = None
     previous_status: Optional[str] = None
     updated_status: Optional[str] = None
+    full_name: Optional[str] = None
+    address: Optional[str] = None
+    contact_number: Optional[str] = None
+    vehicle_number: Optional[str] = None
+    location: Optional[str] = None
+    incident_date: Optional[str] = None
+    incident_time: Optional[str] = None
+    incident_datetime: Optional[str] = None
 
 
 class AccessLogCreate(BaseModel):
@@ -44,6 +52,15 @@ class AccessLogCreate(BaseModel):
 class AccessLogReviewRequest(BaseModel):
     action_type: str = Field(..., pattern="^(Verified|Authorised|Unauthorised|Revoked)$")
     reason: Optional[str] = None
+    action_taken: Optional[str] = None
+    full_name: Optional[str] = None
+    address: Optional[str] = None
+    contact_number: Optional[str] = None
+    vehicle_number: Optional[str] = None
+    location: Optional[str] = None
+    incident_date: Optional[str] = None
+    incident_time: Optional[str] = None
+    incident_datetime: Optional[str] = None
     supervisor_id: Optional[str] = None
     supervisor_name: Optional[str] = None
     event_id: Optional[str] = None
