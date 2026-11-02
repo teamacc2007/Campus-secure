@@ -60,6 +60,7 @@ h1, h2, h3, p, dl, dd { margin: 0; }
 .helper { color: var(--muted); font-size: 10px; line-height: 1.5; }
 
 .bottom-nav { position: fixed; z-index: 10; bottom: 0; left: 50%; transform: translateX(-50%); width: min(393px, 100%); min-height: 74px; padding: 9px 12px 15px; display: grid; grid-template-columns: repeat(4, 1fr); background: rgba(255,255,255,.97); border-top: 1px solid var(--line); backdrop-filter: blur(12px); }
+.bottom-nav.five-items { grid-template-columns: repeat(5, 1fr); }
 .bottom-nav.three-items { grid-template-columns: repeat(3, 1fr); }
 .bottom-nav.two-items { grid-template-columns: repeat(2, 1fr); }
 .bottom-nav button { position: relative; border: 0; background: none; color: #8a97a8; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 8px; }
