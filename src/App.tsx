@@ -205,7 +205,7 @@ const studentMatches: StudentMatch[] = [
     department: "General Medicine & Surgery",
     year: "II",
     batch: "2023–2028",
-    institute: "SRM GROUP OF INSTITUTION TRICHY",
+    institute: "SRM GROUP OF INSTITUTIONS TRICHY",
     similarity: 98,
     accommodationType: "Hosteller",
     hostelName: "Bharathi Hostel",
@@ -220,7 +220,7 @@ const studentMatches: StudentMatch[] = [
     department: "Medical Laboratory Technology",
     year: "II",
     batch: "2023–2027",
-    institute: "SRM GROUP OF INSTITUTION TRICHY",
+    institute: "SRM GROUP OF INSTITUTIONS TRICHY",
     similarity: 96,
     accommodationType: "Day Scholar",
     transportationType: "College Bus",
@@ -431,12 +431,12 @@ function TopBar({ title, subtitle, back, action, collegeBrand = true }: { title:
     {back ? (
       <button className="icon-btn" onClick={back} aria-label="Back"><ArrowLeft size={20} /></button>
     ) : (
-      <div className={`college-logo ${isBranded ? "" : "mini"}`}><img src="/srm-trichy-emblem.png" alt="SRM GROUP OF INSTITUTION TRICHY emblem" /></div>
+      <div className={`college-logo ${isBranded ? "" : "mini"}`}><img src="/srm-logo.png" alt="SRM GROUP OF INSTITUTIONS TRICHY emblem" /></div>
     )}
     <div className="top-copy">
       {isBranded ? (
         <div className="inst-lockup">
-          <span className="inst-title">SRM GROUP OF INSTITUTION</span>
+          <span className="inst-title">SRM GROUP OF INSTITUTIONS</span>
           <span className="inst-sub">TRICHY</span>
           {subtitle && <span className="inst-portal-tag">{subtitle}</span>}
         </div>
@@ -579,11 +579,11 @@ function Login({ enter, go }: { enter: (role: Role) => void; go: (screen: Screen
   return <main className="phone-page login-page">
     <section className="login-brand">
       <div className="login-college-emblem">
-        <img src="/srm-trichy-emblem.png" alt="SRM GROUP OF INSTITUTION TRICHY Emblem" />
+        <img src="/srm-logo.png" alt="SRM GROUP OF INSTITUTIONS TRICHY Emblem" />
       </div>
       <div className="login-inst-text">
         <span className="inst-badge">OFFICIAL INSTITUTION PORTAL</span>
-        <h1 className="inst-title">SRM GROUP OF INSTITUTION</h1>
+        <h1 className="inst-title">SRM GROUP OF INSTITUTIONS</h1>
         <h2 className="inst-sub">TRICHY</h2>
         <p className="app-subtitle">Campus Secure · Identity-Led Campus Access</p>
       </div>
@@ -696,7 +696,7 @@ function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) =
                 initials: "UP",
                 name: "Unrecognized person",
                 id: item.identifier_value || "Not available",
-                institution: "SRM GROUP OF INSTITUTION TRICHY",
+                institution: "SRM GROUP OF INSTITUTIONS TRICHY",
                 department: item.department || "Not available",
                 block: item.location_block || (role === "warden" ? "Bharathi Hostel" : role === "staff" ? "Block A" : role === "supervisor" ? "Institution B Campus" : "Main Gate"),
                 time: timePart,
@@ -732,7 +732,7 @@ function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) =
     return () => { active = false; };
   }, [role]);
 
-  const location = role === "warden" ? "Bharathi Hostel · SRM GROUP OF INSTITUTION TRICHY" : role === "staff" ? "Block A · SRM GROUP OF INSTITUTION TRICHY" : role === "supervisor" ? "Institution B Campus · SRM GROUP OF INSTITUTION TRICHY" : "Main Gate · SRM GROUP OF INSTITUTION TRICHY";
+  const location = role === "warden" ? "Bharathi Hostel · SRM GROUP OF INSTITUTIONS TRICHY" : role === "staff" ? "Block A · SRM GROUP OF INSTITUTIONS TRICHY" : role === "supervisor" ? "Institution B Campus · SRM GROUP OF INSTITUTIONS TRICHY" : "Main Gate · SRM GROUP OF INSTITUTIONS TRICHY";
 
   useEffect(() => {
     let mounted = true;
@@ -845,7 +845,7 @@ function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) =
                       department: mp.department,
                       year: mp.year_roman || "II Year",
                       batch: mp.batch || "2023–2028",
-                      institute: "SRM GROUP OF INSTITUTION TRICHY",
+                      institute: "SRM GROUP OF INSTITUTIONS TRICHY",
                       similarity: Math.round(data.similarity_score * 100),
                       accommodationType: (mp.residence_type as any) || "Day Scholar",
                       photo: mp.photo_url || capturedDataUrl || "/faces/sur_crop.jpg",
@@ -1036,7 +1036,7 @@ function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) =
             {selectedHistoryRecord.phoneNumber && <div><dt>Phone number</dt><dd>{selectedHistoryRecord.phoneNumber}</dd></div>}
             <div><dt>Security officer</dt><dd>{selectedHistoryRecord.guard}</dd></div>
             <div><dt>Security number</dt><dd>{selectedHistoryRecord.guardNumber}</dd></div>
-            <div><dt>Institution</dt><dd>{knownInstitution ? selectedHistoryRecord.institution : "SRM GROUP OF INSTITUTION TRICHY"}</dd></div>
+            <div><dt>Institution</dt><dd>{knownInstitution ? selectedHistoryRecord.institution : "SRM GROUP OF INSTITUTIONS TRICHY"}</dd></div>
             <div><dt>Gate / Location</dt><dd>{selectedHistoryRecord.block}</dd></div>
             <div><dt>Date & time</dt><dd>{formatScanDateTime(selectedHistoryRecord.dateTime)}</dd></div>
             <div><dt>Current verification status</dt><dd>Unrecognized</dd></div>
@@ -1130,7 +1130,7 @@ function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) =
                   <h4>Unrecognized person</h4>
                   <div className="scan-history-location">
                     <MapPin size={12} />
-                    <span>{item.block} — {item.institution || "SRM GROUP OF INSTITUTION TRICHY"}</span>
+                    <span>{item.block} — {item.institution || "SRM GROUP OF INSTITUTIONS TRICHY"}</span>
                   </div>
                   <div className="scan-history-time">
                     <span>{formatScanDateTime(item.dateTime)}</span>
@@ -1190,7 +1190,7 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role, c
     employeeId: "EMP-B-1042",
     designation: "Professor",
     department: "Mechanical Engineering",
-    institute: "SRM GROUP OF INSTITUTION TRICHY",
+    institute: "SRM GROUP OF INSTITUTIONS TRICHY",
   };
   const personName = staff ? staffMember.name : activeStudent.name;
   const institute = staff ? staffMember.institute : activeStudent.institute;
@@ -1229,7 +1229,7 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role, c
       </section>
       <section className="info-card">
         <div className="card-kicker">
-          <img src="/srm-trichy-emblem.png" alt="" className="kicker-emblem" />
+          <img src="/srm-logo.png" alt="" className="kicker-emblem" />
           <IdCard size={15} />
           {institute.toUpperCase()} · VERIFIED PROFILE
         </div>
@@ -1279,7 +1279,7 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role, c
           <div>
             <span>{role === "warden" ? "RESIDENT IDENTITY" : "CAMPUS IDENTITY"}</span>
             <strong>Internal person recognized</strong>
-            <p>Official student of SRM GROUP OF INSTITUTION TRICHY. Entry permitted at {location}.</p>
+            <p>Official student of SRM GROUP OF INSTITUTIONS TRICHY. Entry permitted at {location}.</p>
           </div>
         </section>
       ) : (
@@ -1558,7 +1558,7 @@ function nextVisitorPassNumber(passes: VisitorPass[]) {
 function AccessSupervisorHome({ go, todayCount }: { go: (screen: Screen) => void; todayCount: number }) {
   const meta = roleMeta["access-supervisor"];
   return <>
-    <TopBar title="SRM GROUP OF INSTITUTION TRICHY" subtitle="Access Supervisor Portal" collegeBrand />
+    <TopBar title="SRM GROUP OF INSTITUTIONS TRICHY" subtitle="Access Supervisor Portal" collegeBrand />
     <div className="page-content access-home">
       <section className="profile-head">
         <button className="profile-avatar" onClick={() => go("profile")} aria-label="Open profile">{meta.initials}</button>
@@ -1670,7 +1670,7 @@ async function downloadVisitorPassPdf(pass: VisitorPass) {
   const fromDate = pass.fromDate || pass.eventDate;
   const toDate = pass.toDate || pass.eventDate;
   const duration = inclusiveDuration(fromDate, toDate);
-  const collegeLogo = await assetDataUrl("/srm-trichy-logo.png");
+  const collegeLogo = await assetDataUrl("/srm-logo.png");
 
   pdf.setFillColor(21, 60, 114);
   pdf.rect(0, 0, pageWidth, 33, "F");
@@ -1680,7 +1680,7 @@ async function downloadVisitorPassPdf(pass: VisitorPass) {
   pdf.setTextColor(255, 255, 255);
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(11);
-  pdf.text("SRM GROUP OF INSTITUTION", 44, 11);
+  pdf.text("SRM GROUP OF INSTITUTIONS", 44, 11);
   pdf.setFontSize(9);
   pdf.text("TRICHY", 44, 17);
   pdf.setFont("helvetica", "normal");
@@ -2163,7 +2163,7 @@ function VisitorPassDetails({ pass, title = "Visitor Pass Details", subtitle = "
         <div><span>{pass.entryType === "student" ? "STUDENT ENTRY" : "VISITOR PASS"}</span><h1>{pass.visitorName}</h1><p>{pass.studentNo || pass.passNumber} · Issued by {pass.supervisor}</p></div>
         <Status tone={passTone(pass.status)}>{pass.status}</Status>
       </section>
-      <section className="info-card pass-information"><div className="card-kicker"><img src="/srm-trichy-emblem.png" alt="" className="kicker-emblem" /><TicketCheck size={15} />SRM GROUP OF INSTITUTION TRICHY · PASS INFORMATION</div><dl>
+      <section className="info-card pass-information"><div className="card-kicker"><img src="/srm-logo.png" alt="" className="kicker-emblem" /><TicketCheck size={15} />SRM GROUP OF INSTITUTIONS TRICHY · PASS INFORMATION</div><dl>
         <div><dt>{pass.entryType === "student" ? "Student Name" : "Visitor Name"}</dt><dd>{pass.visitorName}</dd></div><div><dt>{pass.entryType === "student" ? "Entry Number" : "Pass Number"}</dt><dd>{pass.passNumber}</dd></div>
         <div><dt>{pass.entryType === "student" ? "Student No" : "Visitor Phone Number"}</dt><dd>{pass.studentNo || pass.phone}</dd></div>
         <div><dt>Purpose</dt><dd>{pass.purpose}</dd></div>
@@ -2723,7 +2723,7 @@ function Audit({
               : "UP",
             name: r.name || "Unrecognized person",
             id: r.identifier_value || "Not available",
-            institution: "SRM GROUP OF INSTITUTION TRICHY",
+            institution: "SRM GROUP OF INSTITUTIONS TRICHY",
             department: r.department || "Not available",
             block: r.location_block || "Main Gate",
             time: r.timestamp
@@ -3385,11 +3385,11 @@ function ForgotPassword({ go }: { go: (screen: Screen) => void }) {
   return <main className="phone-page login-page">
     <section className="login-brand">
       <div className="login-college-emblem">
-        <img src="/srm-trichy-emblem.png" alt="SRM GROUP OF INSTITUTION TRICHY Emblem" />
+        <img src="/srm-logo.png" alt="SRM GROUP OF INSTITUTIONS TRICHY Emblem" />
       </div>
       <div className="login-inst-text">
         <span className="inst-badge">PASSWORD RECOVERY</span>
-        <h1 className="inst-title">SRM GROUP OF INSTITUTION</h1>
+        <h1 className="inst-title">SRM GROUP OF INSTITUTIONS</h1>
         <h2 className="inst-sub">TRICHY</h2>
         <p className="app-subtitle">Campus Secure · Identity Verification</p>
       </div>
@@ -3812,11 +3812,11 @@ function Profile({ role, go, back }: { role: Role; go: (screen: Screen) => void;
     <div className="page-content">
       <div className="profile-institution-banner">
         <div className="inst-banner-logo">
-          <img src="/srm-trichy-emblem.png" alt="SRM GROUP OF INSTITUTION TRICHY" />
+          <img src="/srm-logo.png" alt="SRM GROUP OF INSTITUTIONS TRICHY" />
         </div>
         <div className="inst-banner-copy">
           <span className="overline">AFFILIATED INSTITUTION</span>
-          <strong>SRM GROUP OF INSTITUTION</strong>
+          <strong>SRM GROUP OF INSTITUTIONS</strong>
           <small>TRICHY</small>
         </div>
       </div>
@@ -3891,7 +3891,7 @@ export default function App() {
       initials: initials,
       name: personName,
       id: "Not available",
-      institution: "SRM GROUP OF INSTITUTION TRICHY",
+      institution: "SRM GROUP OF INSTITUTIONS TRICHY",
       department: "Not available",
       block: role === "warden" ? "Bharathi Hostel" : role === "staff" ? "Block A" : role === "supervisor" ? "Institution B Campus" : "Main Gate",
       time: timeStr,
@@ -3997,7 +3997,7 @@ export default function App() {
         initials: "UP",
         name: "Unrecognized person",
         id: "Not available",
-        institution: "SRM GROUP OF INSTITUTION TRICHY",
+        institution: "SRM GROUP OF INSTITUTIONS TRICHY",
         department: "Not available",
         block: role === "warden" ? "Bharathi Hostel" : role === "staff" ? "Block A" : role === "supervisor" ? "Institution B Campus" : "Main Gate",
         time: timeStr,
@@ -4055,7 +4055,7 @@ export default function App() {
               department: mp.department,
               year: mp.year_roman || "II Year",
               batch: mp.batch || "2023–2028",
-              institute: "SRM GROUP OF INSTITUTION TRICHY",
+              institute: "SRM GROUP OF INSTITUTIONS TRICHY",
               similarity: 100,
               accommodationType: (mp.residence_type as any) || "Hosteller",
               hostelName: mp.hostel_name,

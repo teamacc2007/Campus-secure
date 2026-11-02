@@ -35,18 +35,18 @@ def seed_database():
 
     try:
         # 1. Institutions
-        inst = db.query(Institution).filter(Institution.short_code == "TSRMMCHRC").first()
+        inst = db.query(Institution).filter((Institution.short_code == "SRMTRICHY") | (Institution.short_code == "TSRMMCHRC")).first()
         if not inst:
             inst = Institution(
-                name="SRM GROUP OF INSTITUTION TRICHY",
-                short_code="TSRMMCHRC",
+                name="SRM GROUP OF INSTITUTIONS TRICHY",
+                short_code="SRMTRICHY",
                 campus_code="SRM-TRICHY-01",
                 address="SRM Nagar, Irungalur, Tiruchirappalli, Tamil Nadu 621105",
             )
             db.add(inst)
             db.commit()
             db.refresh(inst)
-            print("[Seed] Created Institution: TSRMMCHRC")
+            print("[Seed] Created Institution: SRMTRICHY")
 
         inst_eec = db.query(Institution).filter(Institution.short_code == "EEC").first()
         if not inst_eec:

@@ -23,7 +23,7 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     docs_url=f"{settings.API_V1_STR}/docs",
     redoc_url=f"{settings.API_V1_STR}/redoc",
-    description="Campus Security Mobile Application Backend API - SRM GROUP OF INSTITUTION TRICHY",
+    description="Campus Security Mobile Application Backend API - SRM GROUP OF INSTITUTIONS TRICHY",
     version="1.0.0",
 )
 
@@ -57,6 +57,6 @@ def health_check():
 def root_endpoint():
     return {
         "message": "Welcome to Campus Secure API",
-        "institution": "SRM GROUP OF INSTITUTION TRICHY",
+        "institution": "SRM GROUP OF INSTITUTIONS TRICHY",
         "documentation": f"{settings.API_V1_STR}/docs",
     }
