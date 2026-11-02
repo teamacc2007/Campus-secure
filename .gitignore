@@ -48,3 +48,4 @@ media/
 
 
 public/faces/captured/*.jpg
+.vercel

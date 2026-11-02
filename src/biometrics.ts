@@ -2,7 +2,7 @@
 // Generated with 48x48 Zero-Mean Normalized Cross-Correlation (ZNCC) + 3-Zone Color Histograms
 
 export interface BiometricProfile {
-  name: 'Sur' | 'Mon' | 'Mith' | 'Thiru';
+  name?: 'Sur' | 'Mon' | 'Mith' | 'Thiru';
   template: number[]; // 2304 floats (48x48)
   colorZones: number[]; // 18 floats (3 zones * (3 means + 3 stds))
 }

@@ -664,6 +664,71 @@ function formatRomanYearWithSuffix(yearRaw?: string): string {
   return roman ? `${roman} Year` : yearRaw.trim();
 }
 
+
+function Logs({ role, reviews, logs }: { role: Role; reviews: Record<string, ReviewRecord>; logs?: LogRecord[] }) {
+  const levelOneRole = role === "security" || role === "warden" || role === "staff";
+  const dateOnlyFilters = levelOneRole || role === "students";
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [activeType, setActiveType] = useState("All");
+  const [fromDate, setFromDate] = useState(dateOnlyFilters ? "2025-06-16" : "2025-06-16T08:00");
+  const [toDate, setToDate] = useState(dateOnlyFilters ? "2025-06-16" : "2025-06-16T18:00");
+  const [category, setCategory] = useState("All Categories");
+  const [institution, setInstitution] = useState("All visible institutions");
+  const [department, setDepartment] = useState("All departments");
+  const [academicYear, setAcademicYear] = useState("All years");
+  const [block, setBlock] = useState(role === "security" ? "Main Gate" : "All Institution B blocks");
+  const [exported, setExported] = useState(false);
+  const title = role === "security" ? "Entries Log" : role === "warden" ? "Hostel Entries Log" : role === "staff" ? "Assigned Entries Log" : "Campus records";
+  const types = role === "students" ? ["All", "Entry", "Exit", "Denied"] : ["All", "Entry", "Exit", "Visitor", "Denied"];
+  const currentLogs = logs ?? logRows;
+  const scopedRows = currentLogs.filter(row => {
+    if (role === "security" && row.block !== "Main Gate") return false;
+    if (role === "security" && row.personType === "External") return false;
+    if (role === "warden" && (row.institution !== "Institution B" || row.hostel !== "Bharathi Hostel" || row.guard !== roleMeta.warden.name)) return false;
+    if (role === "staff" && (row.institution !== "Institution B" || row.block !== "Block A")) return false;
+    if (role === "students" && row.accessCategory === "Visitors") return false;
+    if (activeType !== "All" && row.event !== activeType && !(activeType === "Visitor" && ["Visitor", "Internal visit"].includes(row.event))) return false;
+    const comparableDate = dateOnlyFilters ? row.dateTime.slice(0, 10) : row.dateTime;
+    if (comparableDate < fromDate || comparableDate > toDate) return false;
+    if (levelOneRole && category !== "All Categories" && recordCategory(reviews, row) !== category) return false;
+    if (role === "security" && institution !== "All visible institutions" && row.institution !== institution) return false;
+    if (!levelOneRole && department !== "All departments" && row.department !== department) return false;
+    if (role === "students" && academicYear !== "All years" && row.year !== academicYear) return false;
+    if (!levelOneRole && block !== "All Institution B blocks" && row.block !== block) return false;
+    return true;
+  });
+  const resetFilters = () => {
+    setActiveType("All");
+    setFromDate(dateOnlyFilters ? "2025-06-16" : "2025-06-16T08:00");
+    setToDate(dateOnlyFilters ? "2025-06-16" : "2025-06-16T18:00");
+    setCategory("All Categories");
+    setInstitution("All visible institutions");
+    setDepartment("All departments");
+    setAcademicYear("All years");
+    setBlock(role === "security" ? "Main Gate" : "All Institution B blocks");
+  };
+  return <>
+    <TopBar title={title} subtitle={role === "security" ? "Main Gate · Assigned block only" : role === "warden" ? "Bharathi Hostel · Residents only" : role === "staff" ? "Block A · Assigned duty only" : "Organization-wide · Read-only review"} action={levelOneRole || role === "students" ? undefined : <div className="header-actions"><button className="icon-btn" onClick={() => setExported(true)} aria-label="Export visible logs"><FileClock size={18} /></button><button className={`icon-btn ${filtersOpen ? "primary" : ""}`} onClick={() => setFiltersOpen(!filtersOpen)} aria-label="Toggle filters"><Filter size={18} /></button></div>} />
+    <div className="page-content">
+      {exported && <div className="export-notice"><Check size={14} />Export prepared with {scopedRows.length} filtered records.<button onClick={() => setExported(false)}>Close</button></div>}
+      {levelOneRole ? <section className="filter-panel guard-log-filters"><div className="filter-panel-head"><div></div><button onClick={resetFilters}>Reset</button></div><Field label="Category"><select value={category} onChange={event => setCategory(event.target.value)}><option>All Categories</option><option>Authorized</option><option>Unauthorized</option><option>Revoked</option></select></Field><div className="date-filter"><label><CalendarDays size={15} /><span>{role === "warden" ? "Start Date" : "From Date"}</span><input type="date" value={fromDate} onChange={event => setFromDate(event.target.value)} /></label><span>to</span><label><Clock3 size={15} /><span>{role === "warden" ? "End Date" : "To Date"}</span><input type="date" value={toDate} onChange={event => setToDate(event.target.value)} /></label></div></section> : role === "students" ? <section className="filter-panel student-record-filters"><div className="filter-panel-head"><div><strong>Filter records</strong><span>Choose a date range and record type.</span></div><button onClick={resetFilters}>Reset</button></div><div className="date-filter"><label><CalendarDays size={15} /><span>From Date</span><input type="date" value={fromDate} onChange={event => setFromDate(event.target.value)} /></label><span>to</span><label><Clock3 size={15} /><span>To Date</span><input type="date" value={toDate} onChange={event => setToDate(event.target.value)} /></label></div><div className="filter-row">{types.map(type => <button key={type} className={activeType === type ? "active" : ""} onClick={() => setActiveType(type)}>{type}</button>)}</div></section> : <>
+      <div className="date-filter"><label><CalendarDays size={15} /><span>From</span><input type="datetime-local" value={fromDate} onChange={event => setFromDate(event.target.value)} /></label><span>to</span><label><Clock3 size={15} /><span>To</span><input type="datetime-local" value={toDate} onChange={event => setToDate(event.target.value)} /></label></div>
+      <div className="filter-row">{types.map(type => <button key={type} className={activeType === type ? "active" : ""} onClick={() => setActiveType(type)}>{type}</button>)}</div></>}
+      {!levelOneRole && filtersOpen && <section className="filter-panel"><div className="filter-panel-head"><div><strong>Filter logs</strong><span>Filters are limited to your authorised scope.</span></div><button onClick={resetFilters}>Reset</button></div>
+        <div className="filter-fields">
+          <Field label="Record scope"><select disabled><option>All campus records</option></select></Field>
+          <Field label="Department"><select value={department} onChange={event => setDepartment(event.target.value)}><option>All departments</option><option>Computer Science</option><option>Electronics</option><option>Mechanical</option></select></Field>
+          <Field label="Academic year"><select value={academicYear} onChange={event => setAcademicYear(event.target.value)}><option>All years</option><option>Year I</option><option>Year II</option><option>Year III</option><option>Year IV</option></select></Field>
+          <Field label="Block"><select value={block} onChange={event => setBlock(event.target.value)}><option>All Institution B blocks</option><option>Main Gate</option><option>Block A</option><option>Block B</option><option>Library Block</option></select></Field>
+        </div><Button onClick={() => setFiltersOpen(false)} icon={<Filter size={15} />}>Apply filters</Button>
+      </section>}
+      <div className={`log-summary ${role === "students" ? "two-column" : ""}`}>{levelOneRole || role === "students" ? <><div><strong>{scopedRows.filter(row => recordCategory(reviews, row) === "Authorized").length}</strong><span>Authorized</span></div><div><strong>{scopedRows.filter(row => recordCategory(reviews, row) === "Unauthorized").length}</strong><span>Unauthorized</span></div>{levelOneRole && <div><strong>{scopedRows.filter(row => recordCategory(reviews, row) === "Revoked").length}</strong><span>Revoked</span></div>}</> : <><div><strong>{scopedRows.filter(row => row.event === "Entry").length}</strong><span>Entries</span></div><div><strong>{scopedRows.filter(row => row.event === "Exit").length}</strong><span>Exits</span></div><div><strong>{scopedRows.filter(row => ["Visitor", "Internal visit"].includes(row.event)).length}</strong><span>Visits</span></div></>}</div>
+      <AuditTable rows={scopedRows} reviews={reviews} title={role === "warden" ? "" : levelOneRole ? "ASSIGNED SCOPE LOG" : "CAMPUS RECORDS"} plainNames={role === "students" || role === "warden"} />
+      {scopedRows.length === 0 && <div className="empty-state"><History size={25} /><strong>No matching records</strong><span>Change a filter or expand the date range.</span></div>}
+    </div>
+  </>;
+}
+
 function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) => void; completeScan: (capturedImage: string | null, matchResult?: StudentMatch | null, scores?: Record<string, number> | null) => void; role: "security" | "warden" | "staff" | "supervisor" | "cso"; logs?: LogRecord[] }) {
   const [scanning, setScanning] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
@@ -1415,7 +1480,7 @@ function UnauthorizedForm({
   onRecordEvent,
 }: {
   go: (screen: Screen) => void;
-  role: "security" | "warden" | "staff" | "supervisor";
+  role: "security" | "warden" | "staff" | "supervisor" | "cso";
   capturedPhoto: string | null;
   onRecordEvent?: (photo: string | null, notes?: string, phoneNumber?: string, fullName?: string) => void;
 }) {
@@ -1936,7 +2001,7 @@ function downloadBulkTemplate() {
     ["Rahul Menon", "22CSE1048", "45 Park Street, Bengaluru", ""],
     ["Deepa Varma", "VIS-2048", "8 College Road, Kochi", "photos/deepa_varma.jpg"],
   ];
-  const sheet = XLSX.utils.aoa_to_sheet([bulkTemplateColumns, ...rows]);
+  const sheet = XLSX.utils.aoa_to_sheet([bulkTemplateColumns as any, ...rows]);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, "student-list");
   XLSX.writeFile(workbook, "CampusSecure_Student_Entry_Template.xlsx");
@@ -2245,6 +2310,7 @@ type LogRecord = {
   guardNotes?: string;
   entries?: number;
   decision: "Authorised" | "Denied" | "Pending review";
+  photo?: string;
 };
 
 const logRows: LogRecord[] = [
@@ -2509,10 +2575,10 @@ function UnauthorisedEntriesTable({
     if (rev.status === "Pending Verification") {
       return { label: "Pending", tone: "amber" as const };
     }
-    if (row.event === "Flagged" || row.decision === "Flagged") {
+    if ((row.event as any) === "Flagged" || (row.decision as any) === "Flagged") {
       return { label: "Flagged", tone: "amber" as const };
     }
-    return { label: row.decision || row.event || "Denied", tone: (row.tone || "red") as const };
+    return { label: row.decision || row.event || "Denied", tone: (row.tone || "red") as any };
   };
 
   return (
@@ -4270,7 +4336,7 @@ export default function App() {
   else if (role === "security" || role === "warden" || role === "staff") {
     if (screen === "home") content = <LevelOneHome role={role} go={go} />;
     else if (screen === "scan") content = <LevelOneScan role={role} go={go} completeScan={completeScan} logs={logs} />;
-    else if (screen === "logs") content = <Logs role={role} reviews={reviews} />;
+    else if (screen === "logs") content = <Logs role={role} reviews={reviews} logs={logs} />;
     else if (screen === "unrecognized") content = <UnrecognizedResult role={role} go={go} verifyRegister={verifyRegister} capturedPhoto={capturedPhoto} biometricScores={biometricScores} />;
     else if (screen === "identity") content = <IdentityResult role={role} go={go} identityCase={identityCase} verificationMethod={verificationMethod} student={matchedStudent} capturedPhoto={capturedPhoto} />;
     else if (screen === "unauthorised") content = <UnauthorizedForm role={role} go={go} capturedPhoto={capturedPhoto} onRecordEvent={recordUnauthorizedEvent} />;
@@ -4319,7 +4385,7 @@ export default function App() {
     else if (screen === "assign-supervisor") content = <AssignSupervisor go={go} />;
     else content = <AdminHome go={go} />;
   } else {
-    if (screen === "logs") content = <Logs role="students" reviews={reviews} />;
+    if (screen === "logs") content = <Logs role="students" reviews={reviews} logs={logs} />;
     else if (screen === "workload") content = <Worklog go={go} scope="student-affairs" />;
     else content = <StudentAffairsHome go={go} />;
   }
