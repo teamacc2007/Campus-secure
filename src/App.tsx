@@ -46,10 +46,26 @@ import {
   Users,
   X,
   ScanLine,
+  SlidersHorizontal,
+  UploadCloud,
 } from "lucide-react";
 import { evaluateBiometrics } from "./biometrics";
+import {
+  AuditLogItem,
+  LogFieldVisibility,
+  DEFAULT_LOG_FIELD_VISIBILITY,
+  ManagerEditPermissions,
+  DEFAULT_MANAGER_EDIT_PERMISSIONS,
+  DEFAULT_AUDIT_LOGS,
+  ManualAddStudent,
+  ManagerStudentDirectory,
+  AdminBulkStudentImport,
+  AuditLogsTable,
+  AdminAccessSettings,
+  AdminSecuritiesDirectory,
+} from "./managerAdminComponents";
 
-type Role = "security" | "warden" | "staff" | "supervisor" | "access-supervisor" | "students" | "welfare" | "admin" | "cso" | "manager";
+export type Role = "security" | "warden" | "staff" | "supervisor" | "access-supervisor" | "students" | "welfare" | "admin" | "cso" | "manager";
 type ReviewStatus = "Pending Verification" | "Verified" | "Authorised" | "Unauthorised" | "Revoked";
 type ReviewAction = {
   type: "Verified" | "Authorised" | "Unauthorised" | "Revoked";
@@ -107,7 +123,7 @@ type ReviewRecord = {
   status: ReviewStatus;
   actions: ReviewAction[];
 };
-type Screen =
+export type Screen =
   | "login"
   | "home"
   | "scan"
@@ -134,7 +150,13 @@ type Screen =
   | "bulk-pass"
   | "pass-detail"
   | "access-notifications"
-  | "welfare-logs";
+  | "welfare-logs"
+  | "manager-students"
+  | "add-student"
+  | "admin-bulk-students"
+  | "admin-audit-logs"
+  | "admin-access-settings"
+  | "admin-securities";
 
 export type AuthorizedFaceProfile = {
   id: string;
@@ -148,7 +170,7 @@ export type AuthorizedFaceProfile = {
 
 type IdentityCase = "student" | "staff";
 type VerificationMethod = "face" | "register";
-type StudentMatch = {
+export type StudentMatch = {
   initials: string;
   name: string;
   registerNumber: string;
@@ -527,9 +549,10 @@ function BottomNav({ role, active, go }: { role: Role; active: Screen; go: (scre
     ],
     admin: [
       { screen: "home", label: "Overview", icon: <BarChart3 size={20} /> },
-      { screen: "users", label: "Users", icon: <UserCog size={20} /> },
       { screen: "campus-entries", label: "Records", icon: <DoorOpen size={20} /> },
-      { screen: "login-logs", label: "Worklog", icon: <FileClock size={20} /> },
+      { screen: "admin-bulk-students", label: "Bulk Import", icon: <UploadCloud size={20} /> },
+      { screen: "admin-audit-logs", label: "Audit Logs", icon: <History size={20} /> },
+      { screen: "admin-access-settings", label: "Access & Fields", icon: <SlidersHorizontal size={20} /> },
     ],
     cso: [
       { screen: "home", label: "Overview", icon: <Shield size={20} /> },
@@ -540,8 +563,9 @@ function BottomNav({ role, active, go }: { role: Role; active: Screen; go: (scre
     ],
     manager: [
       { screen: "home", label: "Overview", icon: <Building2 size={20} /> },
+      { screen: "manager-students", label: "Students", icon: <Users size={20} /> },
       { screen: "campus-entries", label: "Records", icon: <FileClock size={20} /> },
-      { screen: "institution-users", label: "Users", icon: <Users size={20} /> },
+      { screen: "admin-audit-logs", label: "Audit", icon: <History size={20} /> },
       { screen: "profile", label: "Profile", icon: <CircleUserRound size={20} /> },
     ],
   };
@@ -1285,7 +1309,7 @@ function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) =
   </>;
 }
 
-function IdentityResult({ go, identityCase, verificationMethod, student, role, capturedPhoto }: { go: (screen: Screen) => void; identityCase: IdentityCase; verificationMethod: VerificationMethod; student: StudentMatch; role: "security" | "warden" | "staff" | "supervisor" | "cso"; capturedPhoto?: string | null }) {
+function IdentityResult({ go, identityCase, verificationMethod, student, role, capturedPhoto, fieldVisibility = DEFAULT_LOG_FIELD_VISIBILITY }: { go: (screen: Screen) => void; identityCase: IdentityCase; verificationMethod: VerificationMethod; student: StudentMatch; role: "security" | "warden" | "staff" | "supervisor" | "cso"; capturedPhoto?: string | null; fieldVisibility?: LogFieldVisibility }) {
   const staff = identityCase === "staff";
   const registerVerified = verificationMethod === "register";
 
@@ -1389,38 +1413,40 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role, c
           </dl>
         ) : (
           <dl>
-            <div><dt>Name</dt><dd>{activeStudent.name}</dd></div>
-            <div><dt>Register Number</dt><dd>{activeStudent.registerNumber}</dd></div>
-            <div><dt>Class</dt><dd>{studentClass}</dd></div>
-            {role === "security" || role === "supervisor" || role === "cso" ? (
-              <div><dt>Year & Department</dt><dd>{profileYear} · {activeStudent.department}</dd></div>
-            ) : (
-              <>
-                <div><dt>Department</dt><dd>{activeStudent.department}</dd></div>
-                <div><dt>Year</dt><dd>{displayYear}</dd></div>
-              </>
+            {fieldVisibility.name && <div><dt>Name</dt><dd>{activeStudent.name}</dd></div>}
+            {fieldVisibility.registerNumber && <div><dt>Register Number</dt><dd>{activeStudent.registerNumber}</dd></div>}
+            {fieldVisibility.class && <div><dt>Class</dt><dd>{studentClass}</dd></div>}
+            {fieldVisibility.department && (
+              role === "security" || role === "supervisor" || role === "cso" ? (
+                <div><dt>Year & Department</dt><dd>{profileYear} · {activeStudent.department}</dd></div>
+              ) : (
+                <>
+                  <div><dt>Department</dt><dd>{activeStudent.department}</dd></div>
+                  {fieldVisibility.year && <div><dt>Year</dt><dd>{displayYear}</dd></div>}
+                </>
+              )
             )}
-            <div><dt>Batch</dt><dd>{displayBatch}</dd></div>
-            <div><dt>Institute</dt><dd>{activeStudent.institute}</dd></div>
-            <div><dt>Accommodation Type</dt><dd>{activeStudent.accommodationType}</dd></div>
+            {fieldVisibility.batch && <div><dt>Batch</dt><dd>{displayBatch}</dd></div>}
+            {fieldVisibility.institute && <div><dt>Institute</dt><dd>{activeStudent.institute}</dd></div>}
+            {fieldVisibility.accommodationType && <div><dt>Accommodation Type</dt><dd>{activeStudent.accommodationType}</dd></div>}
             {activeStudent.accommodationType === "Hosteller" && (
               <>
-                <div><dt>Hostel Name</dt><dd>{activeStudent.hostelName}</dd></div>
-                <div><dt>Room Number</dt><dd>{activeStudent.roomNumber}</dd></div>
+                {fieldVisibility.hostelName && <div><dt>Hostel Name</dt><dd>{activeStudent.hostelName}</dd></div>}
+                {fieldVisibility.roomNumber && <div><dt>Room Number</dt><dd>{activeStudent.roomNumber}</dd></div>}
               </>
             )}
             {(activeStudent.accommodationType === "Day Scholar" || isOwnVehicle) && (
               <>
-                <div><dt>Mode of Transport</dt><dd>{modeOfTransport || (isOwnVehicle ? "Own Vehicle" : "College Bus")}</dd></div>
+                {fieldVisibility.transportationType && <div><dt>Mode of Transport</dt><dd>{modeOfTransport || (isOwnVehicle ? "Own Vehicle" : "College Bus")}</dd></div>}
                 {isOwnVehicle ? (
                   <>
-                    <div><dt>Location</dt><dd>{studentLocation}</dd></div>
-                    {activeStudent.vehicleNumber && <div><dt>Vehicle Number</dt><dd>{activeStudent.vehicleNumber}</dd></div>}
+                    {fieldVisibility.location && <div><dt>Location</dt><dd>{studentLocation}</dd></div>}
+                    {fieldVisibility.vehicleNumber && activeStudent.vehicleNumber && <div><dt>Vehicle Number</dt><dd>{activeStudent.vehicleNumber}</dd></div>}
                   </>
                 ) : (
                   <>
-                    <div><dt>Boarding Point</dt><dd>{activeStudent.boardingPoint ?? "N/A"}</dd></div>
-                    <div><dt>Route Number</dt><dd>{activeStudent.routeNumber ?? "N/A"}</dd></div>
+                    {fieldVisibility.boardingPoint && <div><dt>Boarding Point</dt><dd>{activeStudent.boardingPoint ?? "N/A"}</dd></div>}
+                    {fieldVisibility.routeNumber && <div><dt>Route Number</dt><dd>{activeStudent.routeNumber ?? "N/A"}</dd></div>}
                   </>
                 )}
               </>
@@ -2431,7 +2457,7 @@ const missingValues = ["", "not available", "not identified", "unknown", "n/a", 
 const logValue = (value?: string | null) => (value && !missingValues.includes(value.trim().toLowerCase()) ? value : "-");
 const accommodationOf = (row: LogRecord) => (row.residence === "Day scholar" ? "Day Scholar" : row.residence);
 
-function AuditTable({ rows, reviews, title = "AUDIT LOG", hideCommonInfo = false, plainNames = false }: { rows: LogRecord[]; reviews: Record<string, ReviewRecord>; title?: string; hideCommonInfo?: boolean; plainNames?: boolean }) {
+function AuditTable({ rows, reviews, title = "AUDIT LOG", hideCommonInfo = false, plainNames = false, fieldVisibility = DEFAULT_LOG_FIELD_VISIBILITY }: { rows: LogRecord[]; reviews: Record<string, ReviewRecord>; title?: string; hideCommonInfo?: boolean; plainNames?: boolean; fieldVisibility?: LogFieldVisibility }) {
   const [selected, setSelected] = useState<LogRecord | null>(null);
   const personCategory = selected?.personType === "Student" ? "Student" : selected?.personType === "Staff" ? "Staff" : selected?.personType === "Unauthorised" ? "Unauthorized person" : "Visitor";
   const authorizationStatus = selected?.decision === "Authorised" ? "Authorized" : selected?.decision;
@@ -2443,7 +2469,29 @@ function AuditTable({ rows, reviews, title = "AUDIT LOG", hideCommonInfo = false
   return <>{title && <div className="list-label">{rows.length} RECORDS · {title}</div>}<div className="audit-table-wrap"><table className="audit-table"><thead><tr><th>S.No</th><th>Name</th><th>Reg No</th><th>Dept</th><th>Institute</th><th>Year</th><th>Category</th><th>Accommodation</th></tr></thead><tbody>{rows.map((row, index) => { const rowReview = reviewFor(reviews, row); const category = recordCategory(reviews, row); return <tr key={`${row.name}${row.time}`} onClick={() => setSelected(row)}><td>{index + 1}</td><td><strong>{logValue(row.name)}</strong>{!plainNames && <div className="record-badges"><Status tone={row.tone}>{row.event}</Status><Status tone={category === "Authorized" || category === "Revoked" ? "green" : category === "Visitors" ? "amber" : "red"}>{category}</Status><Status tone={reviewTone(rowReview.status)}>{rowReview.status}</Status></div>}</td><td>{logValue(row.id)}</td><td>{logValue(row.department)}</td><td>{logValue(row.institution)}</td><td>{logValue(row.year?.replace("Year ", ""))}</td><td>{category}</td><td>{logValue(accommodationOf(row))}</td></tr>; })}</tbody></table></div>{selected && <section className="audit-profile log-details-panel"><div className="audit-profile-head"><div className="captured-photo small-capture"><CircleUserRound size={38} /><span>{isRevoked ? "Entry capture" : `Entry capture · ${selected.time}`}</span></div><div><span>{personCategory.toUpperCase()} LOG DETAILS</span><h2>{selected.name}</h2>{!isRevoked && <p>{logValue(selected.id)} · {logValue(selected.institution)}</p>}</div><button onClick={() => setSelected(null)} aria-label="Close log details"><X size={18} /></button></div>
     {isRevoked && <><div className="audit-detail-section"><div className="audit-detail-title">VISIT DETAILS</div><dl><div><dt>Reason to visit</dt><dd>{selected.visitPurpose ?? selected.guardNotes ?? "Not recorded"}</dd></div>{selected.hostName && <div><dt>Person to meet</dt><dd>{selected.hostName}</dd></div>}</dl></div><div className="audit-detail-section revocation-details revoked-priority"><div className="audit-detail-title">REVOCATION DETAILS</div><dl><div><dt>Reason for revocation by supervisor</dt><dd>{revocation?.reason ?? "Not recorded"}</dd></div></dl></div></>}
     {!isRevoked && <div className="audit-detail-section"><div className="audit-detail-title">{personCategory.toUpperCase()} DETAILS</div>
-      <dl><div><dt>S.No</dt><dd>{rows.indexOf(selected) + 1}</dd></div>{!isRevoked && <div><dt>Name</dt><dd>{logValue(selected.name)}</dd></div>}{selected.id && logValue(selected.id) !== "-" && <div><dt>{selected.personType === "Student" ? "Register number" : "ID number"}</dt><dd>{selected.id}</dd></div>}{selected.rollNumber && <div><dt>Roll number</dt><dd>{selected.rollNumber}</dd></div>}{selected.department && logValue(selected.department) !== "-" && <div><dt>Department</dt><dd>{selected.department}</dd></div>}{knownInstitution && <div><dt>Institute</dt><dd>{selected.institution}</dd></div>}{selected.year && <div><dt>Year</dt><dd>{selected.year.replace("Year ", "")}</dd></div>}{selected.batch && <div><dt>Batch</dt><dd>{selected.batch}</dd></div>}<div><dt>Category</dt><dd>{recordCategory(reviews, selected)}</dd></div>{accommodationOf(selected) && <div><dt>Accommodation</dt><dd>{accommodationOf(selected)}</dd></div>}{selected.hostName && <div><dt>Person to meet</dt><dd>{selected.hostName}</dd></div>}{!isRevoked && selected.visitPurpose && <div><dt>Purpose of visit</dt><dd>{selected.visitPurpose}</dd></div>}{selected.phoneNumber && <div><dt>Phone number</dt><dd>{selected.phoneNumber}</dd></div>}{selected.hostel && <div><dt>Hostel</dt><dd>{selected.hostel}</dd></div>}{selected.room && <div><dt>Room</dt><dd>{selected.room}</dd></div>}{selected.transport && <div><dt>Transport</dt><dd>{selected.transport}</dd></div>}{selected.pickup && <div><dt>Pickup point</dt><dd>{selected.pickup}</dd></div>}{selected.routeNumber && <div><dt>Route number</dt><dd>{selected.routeNumber}</dd></div>}{selected.vehicleNumber && <div><dt>Vehicle number</dt><dd>{selected.vehicleNumber}</dd></div>}{!isRevoked && selected.guardNotes && <div><dt>Reason</dt><dd>{selected.guardNotes}</dd></div>}{isRevoked && revocation && <><div><dt>Revoked by</dt><dd>{revocation.actor} · {revocation.actorNumber}</dd></div><div><dt>Revoked at</dt><dd>{revocation.timestamp}</dd></div></>}</dl>
+      <dl>
+        <div><dt>S.No</dt><dd>{rows.indexOf(selected) + 1}</dd></div>
+        {!isRevoked && (fieldVisibility.name !== false) && <div><dt>Name</dt><dd>{logValue(selected.name)}</dd></div>}
+        {selected.id && logValue(selected.id) !== "-" && (fieldVisibility.registerNumber !== false) && <div><dt>{selected.personType === "Student" ? "Register number" : "ID number"}</dt><dd>{selected.id}</dd></div>}
+        {selected.rollNumber && <div><dt>Roll number</dt><dd>{selected.rollNumber}</dd></div>}
+        {selected.department && logValue(selected.department) !== "-" && (fieldVisibility.department !== false) && <div><dt>Department</dt><dd>{selected.department}</dd></div>}
+        {knownInstitution && (fieldVisibility.institute !== false) && <div><dt>Institute</dt><dd>{selected.institution}</dd></div>}
+        {selected.year && (fieldVisibility.year !== false) && <div><dt>Year</dt><dd>{selected.year.replace("Year ", "")}</dd></div>}
+        {selected.batch && (fieldVisibility.batch !== false) && <div><dt>Batch</dt><dd>{selected.batch}</dd></div>}
+        <div><dt>Category</dt><dd>{recordCategory(reviews, selected)}</dd></div>
+        {accommodationOf(selected) && (fieldVisibility.accommodationType !== false) && <div><dt>Accommodation</dt><dd>{accommodationOf(selected)}</dd></div>}
+        {selected.hostName && <div><dt>Person to meet</dt><dd>{selected.hostName}</dd></div>}
+        {!isRevoked && selected.visitPurpose && <div><dt>Purpose of visit</dt><dd>{selected.visitPurpose}</dd></div>}
+        {selected.phoneNumber && <div><dt>Phone number</dt><dd>{selected.phoneNumber}</dd></div>}
+        {selected.hostel && (fieldVisibility.hostelName !== false) && <div><dt>Hostel</dt><dd>{selected.hostel}</dd></div>}
+        {selected.room && (fieldVisibility.roomNumber !== false) && <div><dt>Room</dt><dd>{selected.room}</dd></div>}
+        {selected.transport && (fieldVisibility.transportationType !== false) && <div><dt>Transport</dt><dd>{selected.transport}</dd></div>}
+        {selected.pickup && (fieldVisibility.boardingPoint !== false) && <div><dt>Pickup point</dt><dd>{selected.pickup}</dd></div>}
+        {selected.routeNumber && (fieldVisibility.routeNumber !== false) && <div><dt>Route number</dt><dd>{selected.routeNumber}</dd></div>}
+        {selected.vehicleNumber && (fieldVisibility.vehicleNumber !== false) && <div><dt>Vehicle number</dt><dd>{selected.vehicleNumber}</dd></div>}
+        {!isRevoked && selected.guardNotes && <div><dt>Reason</dt><dd>{selected.guardNotes}</dd></div>}
+        {isRevoked && revocation && <><div><dt>Revoked by</dt><dd>{revocation.actor} · {revocation.actorNumber}</dd></div><div><dt>Revoked at</dt><dd>{revocation.timestamp}</dd></div></>}
+      </dl>
     </div>}
     {!isRevoked && revocation && <div className="audit-detail-section revocation-details"><div className="audit-detail-title">REVOCATION DETAILS</div><dl><div><dt>Reason <b>*</b></dt><dd>{revocation.reason}</dd></div><div><dt>Supervisor comments</dt><dd>{revocation.reason}</dd></div><div><dt>Revoked by</dt><dd>{revocation.actor} · {revocation.actorNumber}</dd></div><div><dt>Revoked at</dt><dd>{revocation.timestamp}</dd></div></dl></div>}
     {!isRevoked && !hideCommonInfo && <div className="audit-detail-section"><div className="audit-detail-title">ORIGINAL SECURITY EVENT</div><dl>{selected.logId && <div><dt>Log ID / Reference Number</dt><dd>{selected.logId}</dd></div>}<div><dt>Person Category</dt><dd>{personCategory}</dd></div><div><dt>Original Event Category</dt><dd>{selected.accessCategory}</dd></div><div><dt>Security Decision</dt><dd>{authorizationStatus}</dd></div><div><dt>Entry or Exit Event</dt><dd>{selected.event}</dd></div><div><dt>Date</dt><dd>{selected.dateTime.slice(0, 10)}</dd></div><div><dt>Timestamp</dt><dd>{selected.dateTime.replace("T", " ")}</dd></div>{knownInstitution && <div><dt>Institution</dt><dd>{selected.institution}</dd></div>}<div><dt>Assigned Gate / Location</dt><dd>{selected.block} · {knownInstitution ? selected.institution : "Institution B"}</dd></div><div><dt>Security Name / Number</dt><dd>{recordedBy}</dd></div></dl></div>}
@@ -3593,8 +3641,12 @@ function OversightHome({ role, go }: { role: "cso" | "manager"; go: (screen: Scr
         {cso && <button onClick={() => go("audit")}><span><FileClock size={21} /></span><div><strong>Audit records</strong></div><ChevronRight size={18} /></button>}
         {cso && <button onClick={() => go("campus-entries")}><span><DoorOpen size={21} /></span><div><strong>Institution entry logs</strong></div><ChevronRight size={18} /></button>}
         {cso && <button onClick={() => go("login-logs")}><span><FileClock size={21} /></span><div><strong>Worklog</strong></div><ChevronRight size={18} /></button>}
+        {!cso && <button onClick={() => go("add-student")}><span className="amber-icon"><UserPlus size={21} /></span><div><strong>Add new student</strong><small>Manual entry with photo & face model training</small></div><ChevronRight size={18} /></button>}
+        {!cso && <button onClick={() => go("manager-students")}><span><Users size={21} /></span><div><strong>Manage institution students</strong><small>View & edit student details (admin permissions applied)</small></div><ChevronRight size={18} /></button>}
+        {!cso && <button onClick={() => go("institution-users")}><span><UserCog size={21} /></span><div><strong>Institution users</strong><small>Manage officers & staff</small></div><ChevronRight size={18} /></button>}
+        {!cso && <button onClick={() => go("campus-entries")}><span><DoorOpen size={21} /></span><div><strong>Institution entry logs</strong></div><ChevronRight size={18} /></button>}
+        {!cso && <button onClick={() => go("admin-audit-logs")}><span><FileClock size={21} /></span><div><strong>Institution audit logs</strong><small>Track all changes & edits made</small></div><ChevronRight size={18} /></button>}
         {!cso && <button onClick={() => go("alerts")}><span><Bell size={21} /></span><div><strong>Alerts from security</strong></div><ChevronRight size={18} /></button>}
-        {!cso && <button onClick={() => go("institution-users")}><span><Users size={21} /></span><div><strong>Institution users</strong></div><ChevronRight size={18} /></button>}
       </div>
     </div>
   </>;
@@ -3680,7 +3732,48 @@ function AdminHome({ go }: { go: (screen: Screen) => void }) {
       <div className="dashboard-stats three"><div><strong>42</strong><small>Portal users</small></div><div><strong>8,426</strong><small>Authorized</small></div><div><strong>27</strong><small>Unauthorized</small></div></div>
       <section className="chart-card"><div className="chart-head"><div><span>ENTRY TREND</span><strong>52,840</strong></div><small>Last 7 days</small></div><div className="login-chart admin-chart">{[62, 76, 59, 86, 78, 45, 51].map((height, index) => <div key={index}><i style={{ height: `${height}%` }} /><span>{["M", "T", "W", "T", "F", "S", "S"][index]}</span></div>)}</div></section>
       <div className="section-heading compact"><div><h2>Admin tools</h2></div></div>
-      <div className="admin-list"><button onClick={() => go("assign-supervisor")}><span><UserCheck size={21} /></span><div><strong>Assign Campus Supervisor</strong></div><ChevronRight size={18} /></button><button onClick={() => go("users")}><span><UserCog size={21} /></span><div><strong>Manage portal users</strong></div><ChevronRight size={18} /></button><button onClick={() => go("campus-entries")}><span><DoorOpen size={21} /></span><div><strong>All campus records</strong></div><ChevronRight size={18} /></button><button onClick={() => go("login-logs")}><span><FileClock size={21} /></span><div><strong>User worklog</strong></div><ChevronRight size={18} /></button></div>
+      <div className="admin-list">
+        <button onClick={() => go("admin-bulk-students")}>
+          <span className="amber-icon"><UploadCloud size={21} /></span>
+          <div><strong>Bulk student creation</strong><small>Upload spreadsheet & train face recognition model</small></div>
+          <ChevronRight size={18} />
+        </button>
+        <button onClick={() => go("campus-entries")}>
+          <span><DoorOpen size={21} /></span>
+          <div><strong>All campus records</strong><small>Filter by institution then by block</small></div>
+          <ChevronRight size={18} />
+        </button>
+        <button onClick={() => go("users")}>
+          <span><Users size={21} /></span>
+          <div><strong>Manage portal users</strong><small>User accounts by institution</small></div>
+          <ChevronRight size={18} />
+        </button>
+        <button onClick={() => go("admin-securities")}>
+          <span><Shield size={21} /></span>
+          <div><strong>Campus securities & guards</strong><small>View personnel by institution & gate</small></div>
+          <ChevronRight size={18} />
+        </button>
+        <button onClick={() => go("admin-audit-logs")}>
+          <span><History size={21} /></span>
+          <div><strong>Audit logs history</strong><small>Table view with row click detail inspection</small></div>
+          <ChevronRight size={18} />
+        </button>
+        <button onClick={() => go("admin-access-settings")}>
+          <span><SlidersHorizontal size={21} /></span>
+          <div><strong>Field visibility & manager access</strong><small>Customize log fields & manager edit permissions</small></div>
+          <ChevronRight size={18} />
+        </button>
+        <button onClick={() => go("assign-supervisor")}>
+          <span><UserCheck size={21} /></span>
+          <div><strong>Assign Campus Supervisor</strong></div>
+          <ChevronRight size={18} />
+        </button>
+        <button onClick={() => go("login-logs")}>
+          <span><FileClock size={21} /></span>
+          <div><strong>User worklog</strong></div>
+          <ChevronRight size={18} />
+        </button>
+      </div>
     </div>
   </>;
 }
@@ -3861,17 +3954,88 @@ function Worklog({ go, scope = "admin" }: { go: (screen: Screen) => void; scope?
   );
 }
 
-function CampusEntries({ go, reviews, scope = "admin" }: { go: (screen: Screen) => void; reviews: Record<string, ReviewRecord>; scope?: "admin" | "institution" }) {
+function CampusEntries({ go, reviews, scope = "admin", fieldVisibility = DEFAULT_LOG_FIELD_VISIBILITY }: { go: (screen: Screen) => void; reviews: Record<string, ReviewRecord>; scope?: "admin" | "institution"; fieldVisibility?: LogFieldVisibility }) {
   const [institution, setInstitution] = useState(scope === "institution" ? "Institution B" : "All institutions");
   const [block, setBlock] = useState("All blocks");
   const [category, setCategory] = useState("All Categories");
   const [query, setQuery] = useState("");
   const [fromDate, setFromDate] = useState("2025-06-16T08:00");
   const [toDate, setToDate] = useState("2025-06-16T18:00");
-  const rows = logRows.filter(row => row.accessCategory !== "Visitors" && (scope === "institution" ? row.institution === "Institution B" || assignedGuardNumbers.has(row.guardNumber) : (institution === "All institutions" || row.institution === institution)) && (block === "All blocks" || row.block === block) && (category === "All Categories" || recordCategory(reviews, row) === category) && row.dateTime >= fromDate && row.dateTime <= toDate && (!query || `${row.name} ${row.id} ${row.institution} ${row.department} ${row.guard}`.toLowerCase().includes(query.toLowerCase()))).sort((a, b) => b.dateTime.localeCompare(a.dateTime));
+
+  const blocksByInst: Record<string, string[]> = {
+    "Institution B": ["Main Gate", "Block A", "Block B", "Library Block", "Bharathi Hostel"],
+    "SRM GROUP OF INSTITUTIONS TRICHY": ["Main Gate", "Block A", "Block B", "Bharathi Hostel"],
+    "Institution A": ["North Gate", "Academic Block", "Science Block", "Auditorium"],
+    "Institution C": ["East Gate", "Engineering Block", "Admin Block", "Hostel Gate"],
+    "Institution D": ["South Gate", "Commerce Block", "Research Block", "Sports Block"],
+  };
+
+  const availableBlocks = institution === "All institutions"
+    ? ["All blocks", "Main Gate", "Block A", "Block B", "Library Block", "Bharathi Hostel", "North Gate", "East Gate", "South Gate"]
+    : ["All blocks", ...(blocksByInst[institution] || ["Main Gate", "Block A", "Block B"])];
+
+  const rows = logRows.filter(row =>
+    row.accessCategory !== "Visitors" &&
+    (scope === "institution"
+      ? row.institution === "Institution B" || row.institution.includes("TRICHY") || assignedGuardNumbers.has(row.guardNumber)
+      : (institution === "All institutions" || row.institution === institution || (institution === "Institution B" && row.institution.includes("TRICHY")))) &&
+    (block === "All blocks" || row.block === block) &&
+    (category === "All Categories" || recordCategory(reviews, row) === category) &&
+    row.dateTime >= fromDate && row.dateTime <= toDate &&
+    (!query || `${row.name} ${row.id} ${row.institution} ${row.department} ${row.guard}`.toLowerCase().includes(query.toLowerCase()))
+  ).sort((a, b) => b.dateTime.localeCompare(a.dateTime));
+
   return <>
     <TopBar title={scope === "institution" ? "Institution records" : "Campus records"} subtitle={scope === "institution" ? "Institution B · Read-only records" : "All institutions · Read-only"} back={() => go("home")} />
-    <div className="page-content"><div className="search-input"><Search size={17} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder={scope === "institution" ? "Search name, ID, department or security" : "Search person, institution or department"} />{query && <button onClick={() => setQuery("")}>Clear</button>}</div><section className="filter-panel admin-filters"><div className="filter-fields"><Field label="Institution"><select disabled={scope === "institution"} value={institution} onChange={event => setInstitution(event.target.value)}><option>All institutions</option>{institutions.map(item => <option key={item}>{item}</option>)}</select></Field><Field label="Block"><select value={block} onChange={event => setBlock(event.target.value)}><option>All blocks</option><option>Main Gate</option><option>Block A</option><option>Block B</option><option>Library Block</option><option>Bharathi Hostel</option></select></Field><Field label="Category"><select value={category} onChange={event => setCategory(event.target.value)}><option>All Categories</option><option>Authorized</option><option>Unauthorized</option><option>Revoked</option></select></Field></div></section><div className="date-filter admin-date"><label><CalendarDays size={15} /><span>From</span><input type="datetime-local" value={fromDate} onChange={event => setFromDate(event.target.value)} /></label><span>to</span><label><Clock3 size={15} /><span>To</span><input type="datetime-local" value={toDate} onChange={event => setToDate(event.target.value)} /></label></div><div className="entry-overview two-column"><div><strong>{rows.filter(row => recordCategory(reviews, row) === "Authorized").length}</strong><span>Authorized</span></div><div><strong>{rows.filter(row => recordCategory(reviews, row) === "Unauthorized").length}</strong><span>Unauthorized</span></div></div><div className="manager-log-count"><strong>{rows.length}</strong><span>matching records</span></div><AuditTable rows={rows} reviews={reviews} title="" plainNames />{rows.length === 0 && <div className="empty-state"><DoorOpen size={25} /><strong>No matching campus records</strong><span>Reset or change the filters.</span></div>}</div>
+    <div className="page-content">
+      <div className="search-input">
+        <Search size={17} />
+        <input value={query} onChange={event => setQuery(event.target.value)} placeholder={scope === "institution" ? "Search name, ID, department or security" : "Search person, institution or department"} />
+        {query && <button onClick={() => setQuery("")}>Clear</button>}
+      </div>
+      <section className="filter-panel admin-filters">
+        <div className="filter-fields">
+          <Field label="Institution">
+            <select
+              disabled={scope === "institution"}
+              value={institution}
+              onChange={event => {
+                setInstitution(event.target.value);
+                setBlock("All blocks");
+              }}
+            >
+              <option>All institutions</option>
+              {institutions.map(item => <option key={item}>{item}</option>)}
+            </select>
+          </Field>
+          <Field label="Block">
+            <select value={block} onChange={event => setBlock(event.target.value)}>
+              {availableBlocks.map(item => <option key={item}>{item}</option>)}
+            </select>
+          </Field>
+          <Field label="Category">
+            <select value={category} onChange={event => setCategory(event.target.value)}>
+              <option>All Categories</option>
+              <option>Authorized</option>
+              <option>Unauthorized</option>
+              <option>Revoked</option>
+            </select>
+          </Field>
+        </div>
+      </section>
+      <div className="date-filter admin-date">
+        <label><CalendarDays size={15} /><span>From</span><input type="datetime-local" value={fromDate} onChange={event => setFromDate(event.target.value)} /></label>
+        <span>to</span>
+        <label><Clock3 size={15} /><span>To</span><input type="datetime-local" value={toDate} onChange={event => setToDate(event.target.value)} /></label>
+      </div>
+      <div className="entry-overview two-column">
+        <div><strong>{rows.filter(row => recordCategory(reviews, row) === "Authorized").length}</strong><span>Authorized</span></div>
+        <div><strong>{rows.filter(row => recordCategory(reviews, row) === "Unauthorized").length}</strong><span>Unauthorized</span></div>
+      </div>
+      <div className="manager-log-count"><strong>{rows.length}</strong><span>matching records</span></div>
+      <AuditTable rows={rows} reviews={reviews} title="" plainNames fieldVisibility={fieldVisibility} />
+      {rows.length === 0 && <div className="empty-state"><DoorOpen size={25} /><strong>No matching campus records</strong><span>Reset or change the filters.</span></div>}
+    </div>
   </>;
 }
 
@@ -4009,6 +4173,127 @@ export default function App() {
   const [scanAttempts, setScanAttempts] = useState(0);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [biometricScores, setBiometricScores] = useState<Record<string, number> | null>(null);
+
+  // Dynamic students list with persistence
+  const [studentsList, setStudentsList] = useState<StudentMatch[]>(() => {
+    try {
+      const saved = localStorage.getItem("campus_secure_students");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return studentMatches;
+  });
+
+  // Audit logs state with persistence
+  const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>(() => {
+    try {
+      const saved = localStorage.getItem("campus_secure_audit_logs");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return DEFAULT_AUDIT_LOGS;
+  });
+
+  // Admin log field display visibility settings
+  const [adminLogFieldVisibility, setAdminLogFieldVisibility] = useState<LogFieldVisibility>(() => {
+    try {
+      const saved = localStorage.getItem("campus_secure_log_field_visibility");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return DEFAULT_LOG_FIELD_VISIBILITY;
+  });
+
+  // Admin-controlled Institute Manager edit permissions
+  const [managerEditPermissions, setManagerEditPermissions] = useState<ManagerEditPermissions>(() => {
+    try {
+      const saved = localStorage.getItem("campus_secure_manager_edit_permissions");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return DEFAULT_MANAGER_EDIT_PERMISSIONS;
+  });
+
+  const handleAddStudent = (newStudent: StudentMatch, auditLog: AuditLogItem) => {
+    setStudentsList(prev => {
+      const updated = [newStudent, ...prev];
+      try { localStorage.setItem("campus_secure_students", JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    studentMatches.unshift(newStudent);
+    setAuditLogs(prev => {
+      const updated = [auditLog, ...prev];
+      try { localStorage.setItem("campus_secure_audit_logs", JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+  };
+
+  const handleUpdateStudent = (updatedStudent: StudentMatch, auditLog: AuditLogItem) => {
+    setStudentsList(prev => {
+      const updated = prev.map(s => s.registerNumber === updatedStudent.registerNumber ? updatedStudent : s);
+      try { localStorage.setItem("campus_secure_students", JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    const idx = studentMatches.findIndex(s => s.registerNumber === updatedStudent.registerNumber);
+    if (idx !== -1) studentMatches[idx] = updatedStudent;
+    setAuditLogs(prev => {
+      const updated = [auditLog, ...prev];
+      try { localStorage.setItem("campus_secure_audit_logs", JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+  };
+
+  const handleBulkImportStudents = (newStudents: StudentMatch[], auditLog: AuditLogItem) => {
+    setStudentsList(prev => {
+      const regSet = new Set(newStudents.map(s => s.registerNumber));
+      const filtered = prev.filter(s => !regSet.has(s.registerNumber));
+      const updated = [...newStudents, ...filtered];
+      try { localStorage.setItem("campus_secure_students", JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    newStudents.forEach(s => {
+      const idx = studentMatches.findIndex(existing => existing.registerNumber === s.registerNumber);
+      if (idx !== -1) studentMatches[idx] = s;
+      else studentMatches.unshift(s);
+    });
+    setAuditLogs(prev => {
+      const updated = [auditLog, ...prev];
+      try { localStorage.setItem("campus_secure_audit_logs", JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+  };
+
+  const handleSaveFieldVisibility = (next: LogFieldVisibility) => {
+    setAdminLogFieldVisibility(next);
+    try { localStorage.setItem("campus_secure_log_field_visibility", JSON.stringify(next)); } catch (e) {}
+  };
+
+  const handleSaveManagerPermissions = (next: ManagerEditPermissions) => {
+    setManagerEditPermissions(next);
+    try { localStorage.setItem("campus_secure_manager_edit_permissions", JSON.stringify(next)); } catch (e) {}
+    const now = new Date();
+    const timeStr = now.toISOString().replace("T", " ").slice(0, 19);
+    const auditLog: AuditLogItem = {
+      id: `AUD-PERM-${Date.now()}`,
+      timestamp: timeStr,
+      dateTime: now.toISOString(),
+      actor: "Avery Williams",
+      actorRole: "Admin",
+      actorId: "ADM-0001",
+      action: "Access Permissions Updated",
+      target: "Institute Manager Role",
+      institution: "SRM GROUP OF INSTITUTIONS TRICHY",
+      block: "Campus Wide",
+      summary: "Admin updated field editing permissions for Institute Manager portal.",
+    };
+    setAuditLogs(prev => {
+      const updated = [auditLog, ...prev];
+      try { localStorage.setItem("campus_secure_audit_logs", JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+  };
   const [logs, setLogs] = useState<LogRecord[]>(() => {
     try {
       const saved = localStorage.getItem("campus_secure_custom_logs");
@@ -4427,7 +4712,7 @@ export default function App() {
     else if (screen === "scan") content = <LevelOneScan role={role} go={go} completeScan={completeScan} logs={logs} />;
     else if (screen === "logs") content = <Logs role={role} reviews={reviews} logs={logs} />;
     else if (screen === "unrecognized") content = <UnrecognizedResult role={role} go={go} verifyRegister={verifyRegister} capturedPhoto={capturedPhoto} biometricScores={biometricScores} />;
-    else if (screen === "identity") content = <IdentityResult role={role} go={go} identityCase={identityCase} verificationMethod={verificationMethod} student={matchedStudent} capturedPhoto={capturedPhoto} />;
+    else if (screen === "identity") content = <IdentityResult role={role} go={go} identityCase={identityCase} verificationMethod={verificationMethod} student={matchedStudent} capturedPhoto={capturedPhoto} fieldVisibility={adminLogFieldVisibility} />;
     else if (screen === "unauthorised") content = <UnauthorizedForm role={role} go={go} capturedPhoto={capturedPhoto} onRecordEvent={recordUnauthorizedEvent} />;
     else if (screen === "success") content = <Success role={role} go={go} />;
     else content = <LevelOneHome role={role} go={go} />;
@@ -4441,7 +4726,7 @@ export default function App() {
   } else if (role === "supervisor") {
     if (screen === "scan") content = <LevelOneScan role="supervisor" go={go} completeScan={completeScan} logs={logs} />;
     else if (screen === "unrecognized") content = <UnrecognizedResult role="supervisor" go={go} verifyRegister={verifyRegister} capturedPhoto={capturedPhoto} biometricScores={biometricScores} />;
-    else if (screen === "identity") content = <IdentityResult role="supervisor" go={go} identityCase={identityCase} verificationMethod={verificationMethod} student={matchedStudent} capturedPhoto={capturedPhoto} />;
+    else if (screen === "identity") content = <IdentityResult role="supervisor" go={go} identityCase={identityCase} verificationMethod={verificationMethod} student={matchedStudent} capturedPhoto={capturedPhoto} fieldVisibility={adminLogFieldVisibility} />;
     else if (screen === "unauthorised") content = <UnauthorizedForm role="supervisor" go={go} capturedPhoto={capturedPhoto} onRecordEvent={recordUnauthorizedEvent} />;
     else if (screen === "success") content = <Success role="supervisor" go={go} />;
     else if (screen === "assignments") content = <Assignments go={go} />;
@@ -4451,7 +4736,7 @@ export default function App() {
   } else if (role === "cso") {
     if (screen === "scan") content = <LevelOneScan role="cso" go={go} completeScan={completeScan} logs={logs} />;
     else if (screen === "unrecognized") content = <UnrecognizedResult role="cso" go={go} verifyRegister={verifyRegister} capturedPhoto={capturedPhoto} biometricScores={biometricScores} />;
-    else if (screen === "identity") content = <IdentityResult role="cso" go={go} identityCase={identityCase} verificationMethod={verificationMethod} student={matchedStudent} capturedPhoto={capturedPhoto} />;
+    else if (screen === "identity") content = <IdentityResult role="cso" go={go} identityCase={identityCase} verificationMethod={verificationMethod} student={matchedStudent} capturedPhoto={capturedPhoto} fieldVisibility={adminLogFieldVisibility} />;
     else if (screen === "unauthorised") content = <UnauthorizedForm role="cso" go={go} capturedPhoto={capturedPhoto} onRecordEvent={recordUnauthorizedEvent} />;
     else if (screen === "success") content = <Success role="cso" go={go} />;
     else if (screen === "assignments") content = <Assignments go={go} />;
@@ -4464,14 +4749,21 @@ export default function App() {
     if (screen === "welfare-logs") content = <WelfareBlockLogs reviews={reviews} />;
     else content = <WelfareHome go={go} />;
   } else if (role === "manager") {
-    if (screen === "campus-entries") content = <CampusEntries go={go} reviews={reviews} scope="institution" />;
+    if (screen === "manager-students") content = <ManagerStudentDirectory go={go} students={studentsList} onUpdateStudent={handleUpdateStudent} permissions={managerEditPermissions} />;
+    else if (screen === "add-student") content = <ManualAddStudent go={go} onAddStudent={handleAddStudent} />;
+    else if (screen === "campus-entries") content = <CampusEntries go={go} reviews={reviews} scope="institution" fieldVisibility={adminLogFieldVisibility} />;
     else if (screen === "institution-users") content = <InstitutionUserDirectory go={go} />;
+    else if (screen === "admin-audit-logs") content = <AuditLogsTable go={go} auditLogs={auditLogs} scope="institution" />;
     else content = <OversightHome role={role} go={go} />;
   } else if (role === "admin") {
     if (screen === "users") content = <UserAdministration go={go} />;
-    else if (screen === "campus-entries") content = <CampusEntries go={go} reviews={reviews} />;
+    else if (screen === "campus-entries") content = <CampusEntries go={go} reviews={reviews} fieldVisibility={adminLogFieldVisibility} />;
     else if (screen === "login-logs") content = <Worklog go={go} />;
     else if (screen === "assign-supervisor") content = <AssignSupervisor go={go} />;
+    else if (screen === "admin-bulk-students") content = <AdminBulkStudentImport go={go} onBulkImport={handleBulkImportStudents} />;
+    else if (screen === "admin-audit-logs") content = <AuditLogsTable go={go} auditLogs={auditLogs} scope="admin" />;
+    else if (screen === "admin-access-settings") content = <AdminAccessSettings go={go} fieldVisibility={adminLogFieldVisibility} onSaveFieldVisibility={handleSaveFieldVisibility} permissions={managerEditPermissions} onSavePermissions={handleSaveManagerPermissions} />;
+    else if (screen === "admin-securities") content = <AdminSecuritiesDirectory go={go} />;
     else content = <AdminHome go={go} />;
   } else {
     if (screen === "logs") content = <Logs role="students" reviews={reviews} logs={logs} />;
@@ -4479,7 +4771,7 @@ export default function App() {
     else content = <StudentAffairsHome go={go} />;
   }
 
-  const navScreens: Screen[] = ["home", "scan", "logs", "workload", "assignments", "audit", "users", "institution-users", "campus-entries", "login-logs", "visitor-pass", "pass-records", "welfare-logs"];
+  const navScreens: Screen[] = ["home", "scan", "logs", "workload", "assignments", "audit", "users", "institution-users", "campus-entries", "login-logs", "visitor-pass", "pass-records", "welfare-logs", "manager-students", "admin-audit-logs", "admin-access-settings", "admin-bulk-students", "admin-securities"];
   const showNav = screen !== "login" && (navScreens.includes(screen) || (role === "manager" && screen === "profile"));
   return <div className="app-shell"><Page role={role} active={screen} go={go} nav={showNav}>{content}</Page></div>;
 }
