@@ -152,18 +152,25 @@ type StudentMatch = {
   initials: string;
   name: string;
   registerNumber: string;
-  dateOfBirth: string;
+  dateOfBirth?: string;
   department: string;
   year: string;
   batch: string;
+  section?: string;
+  classCode?: string;
   institute: string;
   similarity: number;
   accommodationType: "Hosteller" | "Day Scholar";
   hostelName?: string;
   roomNumber?: string;
   transportationType?: "College Bus" | "Own Vehicle";
+  transport?: "College Bus" | "Own Vehicle";
   boardingPoint?: string;
   routeNumber?: string;
+  vehicleNumber?: string;
+  residentialLocation?: string;
+  location?: string;
+  areaOfResidence?: string;
   photo?: string;
 };
 
@@ -250,12 +257,33 @@ const studentMatches: StudentMatch[] = [
     dateOfBirth: "29 January 2004",
     department: "Computer Science & Engineering",
     year: "III",
+    section: "C",
     batch: "2022–2026",
     institute: "Easwari Engineering College",
     similarity: 98,
     accommodationType: "Day Scholar",
     transportationType: "Own Vehicle",
+    vehicleNumber: "TN-09-BK-4421",
+    residentialLocation: "Ramapuram, Chennai",
     photo: "/faces/thiru_crop.jpg",
+  },
+  {
+    initials: "IT",
+    name: "Karthik R",
+    registerNumber: "23IT1042",
+    dateOfBirth: "14 March 2005",
+    department: "Information Technology",
+    year: "II",
+    section: "C",
+    classCode: "IT-II-C",
+    batch: "2023–2027",
+    institute: "SRM GROUP OF INSTITUTIONS TRICHY",
+    similarity: 97,
+    accommodationType: "Day Scholar",
+    transportationType: "Own Vehicle",
+    vehicleNumber: "TN-45-AZ-9988",
+    residentialLocation: "Thillai Nagar, Trichy",
+    photo: "/faces/student_details/22ECE1001_crop.jpg",
   },
   {
     initials: "D1",
@@ -662,6 +690,49 @@ function formatRomanYearWithSuffix(yearRaw?: string): string {
   if (!yearRaw) return "II Year";
   const roman = yearRaw.replace(/year/gi, "").trim();
   return roman ? `${roman} Year` : yearRaw.trim();
+}
+
+function getStudentClass(student: { department?: string; registerNumber?: string; year?: string; section?: string; classCode?: string }): string {
+  if (student.classCode) return student.classCode;
+  
+  let deptCode = "GEN";
+  const dept = (student.department || "").trim();
+  const reg = (student.registerNumber || "").toUpperCase();
+  
+  if (/information technology|\bit\b/i.test(dept)) {
+    deptCode = "IT";
+  } else if (/computer science|\bcse\b/i.test(dept)) {
+    deptCode = "CSE";
+  } else if (/electronics|\bece\b/i.test(dept)) {
+    deptCode = "ECE";
+  } else if (/medicine|surgery|\bmbbs\b/i.test(dept)) {
+    deptCode = "MED";
+  } else if (/laboratory|technology|\bmlt\b|\bahs\b/i.test(dept)) {
+    deptCode = "MLT";
+  } else if (/mechanical|\bmech\b/i.test(dept)) {
+    deptCode = "MECH";
+  } else if (/nursing/i.test(dept)) {
+    deptCode = "NUR";
+  } else if (/physiotherapy|\bbpt\b/i.test(dept)) {
+    deptCode = "BPT";
+  } else {
+    const match = reg.match(/^[0-9]{2}([A-Za-z]+)/);
+    if (match && match[1]) {
+      deptCode = match[1].toUpperCase();
+    } else if (dept.length >= 2) {
+      deptCode = dept.slice(0, 3).toUpperCase();
+    }
+  }
+
+  let yr = (student.year || "II").replace(/year/gi, "").trim();
+  if (yr === "1" || yr === "First") yr = "I";
+  else if (yr === "2" || yr === "Second") yr = "II";
+  else if (yr === "3" || yr === "Third") yr = "III";
+  else if (yr === "4" || yr === "Fourth") yr = "IV";
+
+  const sec = student.section || "C";
+
+  return `${deptCode}-${yr}-${sec}`;
 }
 
 
@@ -1238,6 +1309,11 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role, c
               boardingPoint: data.bus_boarding_point,
               routeNumber: data.bus_route,
               dateOfBirth: data.date_of_birth,
+              transportationType: data.vehicle_number ? "Own Vehicle" : (data.bus_route ? "College Bus" : undefined),
+              vehicleNumber: data.vehicle_number,
+              residentialLocation: (data as any).residential_location,
+              section: (data as any).section,
+              classCode: (data as any).class_code,
             });
           }
         })
@@ -1265,6 +1341,10 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role, c
 
   const { displayYear, displayBatch } = formatYearBatch(activeStudent.year, activeStudent.batch);
   const profileYear = formatRomanYearWithSuffix(activeStudent.year);
+  const studentClass = getStudentClass(activeStudent);
+  const modeOfTransport = activeStudent.transportationType || activeStudent.transport;
+  const isOwnVehicle = modeOfTransport === "Own Vehicle" || Boolean(activeStudent.vehicleNumber);
+  const studentLocation = activeStudent.residentialLocation || activeStudent.location || activeStudent.areaOfResidence || (isTrichySRM ? "Thillai Nagar, Trichy" : "Ramapuram, Chennai");
 
   return <>
     <TopBar title="Identity verified" subtitle="Review before confirming" back={() => go(registerVerified ? "unrecognized" : "scan")} />
@@ -1311,7 +1391,7 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role, c
           <dl>
             <div><dt>Name</dt><dd>{activeStudent.name}</dd></div>
             <div><dt>Register Number</dt><dd>{activeStudent.registerNumber}</dd></div>
-            <div><dt>Date of Birth</dt><dd>{activeStudent.dateOfBirth}</dd></div>
+            <div><dt>Class</dt><dd>{studentClass}</dd></div>
             {role === "security" || role === "supervisor" || role === "cso" ? (
               <div><dt>Year & Department</dt><dd>{profileYear} · {activeStudent.department}</dd></div>
             ) : (
@@ -1329,11 +1409,20 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role, c
                 <div><dt>Room Number</dt><dd>{activeStudent.roomNumber}</dd></div>
               </>
             )}
-            {activeStudent.accommodationType === "Day Scholar" && (
+            {(activeStudent.accommodationType === "Day Scholar" || isOwnVehicle) && (
               <>
-                <div><dt>Transportation Type</dt><dd>{activeStudent.transportationType}</dd></div>
-                <div><dt>Boarding Point</dt><dd>{activeStudent.boardingPoint ?? "N/A"}</dd></div>
-                <div><dt>Route Number</dt><dd>{activeStudent.routeNumber ?? "N/A"}</dd></div>
+                <div><dt>Mode of Transport</dt><dd>{modeOfTransport || (isOwnVehicle ? "Own Vehicle" : "College Bus")}</dd></div>
+                {isOwnVehicle ? (
+                  <>
+                    <div><dt>Location</dt><dd>{studentLocation}</dd></div>
+                    {activeStudent.vehicleNumber && <div><dt>Vehicle Number</dt><dd>{activeStudent.vehicleNumber}</dd></div>}
+                  </>
+                ) : (
+                  <>
+                    <div><dt>Boarding Point</dt><dd>{activeStudent.boardingPoint ?? "N/A"}</dd></div>
+                    <div><dt>Route Number</dt><dd>{activeStudent.routeNumber ?? "N/A"}</dd></div>
+                  </>
+                )}
               </>
             )}
           </dl>
