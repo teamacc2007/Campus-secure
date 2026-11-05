@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import * as XLSX from "xlsx";
 import {
   AlertTriangle,
@@ -20,6 +20,7 @@ import {
   Filter,
   HeartHandshake,
   History,
+  Home,
   IdCard,
   ImagePlus,
   KeyRound,
@@ -156,7 +157,8 @@ export type Screen =
   | "admin-bulk-students"
   | "admin-audit-logs"
   | "admin-access-settings"
-  | "admin-securities";
+  | "admin-securities"
+  | "accommodation-details";
 
 export type AuthorizedFaceProfile = {
   id: string;
@@ -182,23 +184,37 @@ export type StudentMatch = {
   classCode?: string;
   institute: string;
   similarity: number;
-  accommodationType: "Hosteller" | "Day Scholar";
+  accommodationType: "Hosteller" | "Day Scholar" | "PG";
   hostelName?: string;
+  hostelBlock?: string;
   roomNumber?: string;
-  transportationType?: "College Bus" | "Own Vehicle";
+  hostelAddress?: string;
+  pgName?: string;
+  pgAddress?: string;
+  pgContact?: string;
+  distanceFromCampus?: string;
+  residentialAddress?: string;
+  contactNumber?: string;
+  phoneNumber?: string;
+  transportationType?: "College Bus" | "Own Vehicle" | "Other";
   transport?: "College Bus" | "Own Vehicle";
   boardingPoint?: string;
   routeNumber?: string;
+  vehicleType?: string;
   vehicleNumber?: string;
+  transportDescription?: string;
   residentialLocation?: string;
   location?: string;
   areaOfResidence?: string;
+  accommodationNotes?: string;
+  residenceUpdatedAt?: string;
+  residenceUpdatedBy?: string;
   photo?: string;
 };
 
 const roleMeta: Record<Role, { label: string; name: string; initials: string; scope: string; guardNumber?: string; supervisorNumber?: string; phoneNumber?: string }> = {
   security: { label: "Security", name: "Arun Kumar", initials: "AK", scope: "Main Gate · Institution B", guardNumber: "GRD-B-0017", phoneNumber: "+91 98765 43210" },
-  warden: { label: "Hostel Warden", name: "Lakshmi Iyer", initials: "LI", scope: "Bharathi Hostel · Institution B", phoneNumber: "+91 98765 40518" },
+  warden: { label: "Warden", name: "Lakshmi Iyer", initials: "LI", scope: "Bharathi Hostel · Institution B", guardNumber: "WRD-B-0011", phoneNumber: "+91 98765 40518" },
   staff: { label: "Staff", name: "Vijay Nair", initials: "VN", scope: "Block A · Institution B", phoneNumber: "+91 98765 40624" },
   supervisor: { label: "Campus Supervisor", name: "Meera Nair", initials: "MN", scope: "Institution B Campus", supervisorNumber: "SUP-B-0004", phoneNumber: "+91 98765 40128" },
   "access-supervisor": { label: "Access Supervisor", name: "Arun Sharma", initials: "AS", scope: "Main Gate · College Campus", supervisorNumber: "ACS-B-0012", phoneNumber: "+91 98765 40812" },
@@ -211,7 +227,7 @@ const roleMeta: Record<Role, { label: string; name: string; initials: string; sc
 
 const roleIcons: Record<Role, ReactNode> = {
   security: <ShieldCheck size={21} />,
-  warden: <Building2 size={21} />,
+  warden: <ShieldCheck size={21} />,
   staff: <IdCard size={21} />,
   supervisor: <UserCog size={21} />,
   "access-supervisor": <TicketCheck size={21} />,
@@ -239,6 +255,7 @@ const studentMatches: StudentMatch[] = [
     accommodationType: "Hosteller",
     hostelName: "Bharathi Hostel",
     roomNumber: "B-204",
+    phoneNumber: "+91 98765 12041",
     photo: "/faces/sur_crop.jpg",
   },
   {
@@ -255,6 +272,7 @@ const studentMatches: StudentMatch[] = [
     transportationType: "College Bus",
     boardingPoint: "Trichy Central Junction",
     routeNumber: "M-14",
+    phoneNumber: "+91 98765 12185",
     photo: "/faces/mon_crop.jpg",
   },
   {
@@ -270,6 +288,7 @@ const studentMatches: StudentMatch[] = [
     accommodationType: "Hosteller",
     hostelName: "Cauvery Hostel",
     roomNumber: "C-312",
+    phoneNumber: "+91 98765 12531",
     photo: "/faces/mith_crop.jpg",
   },
   {
@@ -287,6 +306,7 @@ const studentMatches: StudentMatch[] = [
     transportationType: "Own Vehicle",
     vehicleNumber: "TN-09-BK-4421",
     residentialLocation: "Ramapuram, Chennai",
+    phoneNumber: "+91 98765 12789",
     photo: "/faces/thiru_crop.jpg",
   },
   {
@@ -515,9 +535,9 @@ function BottomNav({ role, active, go }: { role: Role; active: Screen; go: (scre
       { screen: "alerts", label: "Alerts", icon: <Bell size={20} /> },
     ],
     warden: [
-      { screen: "home", label: "Overview", icon: <Building2 size={20} /> },
-      { screen: "scan", label: "Identify", icon: <ScanFace size={20} /> },
-      { screen: "logs", label: "Logs", icon: <FileClock size={20} /> },
+      { screen: "home", label: "Overview", icon: <Shield size={20} /> },
+      { screen: "scan", label: "Scan", icon: <ScanFace size={20} /> },
+      { screen: "alerts", label: "Alerts", icon: <Bell size={20} /> },
     ],
     staff: [
       { screen: "home", label: "Overview", icon: <IdCard size={20} /> },
@@ -530,6 +550,7 @@ function BottomNav({ role, active, go }: { role: Role; active: Screen; go: (scre
       { screen: "assignments", label: "Security", icon: <UserCog size={20} /> },
       { screen: "scan", label: "Scan", icon: <ScanFace size={20} /> },
       { screen: "audit", label: "Records", icon: <FileClock size={20} /> },
+      { screen: "alerts", label: "Alerts", icon: <Bell size={20} /> },
     ],
     "access-supervisor": [
       { screen: "home", label: "Overview", icon: <Shield size={20} /> },
@@ -616,7 +637,7 @@ function Login({ enter, go }: { enter: (role: Role) => void; go: (screen: Screen
     "institute manager": "manager",
     "institute-manager": "manager",
   };
-  const signIn = () => {
+  const signIn = async () => {
     if (!username.trim() || !password) {
       setError(!username.trim() ? "Username is required." : "Password is required.");
       return;
@@ -627,6 +648,21 @@ function Login({ enter, go }: { enter: (role: Role) => void; go: (screen: Screen
       return;
     }
     setError("");
+    try {
+      const res = await fetch("http://localhost:8000/api/v1/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: username.trim().toLowerCase(), password }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.access_token) {
+          localStorage.setItem("campus_token", data.access_token);
+        }
+      }
+    } catch (e) {
+      // offline/fallback
+    }
     enter(matchedRole);
   };
   return <main className="phone-page login-page">
@@ -655,10 +691,10 @@ function Login({ enter, go }: { enter: (role: Role) => void; go: (screen: Screen
 function LevelOneHome({ role, go }: { role: "security" | "warden" | "staff"; go: (screen: Screen) => void }) {
   const isSecurity = role === "security";
   const isWarden = role === "warden";
-  const portalTitle = isSecurity ? "Security Portal" : isWarden ? "Hostel Warden Portal" : "Staff Portal";
-  const heading = isWarden ? "Verify a resident" : "Verify a person";
-  const actionTitle = isWarden ? "Identify resident" : "Scan person";
-  const actionCopy = isWarden ? "" : isSecurity ? "Capture face and verify campus identity" : "Identify a person for your assigned duty";
+  const portalTitle = isSecurity ? "Security Portal" : isWarden ? "Warden Portal" : "Staff Portal";
+  const heading = "Verify a person";
+  const actionTitle = "Scan person";
+  const actionCopy = "Capture face and verify campus identity";
   return <>
     <TopBar title="Campus Secure" subtitle={portalTitle} action={<Status tone="green">On duty</Status>} />
     <div className="page-content"><ProfileHead role={role} go={go} />
@@ -965,15 +1001,15 @@ function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) =
           ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
           capturedDataUrl = canvas.toDataURL("image/jpeg", 0.90);
 
-          if (role === "security" || role === "supervisor" || role === "cso") {
+          if (role === "security" || role === "warden" || role === "supervisor" || role === "cso") {
             try {
               const resp = await fetch("http://localhost:8000/api/v1/ai/verify-face", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   image_base64: capturedDataUrl,
-                  location_block: (role === "supervisor" || role === "cso") ? "Institution B Campus" : "Gate 1 Main Entrance",
-                  guard_name: role === "cso" ? roleMeta.cso.name : role === "supervisor" ? (roleMeta.supervisor.name || "Meera Nair") : "G. Selvam",
+                  location_block: (role === "supervisor" || role === "cso") ? "Institution B Campus" : role === "warden" ? "Bharathi Hostel" : "Gate 1 Main Entrance",
+                  guard_name: role === "warden" ? roleMeta.warden.name : role === "cso" ? roleMeta.cso.name : role === "supervisor" ? (roleMeta.supervisor.name || "Meera Nair") : "G. Selvam",
                 }),
               });
               if (resp.ok) {
@@ -1090,15 +1126,15 @@ function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) =
         let match: StudentMatch | null = null;
         let scores: Record<string, number> | null = null;
 
-        if (role === "security" || role === "supervisor" || role === "cso") {
+        if (role === "security" || role === "warden" || role === "supervisor" || role === "cso") {
           try {
             const resp = await fetch("http://localhost:8000/api/v1/ai/verify-face", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 image_base64: dataUrl,
-                location_block: (role === "supervisor" || role === "cso") ? "Institution B Campus" : "Gate 1 Main Entrance",
-                guard_name: role === "cso" ? roleMeta.cso.name : role === "supervisor" ? (roleMeta.supervisor.name || "Meera Nair") : "G. Selvam",
+                location_block: (role === "supervisor" || role === "cso") ? "Institution B Campus" : role === "warden" ? "Bharathi Hostel" : "Gate 1 Main Entrance",
+                guard_name: role === "warden" ? roleMeta.warden.name : role === "cso" ? roleMeta.cso.name : role === "supervisor" ? (roleMeta.supervisor.name || "Meera Nair") : "G. Selvam",
               }),
             });
             if (resp.ok) {
@@ -1208,7 +1244,7 @@ function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) =
   }
 
   return <>
-    <TopBar title={role === "warden" ? "Resident verification" : "Face verification"} subtitle={location} back={() => {
+    <TopBar title="Face verification" subtitle={location} back={() => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
@@ -1376,8 +1412,8 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role, c
       <div className="progress-line"><span className="done"><Check size={12} /></span><i className="done" /><span className="active">2</span><i /><span>3</span></div>
       <section className="identity-hero">
         <div className={`captured-photo ${staff ? "staff-photo" : ""}`}>
-          {(capturedPhoto && (verificationMethod === "register" || role === "security" || role === "supervisor" || role === "cso")) || activeStudent.photo ? (
-            <img src={(capturedPhoto && (verificationMethod === "register" || role === "security" || role === "supervisor" || role === "cso")) ? capturedPhoto : activeStudent.photo} alt={personName} className="captured-real-photo" />
+          {(capturedPhoto && (verificationMethod === "register" || role === "security" || role === "warden" || role === "supervisor" || role === "cso")) || activeStudent.photo ? (
+            <img src={(capturedPhoto && (verificationMethod === "register" || role === "security" || role === "warden" || role === "supervisor" || role === "cso")) ? capturedPhoto : activeStudent.photo} alt={personName} className="captured-real-photo" />
           ) : (
             <CircleUserRound size={48} />
           )}
@@ -1495,9 +1531,7 @@ function UnrecognizedResult({ go, verifyRegister, role, capturedPhoto, biometric
     .filter(match => match.similarity >= 60)
     .sort((a, b) => b.similarity - a.similarity);
 
-  const visibleMatches = role === "warden"
-    ? candidateList.filter(match => match.institute.includes("Trichy") && match.hostelName === "Bharathi Hostel")
-    : candidateList;
+  const visibleMatches = candidateList;
 
   const verify = async () => {
     const success = await verifyRegister(registerNumber);
@@ -2426,6 +2460,13 @@ type LogRecord = {
   entries?: number;
   decision: "Authorised" | "Denied" | "Pending review";
   photo?: string;
+  actionTaken?: string;
+  reviewActions?: ReviewAction[];
+  reviewStatus?: ReviewStatus;
+  reviewedBy?: string;
+  reviewedByNumber?: string;
+  reviewedByRole?: string;
+  reviewedAt?: string;
 };
 
 const logRows: LogRecord[] = [
@@ -2445,13 +2486,152 @@ const logRows: LogRecord[] = [
 
 const assignedGuardNumbers = new Set(["GRD-B-0017", "GRD-B-0031", "GRD-B-0038", "GRD-B-0044", "GRD-B-0052", "SG-101", "SG-102", "SG-103", "SG-104"]);
 const recordKey = (row: LogRecord) => row.logId ?? `${row.name}-${row.dateTime}`;
-const reviewFor = (reviews: Record<string, ReviewRecord>, row: LogRecord): ReviewRecord =>
-  reviews[recordKey(row)] ?? { status: "Pending Verification", actions: [] };
+const reviewFor = (reviews: Record<string, ReviewRecord>, row: LogRecord): ReviewRecord => {
+  const rev = reviews[recordKey(row)];
+  if (rev && rev.actions && rev.actions.length > 0) return rev;
+  if (row.reviewActions && row.reviewActions.length > 0) {
+    return {
+      status: (row.reviewStatus as ReviewStatus) || (row.decision === "Authorised" ? "Authorised" : "Unauthorised"),
+      actions: row.reviewActions,
+    };
+  }
+  return rev ?? { status: (row.reviewStatus as ReviewStatus) ?? "Pending Verification", actions: [] };
+};
 const reviewTone = (status: ReviewStatus) => status === "Verified" || status === "Authorised" || status === "Revoked" ? "green" : status === "Unauthorised" ? "red" : "amber";
 const recordCategory = (reviews: Record<string, ReviewRecord>, row: LogRecord) =>
   reviewFor(reviews, row).status === "Revoked" ? "Revoked" : row.accessCategory;
 const latestRevocation = (reviews: Record<string, ReviewRecord>, row: LogRecord) =>
   [...reviewFor(reviews, row).actions].reverse().find(action => action.type === "Revoked");
+
+export function getActionTaken(reviews: Record<string, ReviewRecord>, row: LogRecord): string {
+  const rev = reviewFor(reviews, row);
+  const actions = rev.actions || [];
+  const lastAction = [...actions].reverse().find(a =>
+    a.type === "Unauthorised" || a.type === "Authorised" || a.type === "Verified" || a.type === "Revoked"
+  );
+
+  const status = rev.status;
+  const isUnauth = status === "Unauthorised" || row.decision === "Denied" || row.event === "Denied" || row.accessCategory === "Unauthorized";
+  const isAuth = status === "Authorised" || status === "Verified" || row.decision === "Authorised";
+
+  if (isUnauth) {
+    const text = lastAction?.action_taken || lastAction?.reason || row.actionTaken;
+    if (text && text.trim()) {
+      const lower = text.trim().toLowerCase();
+      if (!lower.startsWith("flagged at entry") && !lower.includes("face recognition score")) {
+        return text.trim();
+      }
+    }
+    if (row.guardNotes && row.guardNotes.trim()) {
+      const lowerNotes = row.guardNotes.trim().toLowerCase();
+      if (
+        !lowerNotes.includes("face recognition score") &&
+        !lowerNotes.startsWith("flagged at entry gate") &&
+        !lowerNotes.startsWith("identity could not be verified")
+      ) {
+        return row.guardNotes.trim();
+      }
+    }
+    return "Not Available";
+  }
+
+  if (isAuth) {
+    const text = lastAction?.action_taken || lastAction?.reason || row.actionTaken;
+    if (text && text.trim()) {
+      const lower = text.trim().toLowerCase();
+      if (!lower.includes("face recognition score") && !lower.startsWith("flagged at entry")) {
+        return text.trim();
+      }
+    }
+    return "—";
+  }
+
+  if (status === "Revoked") {
+    const revAction = [...actions].reverse().find(a => a.type === "Revoked");
+    return revAction?.reason || "Revoked by supervisor";
+  }
+
+  return "—";
+}
+
+export function getDecisionDetails(reviews: Record<string, ReviewRecord>, row: LogRecord) {
+  const rev = reviewFor(reviews, row);
+  const actions = rev.actions || [];
+  const decisionAction = [...actions].reverse().find(a =>
+    a.type === "Unauthorised" || a.type === "Authorised" || a.type === "Verified" || a.type === "Revoked"
+  );
+
+  if (!decisionAction) {
+    if (row.reviewedBy) {
+      return {
+        actor: row.reviewedBy,
+        actorNumber: row.reviewedByNumber || "—",
+        role: row.reviewedByRole || "Campus Supervisor",
+        timestamp: row.reviewedAt || row.dateTime.replace("T", " "),
+        actionTaken: getActionTaken(reviews, row),
+      };
+    }
+    return null;
+  }
+
+  let roleTitle = "Campus Supervisor";
+  const num = decisionAction.actorNumber || decisionAction.supervisor_id || "";
+  const name = decisionAction.actor || decisionAction.supervisor_name || "";
+  if (num.startsWith("CSO") || name.includes("CSO") || (decisionAction as any).supervisor_id?.startsWith("CSO")) {
+    roleTitle = "CSO";
+  } else if (num.startsWith("SUP") || name.includes("Supervisor")) {
+    roleTitle = "Campus Supervisor";
+  } else if (num.startsWith("WRD") || name.includes("Warden")) {
+    roleTitle = "Hostel Warden";
+  }
+
+  return {
+    actor: decisionAction.actor || decisionAction.supervisor_name || decisionAction.decision_made_by || "Campus Supervisor",
+    actorNumber: decisionAction.actorNumber || decisionAction.supervisor_id || "—",
+    role: roleTitle,
+    timestamp: decisionAction.decision_timestamp || decisionAction.timestamp || "—",
+    actionTaken: getActionTaken(reviews, row),
+  };
+}
+
+export function exportRecordsToCsv(rows: LogRecord[], reviews: Record<string, ReviewRecord>) {
+  const headers = ["S.No", "Name", "Reg No", "Department", "Institution", "Year", "Category", "Accommodation", "Status", "Date & Time", "Location", "Security Officer", "Action Taken", "Decision Made By", "Decision Date & Time"];
+  const csvRows = [headers.join(",")];
+  rows.forEach((row, index) => {
+    const rev = reviewFor(reviews, row);
+    const category = recordCategory(reviews, row);
+    const actionTaken = getActionTaken(reviews, row);
+    const dec = getDecisionDetails(reviews, row);
+    const decBy = dec ? `"${dec.actor} (${dec.role} · ${dec.actorNumber})"` : '"—"';
+    const decTime = dec ? `"${dec.timestamp}"` : '"—"';
+    const line = [
+      index + 1,
+      `"${(row.name || "").replace(/"/g, '""')}"`,
+      `"${(row.id || "—").replace(/"/g, '""')}"`,
+      `"${(row.department || "—").replace(/"/g, '""')}"`,
+      `"${(row.institution || "—").replace(/"/g, '""')}"`,
+      `"${(row.year || "—").replace(/"/g, '""')}"`,
+      `"${category}"`,
+      `"${(accommodationOf(row) || "—").replace(/"/g, '""')}"`,
+      `"${rev.status}"`,
+      `"${row.dateTime}"`,
+      `"${(row.block || "").replace(/"/g, '""')}"`,
+      `"${(row.guard || "")} (${row.guardNumber || ""})"`,
+      `"${actionTaken.replace(/"/g, '""')}"`,
+      decBy,
+      decTime,
+    ];
+    csvRows.push(line.join(","));
+  });
+  const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", `campus_records_${new Date().toISOString().slice(0, 10)}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
 
 const missingValues = ["", "not available", "not identified", "unknown", "n/a", "null", "undefined", "—", "-"];
 const logValue = (value?: string | null) => (value && !missingValues.includes(value.trim().toLowerCase()) ? value : "-");
@@ -2466,37 +2646,209 @@ function AuditTable({ rows, reviews, title = "AUDIT LOG", hideCommonInfo = false
   const review = selected ? reviewFor(reviews, selected) : null;
   const revocation = selected ? latestRevocation(reviews, selected) : undefined;
   const isRevoked = review?.status === "Revoked";
-  return <>{title && <div className="list-label">{rows.length} RECORDS · {title}</div>}<div className="audit-table-wrap"><table className="audit-table"><thead><tr><th>S.No</th><th>Name</th><th>Reg No</th><th>Dept</th><th>Institute</th><th>Year</th><th>Category</th><th>Accommodation</th></tr></thead><tbody>{rows.map((row, index) => { const rowReview = reviewFor(reviews, row); const category = recordCategory(reviews, row); return <tr key={`${row.name}${row.time}`} onClick={() => setSelected(row)}><td>{index + 1}</td><td><strong>{logValue(row.name)}</strong>{!plainNames && <div className="record-badges"><Status tone={row.tone}>{row.event}</Status><Status tone={category === "Authorized" || category === "Revoked" ? "green" : category === "Visitors" ? "amber" : "red"}>{category}</Status><Status tone={reviewTone(rowReview.status)}>{rowReview.status}</Status></div>}</td><td>{logValue(row.id)}</td><td>{logValue(row.department)}</td><td>{logValue(row.institution)}</td><td>{logValue(row.year?.replace("Year ", ""))}</td><td>{category}</td><td>{logValue(accommodationOf(row))}</td></tr>; })}</tbody></table></div>{selected && <section className="audit-profile log-details-panel"><div className="audit-profile-head"><div className="captured-photo small-capture"><CircleUserRound size={38} /><span>{isRevoked ? "Entry capture" : `Entry capture · ${selected.time}`}</span></div><div><span>{personCategory.toUpperCase()} LOG DETAILS</span><h2>{selected.name}</h2>{!isRevoked && <p>{logValue(selected.id)} · {logValue(selected.institution)}</p>}</div><button onClick={() => setSelected(null)} aria-label="Close log details"><X size={18} /></button></div>
-    {isRevoked && <><div className="audit-detail-section"><div className="audit-detail-title">VISIT DETAILS</div><dl><div><dt>Reason to visit</dt><dd>{selected.visitPurpose ?? selected.guardNotes ?? "Not recorded"}</dd></div>{selected.hostName && <div><dt>Person to meet</dt><dd>{selected.hostName}</dd></div>}</dl></div><div className="audit-detail-section revocation-details revoked-priority"><div className="audit-detail-title">REVOCATION DETAILS</div><dl><div><dt>Reason for revocation by supervisor</dt><dd>{revocation?.reason ?? "Not recorded"}</dd></div></dl></div></>}
-    {!isRevoked && <div className="audit-detail-section"><div className="audit-detail-title">{personCategory.toUpperCase()} DETAILS</div>
-      <dl>
-        <div><dt>S.No</dt><dd>{rows.indexOf(selected) + 1}</dd></div>
-        {!isRevoked && (fieldVisibility.name !== false) && <div><dt>Name</dt><dd>{logValue(selected.name)}</dd></div>}
-        {selected.id && logValue(selected.id) !== "-" && (fieldVisibility.registerNumber !== false) && <div><dt>{selected.personType === "Student" ? "Register number" : "ID number"}</dt><dd>{selected.id}</dd></div>}
-        {selected.rollNumber && <div><dt>Roll number</dt><dd>{selected.rollNumber}</dd></div>}
-        {selected.department && logValue(selected.department) !== "-" && (fieldVisibility.department !== false) && <div><dt>Department</dt><dd>{selected.department}</dd></div>}
-        {knownInstitution && (fieldVisibility.institute !== false) && <div><dt>Institute</dt><dd>{selected.institution}</dd></div>}
-        {selected.year && (fieldVisibility.year !== false) && <div><dt>Year</dt><dd>{selected.year.replace("Year ", "")}</dd></div>}
-        {selected.batch && (fieldVisibility.batch !== false) && <div><dt>Batch</dt><dd>{selected.batch}</dd></div>}
-        <div><dt>Category</dt><dd>{recordCategory(reviews, selected)}</dd></div>
-        {accommodationOf(selected) && (fieldVisibility.accommodationType !== false) && <div><dt>Accommodation</dt><dd>{accommodationOf(selected)}</dd></div>}
-        {selected.hostName && <div><dt>Person to meet</dt><dd>{selected.hostName}</dd></div>}
-        {!isRevoked && selected.visitPurpose && <div><dt>Purpose of visit</dt><dd>{selected.visitPurpose}</dd></div>}
-        {selected.phoneNumber && <div><dt>Phone number</dt><dd>{selected.phoneNumber}</dd></div>}
-        {selected.hostel && (fieldVisibility.hostelName !== false) && <div><dt>Hostel</dt><dd>{selected.hostel}</dd></div>}
-        {selected.room && (fieldVisibility.roomNumber !== false) && <div><dt>Room</dt><dd>{selected.room}</dd></div>}
-        {selected.transport && (fieldVisibility.transportationType !== false) && <div><dt>Transport</dt><dd>{selected.transport}</dd></div>}
-        {selected.pickup && (fieldVisibility.boardingPoint !== false) && <div><dt>Pickup point</dt><dd>{selected.pickup}</dd></div>}
-        {selected.routeNumber && (fieldVisibility.routeNumber !== false) && <div><dt>Route number</dt><dd>{selected.routeNumber}</dd></div>}
-        {selected.vehicleNumber && (fieldVisibility.vehicleNumber !== false) && <div><dt>Vehicle number</dt><dd>{selected.vehicleNumber}</dd></div>}
-        {!isRevoked && selected.guardNotes && <div><dt>Reason</dt><dd>{selected.guardNotes}</dd></div>}
-        {isRevoked && revocation && <><div><dt>Revoked by</dt><dd>{revocation.actor} · {revocation.actorNumber}</dd></div><div><dt>Revoked at</dt><dd>{revocation.timestamp}</dd></div></>}
-      </dl>
-    </div>}
-    {!isRevoked && revocation && <div className="audit-detail-section revocation-details"><div className="audit-detail-title">REVOCATION DETAILS</div><dl><div><dt>Reason <b>*</b></dt><dd>{revocation.reason}</dd></div><div><dt>Supervisor comments</dt><dd>{revocation.reason}</dd></div><div><dt>Revoked by</dt><dd>{revocation.actor} · {revocation.actorNumber}</dd></div><div><dt>Revoked at</dt><dd>{revocation.timestamp}</dd></div></dl></div>}
-    {!isRevoked && !hideCommonInfo && <div className="audit-detail-section"><div className="audit-detail-title">ORIGINAL SECURITY EVENT</div><dl>{selected.logId && <div><dt>Log ID / Reference Number</dt><dd>{selected.logId}</dd></div>}<div><dt>Person Category</dt><dd>{personCategory}</dd></div><div><dt>Original Event Category</dt><dd>{selected.accessCategory}</dd></div><div><dt>Security Decision</dt><dd>{authorizationStatus}</dd></div><div><dt>Entry or Exit Event</dt><dd>{selected.event}</dd></div><div><dt>Date</dt><dd>{selected.dateTime.slice(0, 10)}</dd></div><div><dt>Timestamp</dt><dd>{selected.dateTime.replace("T", " ")}</dd></div>{knownInstitution && <div><dt>Institution</dt><dd>{selected.institution}</dd></div>}<div><dt>Assigned Gate / Location</dt><dd>{selected.block} · {knownInstitution ? selected.institution : "Institution B"}</dd></div><div><dt>Security Name / Number</dt><dd>{recordedBy}</dd></div></dl></div>}
-    {!isRevoked && review && (review.status !== "Pending Verification" || selected.accessCategory === "Unauthorized") && <div className="audit-detail-section"><div className="audit-detail-title">SUPERVISOR REVIEW & AUDIT HISTORY</div><div className="review-current"><span>Current verification status</span><Status tone={reviewTone(review.status)}>{review.status}</Status></div><div className="history-list"><div><i><Shield size={13} /></i><p><strong>Original event created</strong><span>{selected.guard} · {selected.guardNumber}</span><small>{selected.dateTime.replace("T", " ")} · {selected.block}</small></p></div>{review.actions.map((action, index) => <div key={`${action.type}${action.timestamp}${index}`}><i className={action.type === "Unauthorised" ? "danger-history" : ""}>{action.type === "Verified" || action.type === "Revoked" ? <Check size={13} /> : <ShieldAlert size={13} />}</i><p><strong>Record {action.type.toLowerCase()}</strong><span>{action.actor} · {action.actorNumber}</span><small>{action.timestamp}{action.reason ? ` · Reason: ${action.reason}` : ""}</small></p></div>)}</div></div>}
-    {!isRevoked && <div className="capture-note"><Camera size={14} />Photograph captured with this log record.</div>}</section>}</>;
+  return <>
+    {title && <div className="list-label">{rows.length} RECORDS · {title}</div>}
+    <div className="audit-table-wrap">
+      <table className="audit-table">
+        <thead>
+          <tr>
+            <th>S.No</th>
+            <th>Name</th>
+            <th>Reg No</th>
+            <th>Dept</th>
+            <th>Institute</th>
+            <th>Year</th>
+            <th>Category</th>
+            <th>Accommodation</th>
+            <th>Action Taken</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => {
+            const rowReview = reviewFor(reviews, row);
+            const category = recordCategory(reviews, row);
+            const actionTakenText = getActionTaken(reviews, row);
+            return (
+              <tr key={`${row.name}${row.time}${index}`} onClick={() => setSelected(row)}>
+                <td>{index + 1}</td>
+                <td>
+                  <strong>{logValue(row.name)}</strong>
+                  {!plainNames && (
+                    <div className="record-badges">
+                      <Status tone={row.tone}>{row.event}</Status>
+                      <Status tone={category === "Authorized" || category === "Revoked" ? "green" : category === "Visitors" ? "amber" : "red"}>{category}</Status>
+                      <Status tone={reviewTone(rowReview.status)}>{rowReview.status}</Status>
+                    </div>
+                  )}
+                </td>
+                <td>{logValue(row.id)}</td>
+                <td>{logValue(row.department)}</td>
+                <td>{logValue(row.institution)}</td>
+                <td>{logValue(row.year?.replace("Year ", ""))}</td>
+                <td>{category}</td>
+                <td>{logValue(accommodationOf(row))}</td>
+                <td className="action-taken-cell" title={actionTakenText}>{actionTakenText}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+    {selected && (
+      <section className="audit-profile log-details-panel">
+        <div className="audit-profile-head">
+          <div className="captured-photo small-capture">
+            <CircleUserRound size={38} />
+            <span>{isRevoked ? "Entry capture" : `Entry capture · ${selected.time}`}</span>
+          </div>
+          <div>
+            <span>{personCategory.toUpperCase()} LOG DETAILS</span>
+            <h2>{selected.name}</h2>
+            {!isRevoked && <p>{logValue(selected.id)} · {logValue(selected.institution)}</p>}
+          </div>
+          <button onClick={() => setSelected(null)} aria-label="Close log details">
+            <X size={18} />
+          </button>
+        </div>
+
+        {!isRevoked && (
+          <div className="audit-detail-section supervisor-review-highlight">
+            <div className="audit-detail-title">SUPERVISOR / CSO DECISION & ACTION TAKEN</div>
+            <dl>
+              <div><dt>Current Verification Status</dt><dd><Status tone={reviewTone(review?.status || "Pending Verification")}>{review?.status || "Pending Verification"}</Status></dd></div>
+              <div><dt>Action Taken</dt><dd className="action-taken-detail"><strong>{getActionTaken(reviews, selected)}</strong></dd></div>
+              {(() => {
+                const dec = getDecisionDetails(reviews, selected);
+                if (dec) {
+                  return (
+                    <>
+                      <div><dt>Decision Made By</dt><dd>{dec.actor} ({dec.role} · {dec.actorNumber})</dd></div>
+                      <div><dt>Decision Date & Time</dt><dd>{dec.timestamp}</dd></div>
+                    </>
+                  );
+                }
+                return <div><dt>Decision Status</dt><dd>Pending Review</dd></div>;
+              })()}
+            </dl>
+          </div>
+        )}
+
+        {isRevoked && (
+          <>
+            <div className="audit-detail-section">
+              <div className="audit-detail-title">VISIT DETAILS</div>
+              <dl>
+                <div><dt>Reason to visit</dt><dd>{selected.visitPurpose ?? selected.guardNotes ?? "Not recorded"}</dd></div>
+                {selected.hostName && <div><dt>Person to meet</dt><dd>{selected.hostName}</dd></div>}
+              </dl>
+            </div>
+            <div className="audit-detail-section revocation-details revoked-priority">
+              <div className="audit-detail-title">REVOCATION DETAILS</div>
+              <dl>
+                <div><dt>Reason for revocation by supervisor</dt><dd>{revocation?.reason ?? "Not recorded"}</dd></div>
+              </dl>
+            </div>
+          </>
+        )}
+
+        {!isRevoked && (
+          <div className="audit-detail-section">
+            <div className="audit-detail-title">{personCategory.toUpperCase()} DETAILS</div>
+            <dl>
+              <div><dt>S.No</dt><dd>{rows.indexOf(selected) + 1}</dd></div>
+              {!isRevoked && (fieldVisibility.name !== false) && <div><dt>Name</dt><dd>{logValue(selected.name)}</dd></div>}
+              {selected.id && logValue(selected.id) !== "-" && (fieldVisibility.registerNumber !== false) && <div><dt>{selected.personType === "Student" ? "Register number" : "ID number"}</dt><dd>{selected.id}</dd></div>}
+              {selected.rollNumber && <div><dt>Roll number</dt><dd>{selected.rollNumber}</dd></div>}
+              {selected.department && logValue(selected.department) !== "-" && (fieldVisibility.department !== false) && <div><dt>Department</dt><dd>{selected.department}</dd></div>}
+              {knownInstitution && (fieldVisibility.institute !== false) && <div><dt>Institute</dt><dd>{selected.institution}</dd></div>}
+              {selected.year && (fieldVisibility.year !== false) && <div><dt>Year</dt><dd>{selected.year.replace("Year ", "")}</dd></div>}
+              {selected.batch && (fieldVisibility.batch !== false) && <div><dt>Batch</dt><dd>{selected.batch}</dd></div>}
+              <div><dt>Category</dt><dd>{recordCategory(reviews, selected)}</dd></div>
+              {accommodationOf(selected) && (fieldVisibility.accommodationType !== false) && <div><dt>Accommodation</dt><dd>{accommodationOf(selected)}</dd></div>}
+              {selected.hostName && <div><dt>Person to meet</dt><dd>{selected.hostName}</dd></div>}
+              {!isRevoked && selected.visitPurpose && <div><dt>Purpose of visit</dt><dd>{selected.visitPurpose}</dd></div>}
+              {selected.phoneNumber && <div><dt>Phone number</dt><dd>{selected.phoneNumber}</dd></div>}
+              {selected.hostel && (fieldVisibility.hostelName !== false) && <div><dt>Hostel</dt><dd>{selected.hostel}</dd></div>}
+              {selected.room && (fieldVisibility.roomNumber !== false) && <div><dt>Room</dt><dd>{selected.room}</dd></div>}
+              {selected.transport && (fieldVisibility.transportationType !== false) && <div><dt>Transport</dt><dd>{selected.transport}</dd></div>}
+              {selected.pickup && (fieldVisibility.boardingPoint !== false) && <div><dt>Pickup point</dt><dd>{selected.pickup}</dd></div>}
+              {selected.routeNumber && (fieldVisibility.routeNumber !== false) && <div><dt>Route number</dt><dd>{selected.routeNumber}</dd></div>}
+              {selected.vehicleNumber && (fieldVisibility.vehicleNumber !== false) && <div><dt>Vehicle number</dt><dd>{selected.vehicleNumber}</dd></div>}
+              {!isRevoked && selected.guardNotes && <div><dt>Reason</dt><dd>{selected.guardNotes}</dd></div>}
+              {isRevoked && revocation && <><div><dt>Revoked by</dt><dd>{revocation.actor} · {revocation.actorNumber}</dd></div><div><dt>Revoked at</dt><dd>{revocation.timestamp}</dd></div></>}
+            </dl>
+          </div>
+        )}
+
+        {!isRevoked && revocation && (
+          <div className="audit-detail-section revocation-details">
+            <div className="audit-detail-title">REVOCATION DETAILS</div>
+            <dl>
+              <div><dt>Reason <b>*</b></dt><dd>{revocation.reason}</dd></div>
+              <div><dt>Supervisor comments</dt><dd>{revocation.reason}</dd></div>
+              <div><dt>Revoked by</dt><dd>{revocation.actor} · {revocation.actorNumber}</dd></div>
+              <div><dt>Revoked at</dt><dd>{revocation.timestamp}</dd></div>
+            </dl>
+          </div>
+        )}
+
+        {!isRevoked && !hideCommonInfo && (
+          <div className="audit-detail-section">
+            <div className="audit-detail-title">ORIGINAL SECURITY EVENT</div>
+            <dl>
+              {selected.logId && <div><dt>Log ID / Reference Number</dt><dd>{selected.logId}</dd></div>}
+              <div><dt>Person Category</dt><dd>{personCategory}</dd></div>
+              <div><dt>Original Event Category</dt><dd>{selected.accessCategory}</dd></div>
+              <div><dt>Security Decision</dt><dd>{authorizationStatus}</dd></div>
+              <div><dt>Entry or Exit Event</dt><dd>{selected.event}</dd></div>
+              <div><dt>Date</dt><dd>{selected.dateTime.slice(0, 10)}</dd></div>
+              <div><dt>Timestamp</dt><dd>{selected.dateTime.replace("T", " ")}</dd></div>
+              {knownInstitution && <div><dt>Institution</dt><dd>{selected.institution}</dd></div>}
+              <div><dt>Assigned Gate / Location</dt><dd>{selected.block} · {knownInstitution ? selected.institution : "Institution B"}</dd></div>
+              <div><dt>Security Name / Number</dt><dd>{recordedBy}</dd></div>
+              {selected.guardNotes && <div><dt>Security Guard Notes</dt><dd>{selected.guardNotes}</dd></div>}
+            </dl>
+          </div>
+        )}
+
+        {!isRevoked && review && (review.status !== "Pending Verification" || selected.accessCategory === "Unauthorized") && (
+          <div className="audit-detail-section">
+            <div className="audit-detail-title">SUPERVISOR REVIEW & AUDIT HISTORY</div>
+            <div className="review-current">
+              <span>Current verification status</span>
+              <Status tone={reviewTone(review.status)}>{review.status}</Status>
+            </div>
+            <div className="history-list">
+              <div>
+                <i><Shield size={13} /></i>
+                <p>
+                  <strong>Original event created</strong>
+                  <span>{selected.guard} · {selected.guardNumber}</span>
+                  <small>{selected.dateTime.replace("T", " ")} · {selected.block}</small>
+                </p>
+              </div>
+              {review.actions.map((action, index) => (
+                <div key={`${action.type}${action.timestamp}${index}`}>
+                  <i className={action.type === "Unauthorised" ? "danger-history" : ""}>
+                    {action.type === "Verified" || action.type === "Revoked" ? <Check size={13} /> : <ShieldAlert size={13} />}
+                  </i>
+                  <p>
+                    <strong>Record {action.type.toLowerCase()}</strong>
+                    <span>{action.actor} · {action.actorNumber}</span>
+                    <small>
+                      {action.timestamp}
+                      {action.action_taken ? ` · Action Taken: ${action.action_taken}` : action.reason ? ` · Reason: ${action.reason}` : ""}
+                    </small>
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {!isRevoked && <div className="capture-note"><Camera size={14} />Photograph captured with this log record.</div>}
+      </section>
+    )}
+  </>;
 }
 
 type WorklogDesignation = typeof adminPortalDesignations[number] | "Student Affair" | "Staff";
@@ -2712,6 +3064,13 @@ function UnauthorisedEntriesTable({
     return { label: row.decision || row.event || "Denied", tone: (row.tone || "red") as any };
   };
 
+  const getReportedBy = (row: LogRecord) => {
+    const dec = getDecisionDetails(reviews, row);
+    if (dec) return dec.role;
+    if (row.guard) return row.guard;
+    return "Campus Supervisor";
+  };
+
   return (
     <>
       <div className="audit-table-wrap supervisor-audit-table-wrap">
@@ -2719,21 +3078,27 @@ function UnauthorisedEntriesTable({
           <thead>
             <tr>
               <th>S.No</th>
-              <th>Name</th>
+              <th>Person</th>
+              <th>Reported By</th>
               <th>Phone No</th>
               <th>Status</th>
+              <th>Action Taken</th>
               <th>Entries</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row, index) => {
               const statusInfo = getStatus(row);
+              const actionTakenText = getActionTaken(reviews, row);
+              const reportedByText = getReportedBy(row);
               return (
                 <tr key={recordKey(row)} onClick={() => setSelected(row)}>
                   <td>{index + 1}</td>
                   <td><strong>{displayName(row)}</strong></td>
+                  <td>{reportedByText}</td>
                   <td>{row.phoneNumber ? row.phoneNumber : "—"}</td>
                   <td><Status tone={statusInfo.tone}>{statusInfo.label}</Status></td>
+                  <td className="action-taken-cell" title={actionTakenText}>{actionTakenText}</td>
                   <td>{entryCount(row)}</td>
                 </tr>
               );
@@ -2752,17 +3117,40 @@ function UnauthorisedEntriesTable({
               <X size={18} />
             </button>
           </div>
-          <dl>
-            <div><dt>S.No</dt><dd>{rows.indexOf(selected) + 1}</dd></div>
-            <div><dt>Name</dt><dd>{displayName(selected)}</dd></div>
-            <div><dt>Phone No</dt><dd>{selected.phoneNumber ? selected.phoneNumber : "—"}</dd></div>
-            <div><dt>Status</dt><dd><Status tone={getStatus(selected).tone}>{getStatus(selected).label}</Status></dd></div>
-            <div><dt>Entries</dt><dd>{entryCount(selected)}</dd></div>
-            <div><dt>Location</dt><dd>{selected.block}</dd></div>
-            <div><dt>Date & time</dt><dd>{selected.dateTime.replace("T", " ")}</dd></div>
-            <div><dt>Security officer</dt><dd>{selected.guard} ({selected.guardNumber})</dd></div>
-            <div><dt>Reason / Notes</dt><dd>{selected.guardNotes ?? "—"}</dd></div>
-          </dl>
+
+          <div className="audit-detail-section supervisor-review-highlight">
+            <div className="audit-detail-title">SUPERVISOR / CSO DECISION & ACTION TAKEN</div>
+            <dl>
+              <div><dt>Verification Decision</dt><dd><Status tone={getStatus(selected).tone}>{getStatus(selected).label}</Status></dd></div>
+              <div><dt>Action Taken</dt><dd className="action-taken-detail"><strong>{getActionTaken(reviews, selected)}</strong></dd></div>
+              {(() => {
+                const dec = getDecisionDetails(reviews, selected);
+                if (dec) {
+                  return (
+                    <>
+                      <div><dt>Decision Made By</dt><dd>{dec.actor} ({dec.role} · {dec.actorNumber})</dd></div>
+                      <div><dt>Decision Date & Time</dt><dd>{dec.timestamp}</dd></div>
+                    </>
+                  );
+                }
+                return <div><dt>Decision Status</dt><dd>Pending Review</dd></div>;
+              })()}
+            </dl>
+          </div>
+
+          <div className="audit-detail-section">
+            <div className="audit-detail-title">ORIGINAL SECURITY GUARD RECORD</div>
+            <dl>
+              <div><dt>S.No</dt><dd>{rows.indexOf(selected) + 1}</dd></div>
+              <div><dt>Name</dt><dd>{displayName(selected)}</dd></div>
+              <div><dt>Phone No</dt><dd>{selected.phoneNumber ? selected.phoneNumber : "—"}</dd></div>
+              <div><dt>Gate / Location</dt><dd>{selected.block}</dd></div>
+              <div><dt>Original Entry Date & Time</dt><dd>{selected.dateTime.replace("T", " ")}</dd></div>
+              <div><dt>Security Officer</dt><dd>{selected.guard} ({selected.guardNumber})</dd></div>
+              <div><dt>Original Security Notes</dt><dd>{selected.guardNotes ?? "—"}</dd></div>
+              <div><dt>Entries Count</dt><dd>{entryCount(selected)}</dd></div>
+            </dl>
+          </div>
         </section>
       )}
     </>
@@ -2802,7 +3190,7 @@ function SupervisorHome({ go, reviews, logs }: { go: (screen: Screen) => void; r
       <section className="supervisor-hero"><div><span>CAMPUS STATUS</span><strong>5 / 5</strong><p>Assigned Security</p></div><ShieldCheck size={55} /></section>
       <div className="dashboard-stats">
         <div><span className="stat-icon blue-bg"><UserCog size={18} /></span><strong>8</strong><small>Security on duty</small></div>
-        <div><span className="stat-icon amber-bg"><ShieldAlert size={18} /></span><strong>{unauthorizedCount}</strong><small>Unauthorised</small></div>
+        <div onClick={() => go("alerts")} style={{ cursor: "pointer" }}><span className="stat-icon amber-bg"><ShieldAlert size={18} /></span><strong>{unauthorizedCount}</strong><small>Unauthorised</small></div>
       </div>
       <div className="section-heading compact"><div><h2>Block coverage</h2></div><button onClick={() => go("assignments")}>Manage</button></div>
       <div className="coverage-list">{["Main Gate · Arun Kumar", "Block A · Kavya Rao", "Library · Imran Ali"].map((item, i) => <div key={item}><span><MapPin size={16} /></span><div><strong>{item.split(" · ")[0]}</strong><small>{item.split(" · ")[1]}</small></div><Status tone={i === 2 ? "amber" : "green"}>{i === 2 ? "Break" : "Active"}</Status></div>)}</div>
@@ -2900,7 +3288,7 @@ function Audit({
 }) {
   const [activeTab, setActiveTab] = useState<"unauthorised" | "worklog">("unauthorised");
   const [auditFrom, setAuditFrom] = useState("2025-06-16");
-  const [auditTo, setAuditTo] = useState("2025-06-16");
+  const [auditTo, setAuditTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [selectedOfficerName, setSelectedOfficerName] = useState<string | null>(null);
   const [apiRecords, setApiRecords] = useState<LogRecord[] | null>(null);
 
@@ -2939,8 +3327,11 @@ function Audit({
             guardNumber: r.guard_code || "SG-101",
             guardNotes: r.flag_reason || "Identity could not be verified at the gate.",
             entries: 1,
-            decision: "Denied",
+            decision: r.review_status === "Authorised" ? "Authorised" : "Denied",
             photo: r.snapshot_url || undefined,
+            reviewActions: r.review_actions,
+            reviewStatus: r.review_status,
+            actionTaken: (r.review_actions && r.review_actions.length > 0) ? r.review_actions[r.review_actions.length - 1].action_taken : undefined,
           }));
           setApiRecords(mapped);
         }
@@ -2994,7 +3385,7 @@ function Audit({
 
   const resetAudit = () => {
     setAuditFrom("2025-06-16");
-    setAuditTo("2025-06-16");
+    setAuditTo(new Date().toISOString().slice(0, 10));
     setSelectedOfficerName(null);
   };
 
@@ -3136,7 +3527,7 @@ function Alerts({
   const alertRows = currentLogs.filter(row => {
     if (row.accessCategory !== "Unauthorized") return false;
     if (role === "security") return row.block === "Main Gate";
-    if (role === "warden") return row.guard === roleMeta.warden.name && row.hostel === "Bharathi Hostel" && row.personType === "Unauthorised";
+    if (role === "warden") return row.block === "Bharathi Hostel" || row.guard === roleMeta.warden.name;
     if (role === "staff") return row.institution === "Institution B" && row.block === "Block A";
     return assignedGuardNumbers.has(row.guardNumber);
   });
@@ -3545,7 +3936,7 @@ function Alerts({
     </>;
   }
   return <>
-    <TopBar title={role === "warden" ? "Hostel alerts" : role === "staff" ? "Staff alerts" : role === "cso" ? "Alerts" : "Security alerts"} subtitle={role === "warden" ? "Unrecognized entry attempts · Bharathi Hostel" : role === "supervisor" ? "" : role === "cso" ? "Institution B · CSO review" : "Relevant to your assigned scope"} back={back} action={<button className="text-action" onClick={markAllRead}>{readKeys.length === alertRows.length ? "All read" : "Mark read"}</button>} />
+    <TopBar title={role === "staff" ? "Staff alerts" : role === "cso" ? "Alerts" : "Security alerts"} subtitle={role === "supervisor" ? "" : role === "cso" ? "Institution B · CSO review" : "Relevant to your assigned scope"} back={back} action={<button className="text-action" onClick={markAllRead}>{readKeys.length === alertRows.length ? "All read" : "Mark read"}</button>} />
     <div className="page-content">
       <div className="notification-legend"><span><i />Unread</span><strong>{alertRows.filter(row => reviewFor(reviews, row).status === "Pending Verification").length} pending verification</strong></div>
       <div className="alert-list">
@@ -3687,8 +4078,8 @@ function OversightHome({ role, go }: { role: "cso" | "manager"; go: (screen: Scr
         {cso && <button onClick={() => go("audit")}><span><FileClock size={21} /></span><div><strong>Audit records</strong></div><ChevronRight size={18} /></button>}
         {cso && <button onClick={() => go("campus-entries")}><span><DoorOpen size={21} /></span><div><strong>Institution entry logs</strong></div><ChevronRight size={18} /></button>}
         {cso && <button onClick={() => go("login-logs")}><span><FileClock size={21} /></span><div><strong>Worklog</strong></div><ChevronRight size={18} /></button>}
-        {!cso && <button onClick={() => go("add-student")}><span className="amber-icon"><UserPlus size={21} /></span><div><strong>Add new student</strong><small>Manual entry with photo & face model training</small></div><ChevronRight size={18} /></button>}
-        {!cso && <button onClick={() => go("manager-students")}><span><Users size={21} /></span><div><strong>Manage institution students</strong><small>View & edit student details (admin permissions applied)</small></div><ChevronRight size={18} /></button>}
+        <button onClick={() => go("add-student")}><span className="amber-icon"><UserPlus size={21} /></span><div><strong>Add new student</strong><small>Manual entry with photo & face model training</small></div><ChevronRight size={18} /></button>
+        <button onClick={() => go("manager-students")}><span><Users size={21} /></span><div><strong>Manage institution students</strong><small>View & edit student details</small></div><ChevronRight size={18} /></button>
         {!cso && <button onClick={() => go("institution-users")}><span><UserCog size={21} /></span><div><strong>Institution users</strong><small>Manage officers & staff</small></div><ChevronRight size={18} /></button>}
         {!cso && <button onClick={() => go("campus-entries")}><span><DoorOpen size={21} /></span><div><strong>Institution entry logs</strong></div><ChevronRight size={18} /></button>}
         {!cso && <button onClick={() => go("admin-audit-logs")}><span><FileClock size={21} /></span><div><strong>Institution audit logs</strong><small>Track all changes & edits made</small></div><ChevronRight size={18} /></button>}
@@ -4000,13 +4391,73 @@ function Worklog({ go, scope = "admin" }: { go: (screen: Screen) => void; scope?
   );
 }
 
-function CampusEntries({ go, reviews, scope = "admin", fieldVisibility = DEFAULT_LOG_FIELD_VISIBILITY }: { go: (screen: Screen) => void; reviews: Record<string, ReviewRecord>; scope?: "admin" | "institution"; fieldVisibility?: LogFieldVisibility }) {
+function CampusEntries({
+  go,
+  reviews,
+  scope = "admin",
+  fieldVisibility = DEFAULT_LOG_FIELD_VISIBILITY,
+  logs,
+}: {
+  go: (screen: Screen) => void;
+  reviews: Record<string, ReviewRecord>;
+  scope?: "admin" | "institution";
+  fieldVisibility?: LogFieldVisibility;
+  logs?: LogRecord[];
+}) {
   const [institution, setInstitution] = useState(scope === "institution" ? "Institution B" : "All institutions");
   const [block, setBlock] = useState("All blocks");
   const [category, setCategory] = useState("All Categories");
   const [query, setQuery] = useState("");
   const [fromDate, setFromDate] = useState("2025-06-16T08:00");
-  const [toDate, setToDate] = useState("2025-06-16T18:00");
+  const [toDate, setToDate] = useState(() => `${new Date().toISOString().slice(0, 10)}T23:59`);
+  const [dbLogs, setDbLogs] = useState<LogRecord[] | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetch("http://localhost:8000/api/v1/access-logs/?limit=300")
+      .then(res => (res.ok ? res.json() : null))
+      .then((data: any[]) => {
+        if (!active || !Array.isArray(data)) return;
+        const mapped: LogRecord[] = data.map((item: any) => {
+          const dt = item.timestamp
+            ? (item.timestamp.includes("T") ? item.timestamp.slice(0, 19) : item.timestamp.replace(" ", "T").slice(0, 19))
+            : new Date().toISOString().slice(0, 19);
+          const timePart = dt.length >= 16 ? dt.slice(11, 16) : "10:00";
+          const isDenied = item.verification_status === "Unauthorized" || item.review_status === "Unauthorised";
+          return {
+            initials: item.name ? item.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase() || "UP" : "UP",
+            name: item.name || "Unrecognized person",
+            id: item.identifier_value || "Not available",
+            institution: "SRM GROUP OF INSTITUTIONS TRICHY",
+            department: item.department || "Not available",
+            block: item.location_block || "Main Gate",
+            time: timePart,
+            dateTime: dt,
+            event: isDenied ? "Denied" : "Entry",
+            tone: isDenied ? "red" : "green",
+            personType: item.person_type === "Unauthorized" ? "Unauthorised" : (item.person_type as any) || "Student",
+            category: isDenied ? "Unauthorised visitor" : "Internal · Institution B",
+            accessCategory: isDenied ? "Unauthorized" : "Authorized",
+            logId: item.record_identifier,
+            phoneNumber: item.phone_number,
+            guard: item.guard_name || "G. Selvam",
+            guardNumber: item.guard_code || "SG-101",
+            guardNotes: item.flag_reason || (isDenied ? "Identity could not be verified at the gate." : undefined),
+            entries: 1,
+            decision: item.review_status === "Authorised" || item.verification_status === "Authorized" ? "Authorised" : "Denied",
+            photo: item.snapshot_url || undefined,
+            reviewActions: item.review_actions,
+            reviewStatus: item.review_status,
+            actionTaken: (item.review_actions && item.review_actions.length > 0) ? item.review_actions[item.review_actions.length - 1].action_taken : undefined,
+          };
+        });
+        setDbLogs(mapped);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const blocksByInst: Record<string, string[]> = {
     "Institution B": ["Main Gate", "Block A", "Block B", "Library Block", "Bharathi Hostel"],
@@ -4020,7 +4471,9 @@ function CampusEntries({ go, reviews, scope = "admin", fieldVisibility = DEFAULT
     ? ["All blocks", "Main Gate", "Block A", "Block B", "Library Block", "Bharathi Hostel", "North Gate", "East Gate", "South Gate"]
     : ["All blocks", ...(blocksByInst[institution] || ["Main Gate", "Block A", "Block B"])];
 
-  const rows = logRows.filter(row =>
+  const currentSourceLogs = dbLogs && dbLogs.length > 0 ? dbLogs : (logs ?? logRows);
+
+  const rows = currentSourceLogs.filter(row =>
     row.accessCategory !== "Visitors" &&
     (scope === "institution"
       ? row.institution === "Institution B" || row.institution.includes("TRICHY") || assignedGuardNumbers.has(row.guardNumber)
@@ -4032,7 +4485,18 @@ function CampusEntries({ go, reviews, scope = "admin", fieldVisibility = DEFAULT
   ).sort((a, b) => b.dateTime.localeCompare(a.dateTime));
 
   return <>
-    <TopBar title={scope === "institution" ? "Institution records" : "Campus records"} subtitle={scope === "institution" ? "Institution B · Read-only records" : "All institutions · Read-only"} back={() => go("home")} />
+    <TopBar
+      title={scope === "institution" ? "Institution records" : "Campus records"}
+      subtitle={scope === "institution" ? "Institution B · Read-only records" : "All institutions · Read-only"}
+      back={() => go("home")}
+      action={
+        <div className="header-actions">
+          <button className="icon-btn" onClick={() => exportRecordsToCsv(rows, reviews)} aria-label="Export records as CSV" title="Export CSV with Action Taken">
+            <FileClock size={18} />
+          </button>
+        </div>
+      }
+    />
     <div className="page-content">
       <div className="search-input">
         <Search size={17} />
@@ -4149,6 +4613,19 @@ function WelfareHome({ go }: { go: (screen: Screen) => void }) {
     <div className="page-content"><ProfileHead role="welfare" go={go} />
       <section className="admin-hero"><div><span>STUDENT MOVEMENTS TODAY</span><strong>{welfareLogs.length}</strong></div><HeartHandshake size={50} /></section>
       <div className="dashboard-stats three"><div><strong>{welfareLogs.length - unauthorized}</strong><small>Authorized</small></div><div><strong>{unauthorized}</strong><small>Unauthorized</small></div><div><strong>{welfareBlocks.length}</strong><small>Blocks</small></div></div>
+      <div className="section-heading compact" style={{ marginTop: 22 }}>
+        <div><h2>Student Residence Management</h2></div>
+      </div>
+      <div className="admin-list">
+        <button onClick={() => go("accommodation-details")}>
+          <span className="blue-icon"><Home size={21} /></span>
+          <div>
+            <strong>Accommodation Details</strong>
+            <small>View and update student's residence (Hostel / PG / Day Scholar)</small>
+          </div>
+          <ChevronRight size={18} />
+        </button>
+      </div>
     </div>
   </>;
 }
@@ -4183,6 +4660,1085 @@ function WelfareBlockLogs({ reviews }: { reviews: Record<string, ReviewRecord> }
       {rows.length === 0 && <div className="empty-state"><Users size={25} /><strong>No matching student logs</strong><span>Reset or change the filters.</span></div>}
     </div>
   </>;
+}
+
+interface AccommodationHistoryItem {
+  id: number;
+  register_number: string;
+  previous_residence_type?: string;
+  previous_details?: Record<string, any>;
+  new_residence_type: string;
+  new_details: Record<string, any>;
+  effective_date: string;
+  updated_by: string;
+  updated_timestamp: string;
+}
+
+function AccommodationDetails({
+  go,
+  back,
+  role,
+  students,
+  onUpdateStudent,
+}: {
+  go: (screen: Screen) => void;
+  back: () => void;
+  role: Role;
+  students: StudentMatch[];
+  onUpdateStudent?: (student: StudentMatch) => void;
+}) {
+  const [selectedReg, setSelectedReg] = useState<string>(students[0]?.registerNumber ?? "23MED0412");
+  const [selectedStudentOverride, setSelectedStudentOverride] = useState<StudentMatch | null>(null);
+  const student = (selectedStudentOverride && selectedStudentOverride.registerNumber === selectedReg)
+    ? selectedStudentOverride
+    : (students.find(s => s.registerNumber === selectedReg) || students[0]);
+
+  // Section A Phone Number (actual student phone retrieved from PostgreSQL)
+  const [studentPhone, setStudentPhone] = useState<string>("");
+
+  // Searchable student selection state
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [apiSearchResults, setApiSearchResults] = useState<StudentMatch[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  // Permitted institutional scope filter (Dr. Kavitha Rao: Student Welfare for Institution B / SRM GROUP OF INSTITUTIONS TRICHY)
+  const isInPermittedScope = (s: { institute?: string; department?: string; registerNumber?: string }) => {
+    if (!s.institute) return true;
+    const inst = s.institute.toLowerCase();
+    return inst.includes("institution b") || inst.includes("srm") || inst.includes("trichy");
+  };
+
+  const permittedStudents = useMemo(() => {
+    return students.filter(isInPermittedScope);
+  }, [students]);
+
+  // Dynamic search from PostgreSQL backend with institutional scope restriction
+  useEffect(() => {
+    if (!isSearchOpen) return;
+    let active = true;
+
+    const fetchResults = async () => {
+      setIsSearching(true);
+      try {
+        const q = searchQuery.trim();
+        const url = q
+          ? `http://localhost:8000/api/v1/students/?query=${encodeURIComponent(q)}&institution_id=1`
+          : `http://localhost:8000/api/v1/students/?institution_id=1`;
+        const res = await fetch(url);
+        if (res.ok && active) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            const mapped: StudentMatch[] = data.map((item: any) => ({
+              initials: item.initials || item.name.slice(0, 2).toUpperCase(),
+              name: item.name,
+              registerNumber: item.register_number,
+              dateOfBirth: item.date_of_birth,
+              department: item.department,
+              year: item.year_roman || "I Year",
+              batch: item.batch,
+              institute: "SRM GROUP OF INSTITUTIONS TRICHY",
+              similarity: 100,
+              accommodationType: (item.residence_type === "PG" ? "PG" : item.residence_type?.toLowerCase().includes("day") ? "Day Scholar" : "Hosteller") as any,
+              hostelName: item.hostel_name,
+              roomNumber: item.room_number,
+              routeNumber: item.bus_route,
+              boardingPoint: item.bus_boarding_point,
+              vehicleNumber: item.vehicle_number,
+              photo: item.photo_url,
+              phoneNumber: item.phone_number || item.contact_number,
+              contactNumber: item.contact_number,
+            }));
+            setApiSearchResults(mapped);
+          }
+        }
+      } catch (e) {
+        // offline/fallback to local students
+      } finally {
+        if (active) setIsSearching(false);
+      }
+    };
+
+    const debounce = setTimeout(fetchResults, 150);
+    return () => {
+      active = false;
+      clearTimeout(debounce);
+    };
+  }, [searchQuery, isSearchOpen]);
+
+  // Combined, deduplicated, case-insensitive filtered results for dropdown
+  const displayedResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const map = new Map<string, StudentMatch>();
+
+    // Add API PostgreSQL results within permitted scope
+    apiSearchResults.forEach(s => {
+      if (isInPermittedScope(s)) {
+        map.set(s.registerNumber.toUpperCase(), s);
+      }
+    });
+
+    // Also include matching local permitted students
+    permittedStudents.forEach(s => {
+      const regUpper = s.registerNumber.toUpperCase();
+      if (!map.has(regUpper)) {
+        if (!q || s.name.toLowerCase().includes(q) || s.registerNumber.toLowerCase().includes(q)) {
+          map.set(regUpper, s);
+        }
+      }
+    });
+
+    return Array.from(map.values()).filter(s => {
+      if (!q) return true;
+      return (
+        s.name.toLowerCase().includes(q) ||
+        s.registerNumber.toLowerCase().includes(q)
+      );
+    });
+  }, [searchQuery, apiSearchResults, permittedStudents]);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setIsSearchOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleSelectStudent = (s: StudentMatch) => {
+    setSelectedStudentOverride(s);
+    setSelectedReg(s.registerNumber);
+    setIsSearchOpen(false);
+    setSearchQuery("");
+    setIsEditing(false);
+    setErrors({});
+    setApiError(null);
+    setSaveSuccess(null);
+  };
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [historyList, setHistoryList] = useState<AccommodationHistoryItem[]>([]);
+
+  // Residence Type
+  const [residenceType, setResidenceType] = useState<"Hosteller" | "PG" | "Day Scholar">("Hosteller");
+
+  // Hosteller Fields
+  const [hostelName, setHostelName] = useState("");
+  const [hostelBlock, setHostelBlock] = useState("");
+  const [roomNumber, setRoomNumber] = useState("");
+  const [hostelAddress, setHostelAddress] = useState("");
+
+  // PG Fields
+  const [pgName, setPgName] = useState("");
+  const [pgAddress, setPgAddress] = useState("");
+  const [pgContact, setPgContact] = useState("");
+  const [distanceFromCampus, setDistanceFromCampus] = useState("");
+  const [pgNotes, setPgNotes] = useState("");
+
+  // Day Scholar Fields
+  const [residentialAddress, setResidentialAddress] = useState("");
+  const [contactNumber, setContactNumber] = useState("");
+  const [transportationType, setTransportationType] = useState<"College Bus" | "Own Vehicle" | "Other">("College Bus");
+  const [routeNumber, setRouteNumber] = useState("");
+  const [boardingPoint, setBoardingPoint] = useState("");
+  const [vehicleType, setVehicleType] = useState("");
+  const [vehicleNumber, setVehicleNumber] = useState("");
+  const [transportDescription, setTransportDescription] = useState("");
+  const [dayScholarNotes, setDayScholarNotes] = useState("");
+
+  // Inline Validation Errors
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const populateFields = (targetStudent: StudentMatch, apiData?: any) => {
+    if (!targetStudent) return;
+    const rawType = (apiData?.residence_type || targetStudent.accommodationType || "Hosteller") as string;
+    const normType = rawType === "PG" ? "PG" : rawType.toLowerCase().includes("day") ? "Day Scholar" : "Hosteller";
+    setResidenceType(normType);
+
+    setHostelName(apiData?.hostel_name ?? targetStudent.hostelName ?? "");
+    setHostelBlock(apiData?.hostel_block ?? targetStudent.hostelBlock ?? "");
+    setRoomNumber(apiData?.room_number ?? targetStudent.roomNumber ?? "");
+    setHostelAddress(apiData?.hostel_address ?? targetStudent.hostelAddress ?? "");
+
+    setPgName(apiData?.pg_name ?? targetStudent.pgName ?? "");
+    setPgAddress(apiData?.pg_address ?? targetStudent.pgAddress ?? "");
+    setPgContact(apiData?.pg_contact ?? targetStudent.pgContact ?? "");
+    setDistanceFromCampus(apiData?.distance_from_campus ?? targetStudent.distanceFromCampus ?? "");
+    setPgNotes(apiData?.accommodation_notes ?? targetStudent.accommodationNotes ?? "");
+
+    setResidentialAddress(apiData?.residential_address ?? targetStudent.residentialAddress ?? "");
+    setContactNumber(apiData?.contact_number ?? targetStudent.contactNumber ?? "");
+    const trans = (apiData?.transportation_type || targetStudent.transportationType || "College Bus") as string;
+    setTransportationType(trans === "Own Vehicle" ? "Own Vehicle" : trans === "Other" ? "Other" : "College Bus");
+    setRouteNumber(apiData?.bus_route ?? targetStudent.routeNumber ?? "");
+    setBoardingPoint(apiData?.bus_boarding_point ?? targetStudent.boardingPoint ?? "");
+    setVehicleType(apiData?.vehicle_type ?? targetStudent.vehicleType ?? "");
+    setVehicleNumber(apiData?.vehicle_number ?? targetStudent.vehicleNumber ?? "");
+    setTransportDescription(apiData?.transport_description ?? targetStudent.transportDescription ?? "");
+    setDayScholarNotes(apiData?.accommodation_notes ?? targetStudent.accommodationNotes ?? "");
+  };
+
+  const fetchBackendData = async (reg: string) => {
+    try {
+      const res = await fetch(`http://localhost:8000/api/v1/students/accommodation/${encodeURIComponent(reg)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.history && Array.isArray(data.history)) {
+          setHistoryList(data.history);
+        }
+        const ph = data.phone_number || data.contact_number || student?.phoneNumber || student?.contactNumber || "";
+        setStudentPhone(ph);
+        populateFields(student, data);
+        return;
+      }
+    } catch (e) {
+      // Backend unavailable or offline
+    }
+    const ph = student?.phoneNumber || student?.contactNumber || "";
+    setStudentPhone(ph);
+    populateFields(student);
+  };
+
+  useEffect(() => {
+    setIsEditing(false);
+    setErrors({});
+    setApiError(null);
+    setSaveSuccess(null);
+    if (student) {
+      fetchBackendData(student.registerNumber);
+    }
+  }, [selectedReg]);
+
+  const handleStartEdit = () => {
+    populateFields(student);
+    setErrors({});
+    setApiError(null);
+    setSaveSuccess(null);
+    setIsEditing(true);
+  };
+
+  const handleCancel = () => {
+    populateFields(student);
+    setErrors({});
+    setApiError(null);
+    setIsEditing(false);
+  };
+
+  const handleSave = async () => {
+    const errs: Record<string, string> = {};
+
+    if (residenceType === "Hosteller") {
+      if (!hostelName.trim()) errs.hostelName = "Hostel name is required.";
+      if (!roomNumber.trim()) errs.roomNumber = "Room number is required.";
+    } else if (residenceType === "PG") {
+      if (!pgName.trim()) errs.pgName = "PG name is required.";
+      if (!pgAddress.trim()) errs.pgAddress = "Complete PG address is required.";
+      if (!pgContact.trim()) {
+        errs.pgContact = "Contact number is required.";
+      } else if (!isValidPhoneNumber(pgContact)) {
+        errs.pgContact = "Please enter a valid 10-digit contact number.";
+      }
+    } else if (residenceType === "Day Scholar") {
+      if (!residentialAddress.trim()) errs.residentialAddress = "Complete residential address is required.";
+      if (!contactNumber.trim()) {
+        errs.contactNumber = "Contact number is required.";
+      } else if (!isValidPhoneNumber(contactNumber)) {
+        errs.contactNumber = "Please enter a valid 10-digit contact number.";
+      }
+      if (!transportationType) {
+        errs.transportationType = "Transportation type is required.";
+      } else if (transportationType === "College Bus") {
+        if (!routeNumber.trim()) errs.routeNumber = "Bus route number is required.";
+        if (!boardingPoint.trim()) errs.boardingPoint = "Boarding point is required.";
+      } else if (transportationType === "Own Vehicle") {
+        if (!vehicleType.trim()) errs.vehicleType = "Vehicle type is required.";
+        if (!vehicleNumber.trim()) errs.vehicleNumber = "Vehicle registration number is required.";
+      } else if (transportationType === "Other") {
+        if (!transportDescription.trim()) errs.transportDescription = "Description of travel mode is required.";
+      }
+    }
+
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      return;
+    }
+
+    setErrors({});
+    setIsSaving(true);
+    setApiError(null);
+
+    const updaterName = roleMeta["welfare"]?.name || "Dr. Kavitha Rao";
+    const todayFormatted = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
+    const nowStr = new Date().toLocaleString();
+
+    const payload = {
+      residence_type: residenceType,
+      hostel_name: residenceType === "Hosteller" ? hostelName.trim() : null,
+      hostel_block: residenceType === "Hosteller" ? (hostelBlock.trim() || null) : null,
+      room_number: residenceType === "Hosteller" ? roomNumber.trim() : null,
+      hostel_address: residenceType === "Hosteller" ? (hostelAddress.trim() || null) : null,
+      pg_name: residenceType === "PG" ? pgName.trim() : null,
+      pg_address: residenceType === "PG" ? pgAddress.trim() : null,
+      pg_contact: residenceType === "PG" ? pgContact.trim() : null,
+      distance_from_campus: residenceType === "PG" ? (distanceFromCampus.trim() || null) : null,
+      residential_address: residenceType === "Day Scholar" ? residentialAddress.trim() : null,
+      contact_number: residenceType === "Day Scholar" ? contactNumber.trim() : null,
+      transportation_type: residenceType === "Day Scholar" ? transportationType : null,
+      bus_route: residenceType === "Day Scholar" && transportationType === "College Bus" ? routeNumber.trim() : null,
+      bus_boarding_point: residenceType === "Day Scholar" && transportationType === "College Bus" ? boardingPoint.trim() : null,
+      vehicle_type: residenceType === "Day Scholar" && transportationType === "Own Vehicle" ? vehicleType.trim() : null,
+      vehicle_number: residenceType === "Day Scholar" && transportationType === "Own Vehicle" ? vehicleNumber.trim() : null,
+      transport_description: residenceType === "Day Scholar" && transportationType === "Other" ? transportDescription.trim() : null,
+      notes: (residenceType === "PG" ? pgNotes.trim() : residenceType === "Day Scholar" ? dayScholarNotes.trim() : "") || null,
+      effective_date: todayFormatted,
+      updated_by: updaterName,
+    };
+
+    let updatedBackendHistory: AccommodationHistoryItem[] | null = null;
+    try {
+      const res = await fetch(`http://localhost:8000/api/v1/students/accommodation/${encodeURIComponent(student.registerNumber)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.history && Array.isArray(data.history)) {
+          updatedBackendHistory = data.history;
+        }
+      } else {
+        const errJson = await res.json().catch(() => null);
+        if (errJson?.detail) {
+          setApiError(errJson.detail);
+          setIsSaving(false);
+          return;
+        }
+      }
+    } catch (e) {
+      // offline/fallback
+    }
+
+    const updatedStudent: StudentMatch = {
+      ...student,
+      accommodationType: residenceType,
+      hostelName: residenceType === "Hosteller" ? hostelName.trim() : undefined,
+      hostelBlock: residenceType === "Hosteller" ? (hostelBlock.trim() || undefined) : undefined,
+      roomNumber: residenceType === "Hosteller" ? roomNumber.trim() : undefined,
+      hostelAddress: residenceType === "Hosteller" ? (hostelAddress.trim() || undefined) : undefined,
+      pgName: residenceType === "PG" ? pgName.trim() : undefined,
+      pgAddress: residenceType === "PG" ? pgAddress.trim() : undefined,
+      pgContact: residenceType === "PG" ? pgContact.trim() : undefined,
+      distanceFromCampus: residenceType === "PG" ? (distanceFromCampus.trim() || undefined) : undefined,
+      residentialAddress: residenceType === "Day Scholar" ? residentialAddress.trim() : undefined,
+      contactNumber: residenceType === "Day Scholar" ? contactNumber.trim() : undefined,
+      transportationType: residenceType === "Day Scholar" ? transportationType : undefined,
+      routeNumber: (residenceType === "Day Scholar" && transportationType === "College Bus") ? routeNumber.trim() : undefined,
+      boardingPoint: (residenceType === "Day Scholar" && transportationType === "College Bus") ? boardingPoint.trim() : undefined,
+      vehicleType: (residenceType === "Day Scholar" && transportationType === "Own Vehicle") ? vehicleType.trim() : undefined,
+      vehicleNumber: (residenceType === "Day Scholar" && transportationType === "Own Vehicle") ? vehicleNumber.trim() : undefined,
+      transportDescription: (residenceType === "Day Scholar" && transportationType === "Other") ? transportDescription.trim() : undefined,
+      accommodationNotes: (residenceType === "PG" ? pgNotes.trim() : residenceType === "Day Scholar" ? dayScholarNotes.trim() : undefined),
+      residenceUpdatedAt: nowStr,
+      residenceUpdatedBy: updaterName,
+    };
+
+    if (onUpdateStudent) {
+      onUpdateStudent(updatedStudent);
+    }
+
+    if (updatedBackendHistory) {
+      setHistoryList(updatedBackendHistory);
+    } else {
+      const mockHist: AccommodationHistoryItem = {
+        id: Date.now(),
+        register_number: student.registerNumber,
+        previous_residence_type: student.accommodationType,
+        previous_details: {
+          hostelName: student.hostelName,
+          roomNumber: student.roomNumber,
+          pgName: student.pgName,
+          residentialAddress: student.residentialAddress,
+        },
+        new_residence_type: residenceType,
+        new_details: payload,
+        effective_date: todayFormatted,
+        updated_by: updaterName,
+        updated_timestamp: new Date().toISOString(),
+      };
+      setHistoryList(prev => [mockHist, ...prev]);
+    }
+
+    setIsSaving(false);
+    setIsEditing(false);
+    setSaveSuccess(`Accommodation details for ${student.name} (${student.registerNumber}) updated to ${residenceType}.`);
+  };
+
+  if (!student) {
+    return (
+      <>
+        <TopBar title="Accommodation Details" subtitle="Update student residence information" back={back} />
+        <div className="page-content">
+          <div className="empty-state">
+            <Users size={32} />
+            <strong>No student selected</strong>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <TopBar title="Accommodation Details" subtitle="Update student residence information" back={back} />
+      <div className="page-content">
+        {/* Searchable Student Selector */}
+        <section className="student-selector-panel" ref={searchContainerRef}>
+          <div className="field">
+            <span>Select Student</span>
+            <div
+              className={`searchable-student-trigger ${isSearchOpen ? "open" : ""} ${isEditing ? "disabled" : ""}`}
+              onClick={() => {
+                if (!isEditing) {
+                  setIsSearchOpen(prev => !prev);
+                }
+              }}
+              tabIndex={0}
+              role="button"
+              aria-expanded={isSearchOpen}
+              aria-label="Select Student"
+            >
+              <div className="trigger-student-info">
+                <strong>{student.name}</strong>
+                <span className="trigger-reg">({student.registerNumber})</span>
+                <span className="trigger-dept">— {student.department}</span>
+              </div>
+              <ChevronRight
+                size={16}
+                className={`trigger-arrow ${isSearchOpen ? "rotated" : ""}`}
+              />
+            </div>
+
+            {isSearchOpen && (
+              <div className="searchable-student-dropdown">
+                <div className="searchable-input-wrapper">
+                  <Search size={15} className="search-icon" />
+                  <input
+                    type="text"
+                    autoFocus
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    placeholder="Search by student name or register number..."
+                    className="searchable-search-input"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      className="search-clear-btn"
+                      onClick={() => setSearchQuery("")}
+                      aria-label="Clear search"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                <div className="searchable-results-list">
+                  {isSearching && (
+                    <div className="search-loading">
+                      <span>Searching PostgreSQL database...</span>
+                    </div>
+                  )}
+
+                  {!isSearching && displayedResults.length === 0 && (
+                    <div className="search-no-results">
+                      <span>No matching student found.</span>
+                    </div>
+                  )}
+
+                  {displayedResults.map(s => {
+                    const isSelected = s.registerNumber === selectedReg;
+                    return (
+                      <div
+                        key={s.registerNumber}
+                        className={`searchable-item ${isSelected ? "selected" : ""}`}
+                        onClick={() => handleSelectStudent(s)}
+                      >
+                        <div className="searchable-item-primary">
+                          <span className="searchable-name">{s.name}</span>
+                          <span className="searchable-reg">{s.registerNumber}</span>
+                        </div>
+                        <div className="searchable-item-dept">{s.department}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {saveSuccess && (
+          <div className="accommodation-toast success">
+            <Check size={18} />
+            <span>{saveSuccess}</span>
+            <button type="button" onClick={() => setSaveSuccess(null)} className="toast-dismiss">
+              <X size={15} />
+            </button>
+          </div>
+        )}
+
+        {apiError && (
+          <div className="accommodation-toast error">
+            <AlertTriangle size={18} />
+            <span>{apiError}</span>
+            <button type="button" onClick={() => setApiError(null)} className="toast-dismiss">
+              <X size={15} />
+            </button>
+          </div>
+        )}
+
+        {/* SECTION A: STUDENT DETAILS (READ-ONLY) */}
+        <section className="card accommodation-section-card">
+          <div className="card-header-row">
+            <div>
+              <span className="card-kicker">SECTION A</span>
+              <h2 className="card-heading">STUDENT DETAILS</h2>
+            </div>
+            <span className="read-only-pill">Read-only academic record</span>
+          </div>
+
+          <div className="read-only-grid">
+            <div className="data-item">
+              <span className="data-label">Student Name</span>
+              <strong className="data-value">{student.name}</strong>
+            </div>
+            <div className="data-item">
+              <span className="data-label">Register Number</span>
+              <strong className="data-value">{student.registerNumber}</strong>
+            </div>
+            <div className="data-item">
+              <span className="data-label">Phone Number</span>
+              <strong className="data-value">
+                {studentPhone || student?.phoneNumber || student?.contactNumber || "Not Available"}
+              </strong>
+            </div>
+            <div className="data-item">
+              <span className="data-label">Department</span>
+              <strong className="data-value">{student.department}</strong>
+            </div>
+          </div>
+        </section>
+
+        {/* SECTION B: RESIDENCE INFORMATION */}
+        <section className="card accommodation-section-card" style={{ marginTop: 16 }}>
+          <div className="card-header-row">
+            <div>
+              <span className="card-kicker">SECTION B</span>
+              <h2 className="card-heading">RESIDENCE INFORMATION</h2>
+            </div>
+            {!isEditing && (
+              <button
+                type="button"
+                className="edit-residence-btn"
+                onClick={handleStartEdit}
+                aria-label="Edit residence information"
+              >
+                <Pencil size={14} />
+                <span>Edit</span>
+              </button>
+            )}
+          </div>
+
+          {!isEditing ? (
+            /* READ-ONLY RESIDENCE VIEW */
+            <div className="residence-readonly-view">
+              <div className="current-residence-bar">
+                <span className="current-residence-label">Current Residence</span>
+                <Status tone={student.accommodationType === "Hosteller" ? "green" : student.accommodationType === "PG" ? "purple" : "blue"}>
+                  {student.accommodationType}
+                </Status>
+              </div>
+
+              <div className="residence-details-list">
+                {student.accommodationType === "Hosteller" && (
+                  <>
+                    <div className="residence-detail-row">
+                      <span>Hostel Name</span>
+                      <strong>{student.hostelName || "Bharathi Hostel"}</strong>
+                    </div>
+                    {student.hostelBlock && (
+                      <div className="residence-detail-row">
+                        <span>Hostel Block</span>
+                        <strong>{student.hostelBlock}</strong>
+                      </div>
+                    )}
+                    <div className="residence-detail-row">
+                      <span>Room Number</span>
+                      <strong>{student.roomNumber || "B-204"}</strong>
+                    </div>
+                    {student.hostelAddress && (
+                      <div className="residence-detail-row multiline">
+                        <span>Hostel Address</span>
+                        <strong>{student.hostelAddress}</strong>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {student.accommodationType === "PG" && (
+                  <>
+                    <div className="residence-detail-row">
+                      <span>PG Name</span>
+                      <strong>{student.pgName || "Not specified"}</strong>
+                    </div>
+                    <div className="residence-detail-row multiline">
+                      <span>Complete PG Address</span>
+                      <strong>{student.pgAddress || "Not specified"}</strong>
+                    </div>
+                    <div className="residence-detail-row">
+                      <span>Contact Number</span>
+                      <strong>{student.pgContact || "Not specified"}</strong>
+                    </div>
+                    {student.distanceFromCampus && (
+                      <div className="residence-detail-row">
+                        <span>Distance from Campus</span>
+                        <strong>{student.distanceFromCampus}</strong>
+                      </div>
+                    )}
+                    {student.accommodationNotes && (
+                      <div className="residence-detail-row multiline">
+                        <span>Additional Notes</span>
+                        <strong>{student.accommodationNotes}</strong>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {student.accommodationType === "Day Scholar" && (
+                  <>
+                    <div className="residence-detail-row multiline">
+                      <span>Complete Residential Address</span>
+                      <strong>{student.residentialAddress || "Trichy City"}</strong>
+                    </div>
+                    <div className="residence-detail-row">
+                      <span>Contact Number</span>
+                      <strong>{student.contactNumber || "+91 98765 00000"}</strong>
+                    </div>
+                    <div className="residence-detail-row">
+                      <span>Transportation Type</span>
+                      <strong>{student.transportationType || student.transport || "College Bus"}</strong>
+                    </div>
+                    {(student.transportationType === "College Bus" || (!student.transportationType && student.transport === "College Bus")) && (
+                      <>
+                        <div className="residence-detail-row">
+                          <span>Bus Route Number</span>
+                          <strong>{student.routeNumber || "Route 12"}</strong>
+                        </div>
+                        <div className="residence-detail-row">
+                          <span>Boarding Point</span>
+                          <strong>{student.boardingPoint || "Central Bus Stand"}</strong>
+                        </div>
+                      </>
+                    )}
+                    {student.transportationType === "Own Vehicle" && (
+                      <>
+                        <div className="residence-detail-row">
+                          <span>Vehicle Type</span>
+                          <strong>{student.vehicleType || "Two-Wheeler"}</strong>
+                        </div>
+                        <div className="residence-detail-row">
+                          <span>Vehicle Registration Number</span>
+                          <strong>{student.vehicleNumber || "TN 45 AB 1234"}</strong>
+                        </div>
+                      </>
+                    )}
+                    {student.transportationType === "Other" && (
+                      <div className="residence-detail-row">
+                        <span>Description of Travel Mode</span>
+                        <strong>{student.transportDescription || "Walking / Public transit"}</strong>
+                      </div>
+                    )}
+                    {student.accommodationNotes && (
+                      <div className="residence-detail-row multiline">
+                        <span>Additional Notes</span>
+                        <strong>{student.accommodationNotes}</strong>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {(student.residenceUpdatedAt || student.residenceUpdatedBy) && (
+                <div className="residence-meta-footer">
+                  <Clock3 size={13} />
+                  <span>
+                    Last updated {student.residenceUpdatedAt ? `on ${student.residenceUpdatedAt}` : ""} {student.residenceUpdatedBy ? `by ${student.residenceUpdatedBy}` : ""}
+                  </span>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* RESIDENCE UPDATE FORM */
+            <div className="residence-edit-form">
+              <div className="edit-form-notice">
+                <span>Select new residence type and enter required details below.</span>
+              </div>
+
+              {/* Residence Type Selection */}
+              <div className="field">
+                <span className="field-title">Residence Type *</span>
+                <div className="residence-type-selector">
+                  {(["Hosteller", "PG", "Day Scholar"] as const).map(type => (
+                    <button
+                      key={type}
+                      type="button"
+                      className={`residence-type-option ${residenceType === type ? "selected" : ""}`}
+                      onClick={() => {
+                        setResidenceType(type);
+                        setErrors({});
+                      }}
+                    >
+                      <span className="residence-radio-indicator">
+                        {residenceType === type && <span className="residence-radio-dot" />}
+                      </span>
+                      <span className="residence-type-title">{type}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* CASE 1: HOSTELLER FIELDS */}
+              {residenceType === "Hosteller" && (
+                <div className="residence-fields-group">
+                  <label className="field">
+                    <span>Hostel Name *</span>
+                    <input
+                      type="text"
+                      value={hostelName}
+                      onChange={e => {
+                        setHostelName(e.target.value);
+                        if (e.target.value.trim()) setErrors(prev => ({ ...prev, hostelName: "" }));
+                      }}
+                      placeholder="e.g. Bharathi Hostel, Cauvery Hostel"
+                    />
+                    {errors.hostelName && <small className="field-error">{errors.hostelName}</small>}
+                  </label>
+
+                  <label className="field">
+                    <span>Hostel Block (Optional)</span>
+                    <input
+                      type="text"
+                      value={hostelBlock}
+                      onChange={e => setHostelBlock(e.target.value)}
+                      placeholder="e.g. Block A, East Wing"
+                    />
+                  </label>
+
+                  <label className="field">
+                    <span>Room Number *</span>
+                    <input
+                      type="text"
+                      value={roomNumber}
+                      onChange={e => {
+                        setRoomNumber(e.target.value);
+                        if (e.target.value.trim()) setErrors(prev => ({ ...prev, roomNumber: "" }));
+                      }}
+                      placeholder="e.g. B-204"
+                    />
+                    {errors.roomNumber && <small className="field-error">{errors.roomNumber}</small>}
+                  </label>
+
+                  <label className="field">
+                    <span>Hostel Address (Optional)</span>
+                    <textarea
+                      rows={2}
+                      value={hostelAddress}
+                      onChange={e => setHostelAddress(e.target.value)}
+                      placeholder="Enter hostel campus location or full address"
+                    />
+                  </label>
+                </div>
+              )}
+
+              {/* CASE 2: PG FIELDS */}
+              {residenceType === "PG" && (
+                <div className="residence-fields-group">
+                  <label className="field">
+                    <span>PG Name *</span>
+                    <input
+                      type="text"
+                      value={pgName}
+                      onChange={e => {
+                        setPgName(e.target.value);
+                        if (e.target.value.trim()) setErrors(prev => ({ ...prev, pgName: "" }));
+                      }}
+                      placeholder="e.g. Sri Sai Deluxe PG for Men / Women"
+                    />
+                    {errors.pgName && <small className="field-error">{errors.pgName}</small>}
+                  </label>
+
+                  <label className="field">
+                    <span>Complete PG Address *</span>
+                    <textarea
+                      rows={3}
+                      value={pgAddress}
+                      onChange={e => {
+                        setPgAddress(e.target.value);
+                        if (e.target.value.trim()) setErrors(prev => ({ ...prev, pgAddress: "" }));
+                      }}
+                      placeholder="Enter full postal address, street, landmark, pincode..."
+                    />
+                    {errors.pgAddress && <small className="field-error">{errors.pgAddress}</small>}
+                  </label>
+
+                  <label className="field">
+                    <span>Contact Number *</span>
+                    <input
+                      type="tel"
+                      value={pgContact}
+                      onChange={e => {
+                        setPgContact(e.target.value);
+                        if (e.target.value.trim()) setErrors(prev => ({ ...prev, pgContact: "" }));
+                      }}
+                      placeholder="e.g. 9876543210 or +91 98765 43210"
+                    />
+                    {errors.pgContact && <small className="field-error">{errors.pgContact}</small>}
+                  </label>
+
+                  <label className="field">
+                    <span>Distance from Campus (Optional)</span>
+                    <input
+                      type="text"
+                      value={distanceFromCampus}
+                      onChange={e => setDistanceFromCampus(e.target.value)}
+                      placeholder="e.g. 1.2 km or 500 m"
+                    />
+                  </label>
+
+                  <label className="field">
+                    <span>Additional Notes (Optional)</span>
+                    <textarea
+                      rows={2}
+                      value={pgNotes}
+                      onChange={e => setPgNotes(e.target.value)}
+                      placeholder="Any relevant warden remarks or local guardian details..."
+                    />
+                  </label>
+                </div>
+              )}
+
+              {/* CASE 3: DAY SCHOLAR FIELDS */}
+              {residenceType === "Day Scholar" && (
+                <div className="residence-fields-group">
+                  <label className="field">
+                    <span>Complete Residential Address *</span>
+                    <textarea
+                      rows={3}
+                      value={residentialAddress}
+                      onChange={e => {
+                        setResidentialAddress(e.target.value);
+                        if (e.target.value.trim()) setErrors(prev => ({ ...prev, residentialAddress: "" }));
+                      }}
+                      placeholder="Enter student's permanent or home address with pincode..."
+                    />
+                    {errors.residentialAddress && <small className="field-error">{errors.residentialAddress}</small>}
+                  </label>
+
+                  <label className="field">
+                    <span>Contact Number *</span>
+                    <input
+                      type="tel"
+                      value={contactNumber}
+                      onChange={e => {
+                        setContactNumber(e.target.value);
+                        if (e.target.value.trim()) setErrors(prev => ({ ...prev, contactNumber: "" }));
+                      }}
+                      placeholder="e.g. 9876543210 or +91 98765 43210"
+                    />
+                    {errors.contactNumber && <small className="field-error">{errors.contactNumber}</small>}
+                  </label>
+
+                  <label className="field">
+                    <span>Transportation Type *</span>
+                    <select
+                      value={transportationType}
+                      onChange={e => {
+                        setTransportationType(e.target.value as "College Bus" | "Own Vehicle" | "Other");
+                        setErrors(prev => ({
+                          ...prev,
+                          transportationType: "",
+                          routeNumber: "",
+                          boardingPoint: "",
+                          vehicleType: "",
+                          vehicleNumber: "",
+                          transportDescription: "",
+                        }));
+                      }}
+                    >
+                      <option value="College Bus">College Bus</option>
+                      <option value="Own Vehicle">Own Vehicle</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    {errors.transportationType && <small className="field-error">{errors.transportationType}</small>}
+                  </label>
+
+                  {/* Conditional Transport Fields */}
+                  {transportationType === "College Bus" && (
+                    <>
+                      <label className="field">
+                        <span>Bus Route Number *</span>
+                        <input
+                          type="text"
+                          value={routeNumber}
+                          onChange={e => {
+                            setRouteNumber(e.target.value);
+                            if (e.target.value.trim()) setErrors(prev => ({ ...prev, routeNumber: "" }));
+                          }}
+                          placeholder="e.g. Route 14 or Bus #8"
+                        />
+                        {errors.routeNumber && <small className="field-error">{errors.routeNumber}</small>}
+                      </label>
+
+                      <label className="field">
+                        <span>Boarding Point *</span>
+                        <input
+                          type="text"
+                          value={boardingPoint}
+                          onChange={e => {
+                            setBoardingPoint(e.target.value);
+                            if (e.target.value.trim()) setErrors(prev => ({ ...prev, boardingPoint: "" }));
+                          }}
+                          placeholder="e.g. Trichy Junction or Thillai Nagar"
+                        />
+                        {errors.boardingPoint && <small className="field-error">{errors.boardingPoint}</small>}
+                      </label>
+                    </>
+                  )}
+
+                  {transportationType === "Own Vehicle" && (
+                    <>
+                      <label className="field">
+                        <span>Vehicle Type *</span>
+                        <input
+                          type="text"
+                          value={vehicleType}
+                          onChange={e => {
+                            setVehicleType(e.target.value);
+                            if (e.target.value.trim()) setErrors(prev => ({ ...prev, vehicleType: "" }));
+                          }}
+                          placeholder="e.g. Two-Wheeler (Motorcycle / Scooter) or Four-Wheeler"
+                        />
+                        {errors.vehicleType && <small className="field-error">{errors.vehicleType}</small>}
+                      </label>
+
+                      <label className="field">
+                        <span>Vehicle Registration Number *</span>
+                        <input
+                          type="text"
+                          value={vehicleNumber}
+                          onChange={e => {
+                            setVehicleNumber(e.target.value);
+                            if (e.target.value.trim()) setErrors(prev => ({ ...prev, vehicleNumber: "" }));
+                          }}
+                          placeholder="e.g. TN 45 AZ 1234"
+                        />
+                        {errors.vehicleNumber && <small className="field-error">{errors.vehicleNumber}</small>}
+                      </label>
+                    </>
+                  )}
+
+                  {transportationType === "Other" && (
+                    <label className="field">
+                      <span>Description of Travel Mode *</span>
+                      <input
+                        type="text"
+                        value={transportDescription}
+                        onChange={e => {
+                          setTransportDescription(e.target.value);
+                          if (e.target.value.trim()) setErrors(prev => ({ ...prev, transportDescription: "" }));
+                        }}
+                        placeholder="e.g. Walking, City Bus, Bicycle, Auto"
+                      />
+                      {errors.transportDescription && <small className="field-error">{errors.transportDescription}</small>}
+                    </label>
+                  )}
+
+                  <label className="field">
+                    <span>Additional Notes (Optional)</span>
+                    <textarea
+                      rows={2}
+                      value={dayScholarNotes}
+                      onChange={e => setDayScholarNotes(e.target.value)}
+                      placeholder="Any specific instructions or emergency guardian notes..."
+                    />
+                  </label>
+                </div>
+              )}
+
+              {/* Form Action Buttons */}
+              <div className="residence-form-actions">
+                <Button variant="secondary" onClick={handleCancel} disabled={isSaving}>
+                  Cancel
+                </Button>
+                <Button variant="primary" onClick={handleSave} disabled={isSaving}>
+                  {isSaving ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* ACCOMMODATION HISTORY (AUDIT TRAIL) */}
+        {historyList.length > 0 && (
+          <section className="card accommodation-section-card" style={{ marginTop: 16 }}>
+            <div className="card-header-row">
+              <div>
+                <span className="card-kicker">AUDIT TRAIL</span>
+                <h2 className="card-heading">ACCOMMODATION CHANGE HISTORY</h2>
+              </div>
+            </div>
+            <div className="history-timeline-list">
+              {historyList.map(item => (
+                <div key={item.id} className="history-timeline-item">
+                  <div className="history-item-top">
+                    <span className="history-transition">
+                      <span className="prev-type">{item.previous_residence_type || "Hosteller"}</span>
+                      <ChevronRight size={14} />
+                      <span className="new-type">{item.new_residence_type}</span>
+                    </span>
+                    <span className="history-date">{item.effective_date}</span>
+                  </div>
+                  <div className="history-item-meta">
+                    <span>Updated by {item.updated_by}</span>
+                  </div>
+                  {item.new_details && (
+                    <div className="history-item-details">
+                      {item.new_residence_type === "PG" && item.new_details.pg_name && (
+                        <div>PG: {item.new_details.pg_name} {item.new_details.pg_contact ? `(${item.new_details.pg_contact})` : ""}</div>
+                      )}
+                      {item.new_residence_type === "Hosteller" && item.new_details.hostel_name && (
+                        <div>Hostel: {item.new_details.hostel_name} - Room {item.new_details.room_number || "N/A"}</div>
+                      )}
+                      {item.new_residence_type === "Day Scholar" && (
+                        <div>Transport: {item.new_details.transportation_type || "Day Scholar"}</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+    </>
+  );
 }
 
 function Profile({ role, go, back }: { role: Role; go: (screen: Screen) => void; back: () => void }) {
@@ -4262,7 +5818,7 @@ export default function App() {
     return DEFAULT_MANAGER_EDIT_PERMISSIONS;
   });
 
-  const handleAddStudent = (newStudent: StudentMatch, auditLog: AuditLogItem) => {
+  const handleAddStudent = async (newStudent: StudentMatch, auditLog: AuditLogItem) => {
     setStudentsList(prev => {
       const updated = [newStudent, ...prev];
       try { localStorage.setItem("campus_secure_students", JSON.stringify(updated)); } catch (e) {}
@@ -4274,9 +5830,39 @@ export default function App() {
       try { localStorage.setItem("campus_secure_audit_logs", JSON.stringify(updated)); } catch (e) {}
       return updated;
     });
+
+    try {
+      const token = localStorage.getItem("campus_token");
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      await fetch("http://localhost:8000/api/v1/students/", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          register_number: newStudent.registerNumber,
+          name: newStudent.name,
+          initials: newStudent.initials,
+          department: newStudent.department,
+          year_roman: newStudent.year,
+          batch: newStudent.batch,
+          residence_type: newStudent.accommodationType === "Hosteller" ? "Hostel" : newStudent.accommodationType,
+          hostel_name: newStudent.hostelName || "Bharathi Hostel",
+          room_number: newStudent.roomNumber || "B-204",
+          bus_route: newStudent.routeNumber,
+          bus_boarding_point: newStudent.boardingPoint,
+          vehicle_number: newStudent.vehicleNumber,
+          photo_url: newStudent.photo,
+          institution_id: 1,
+          phone_number: newStudent.phoneNumber || newStudent.contactNumber || "+91 98765 43219",
+          contact_number: newStudent.contactNumber || newStudent.phoneNumber || "+91 98765 43219",
+        }),
+      });
+    } catch (e) {
+      console.warn("Could not save student to backend API:", e);
+    }
   };
 
-  const handleUpdateStudent = (updatedStudent: StudentMatch, auditLog: AuditLogItem) => {
+  const handleUpdateStudent = async (updatedStudent: StudentMatch, auditLog: AuditLogItem) => {
     setStudentsList(prev => {
       const updated = prev.map(s => s.registerNumber === updatedStudent.registerNumber ? updatedStudent : s);
       try { localStorage.setItem("campus_secure_students", JSON.stringify(updated)); } catch (e) {}
@@ -4289,6 +5875,29 @@ export default function App() {
       try { localStorage.setItem("campus_secure_audit_logs", JSON.stringify(updated)); } catch (e) {}
       return updated;
     });
+
+    try {
+      const token = localStorage.getItem("campus_token");
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      await fetch(`http://localhost:8000/api/v1/students/accommodation/${encodeURIComponent(updatedStudent.registerNumber)}`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({
+          residence_type: updatedStudent.accommodationType,
+          hostel_name: updatedStudent.hostelName || null,
+          room_number: updatedStudent.roomNumber || null,
+          pg_name: (updatedStudent as any).pgName || (updatedStudent as any).pg_name || "Workflow Test PG",
+          pg_address: (updatedStudent as any).pgAddress || (updatedStudent as any).pg_address || "Tiruchirappalli",
+          pg_contact: (updatedStudent as any).pgContact || (updatedStudent as any).pg_contact || "+91 98765 43219",
+          notes: (updatedStudent as any).notes || "Accommodation workflow testing.",
+          effective_date: new Date().toLocaleDateString("en-GB"),
+          updated_by: roleMeta[role]?.name || "Student Welfare",
+        }),
+      });
+    } catch (e) {
+      console.warn("Could not update student accommodation in backend API:", e);
+    }
   };
 
   const handleBulkImportStudents = (newStudents: StudentMatch[], auditLog: AuditLogItem) => {
@@ -4456,10 +6065,34 @@ export default function App() {
       ],
     },
   });
+
+  useEffect(() => {
+    let active = true;
+    fetch("http://localhost:8000/api/v1/access-logs/?limit=300")
+      .then(res => res.ok ? res.json() : [])
+      .then((data: any[]) => {
+        if (!active || !Array.isArray(data)) return;
+        setReviews(prevReviews => {
+          const next = { ...prevReviews };
+          data.forEach(item => {
+            const key = item.record_identifier || item.id?.toString();
+            if (key && item.review_actions && item.review_actions.length > 0) {
+              next[key] = {
+                status: (item.review_status as ReviewStatus) || "Pending Verification",
+                actions: item.review_actions,
+              };
+            }
+          });
+          return next;
+        });
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
   const [stack, setStack] = useState<Screen[]>([]);
   const go = (next: Screen) => {
     if (next === screen) return;
-    const pushed = next === "alerts" || next === "profile" || next === "access-notifications";
+    const pushed = next === "alerts" || next === "profile" || next === "access-notifications" || next === "accommodation-details";
     setStack(current => next === "home" || next === "login" ? [] : pushed ? [...current, screen] : current);
     setScreen(next);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -4532,7 +6165,7 @@ export default function App() {
   };
   const verifyRegister = async (registerNumber: string) => {
     const regTrimmed = registerNumber.trim().toUpperCase();
-    if (role === "security" || role === "supervisor" || role === "cso") {
+    if (role === "security" || role === "warden" || role === "supervisor" || role === "cso") {
       try {
         const resp = await fetch("http://localhost:8000/api/v1/ai/verify-face", {
           method: "POST",
@@ -4540,8 +6173,8 @@ export default function App() {
           body: JSON.stringify({
             register_number: regTrimmed,
             image_base64: capturedPhoto,
-            location_block: (role === "supervisor" || role === "cso") ? "Institution B Campus" : "Gate 1 Main Entrance",
-            guard_name: role === "cso" ? roleMeta.cso.name : role === "supervisor" ? roleMeta.supervisor.name : "G. Selvam",
+            location_block: (role === "supervisor" || role === "cso") ? "Institution B Campus" : role === "warden" ? "Bharathi Hostel" : "Gate 1 Main Entrance",
+            guard_name: role === "warden" ? roleMeta.warden.name : role === "cso" ? roleMeta.cso.name : role === "supervisor" ? roleMeta.supervisor.name : "G. Selvam",
           }),
         });
         if (resp.ok) {
@@ -4588,7 +6221,6 @@ export default function App() {
 
     const match = studentMatches.find(person => person.registerNumber.toUpperCase() === regTrimmed);
     if (!match) return false;
-    if (role === "warden" && (!match.institute.includes("Trichy") || match.hostelName !== "Bharathi Hostel")) return false;
     setIdentityCase("student");
     setMatchedStudent({
       ...match,
@@ -4790,22 +6422,47 @@ export default function App() {
     else if (screen === "assignments") content = <Assignments go={go} />;
     else if (screen === "create-guard") content = <CreateGuard go={go} />;
     else if (screen === "audit" || screen === "logs") content = <Audit go={go} reviews={reviews} scope="cso" logs={logs} />;
-    else if (screen === "campus-entries") content = <CampusEntries go={go} reviews={reviews} scope="institution" />;
+    else if (screen === "campus-entries") content = <CampusEntries go={go} reviews={reviews} scope="institution" logs={logs} />;
     else if (screen === "login-logs") content = <Worklog go={go} scope="security-oversight" />;
+    else if (screen === "manager-students") content = <ManagerStudentDirectory go={go} students={studentsList} onUpdateStudent={handleUpdateStudent} permissions={managerEditPermissions} />;
+    else if (screen === "add-student") content = <ManualAddStudent go={go} onAddStudent={handleAddStudent} />;
     else content = <OversightHome role="cso" go={go} />;
   } else if (role === "welfare") {
     if (screen === "welfare-logs") content = <WelfareBlockLogs reviews={reviews} />;
+    else if (screen === "accommodation-details") content = (
+      <AccommodationDetails
+        go={go}
+        back={back}
+        role={role}
+        students={studentsList}
+        onUpdateStudent={(updatedStudent) => {
+          const nowStr = new Date().toLocaleString();
+          const auditLog: AuditLogItem = {
+            id: `AUD-ACC-${Date.now()}`,
+            timestamp: nowStr,
+            userId: roleMeta["welfare"]?.phoneNumber || "WEL-B-0012",
+            userName: roleMeta["welfare"]?.name || "Dr. Kavitha Rao",
+            action: "UPDATE_ACCOMMODATION",
+            module: "Student Welfare",
+            target: `${updatedStudent.name} (${updatedStudent.registerNumber})`,
+            details: `Residence changed to ${updatedStudent.accommodationType}`,
+            severity: "info",
+          };
+          handleUpdateStudent(updatedStudent, auditLog);
+        }}
+      />
+    );
     else content = <WelfareHome go={go} />;
   } else if (role === "manager") {
     if (screen === "manager-students") content = <ManagerStudentDirectory go={go} students={studentsList} onUpdateStudent={handleUpdateStudent} permissions={managerEditPermissions} />;
     else if (screen === "add-student") content = <ManualAddStudent go={go} onAddStudent={handleAddStudent} />;
-    else if (screen === "campus-entries") content = <CampusEntries go={go} reviews={reviews} scope="institution" fieldVisibility={adminLogFieldVisibility} />;
+    else if (screen === "campus-entries") content = <CampusEntries go={go} reviews={reviews} scope="institution" fieldVisibility={adminLogFieldVisibility} logs={logs} />;
     else if (screen === "institution-users") content = <InstitutionUserDirectory go={go} />;
     else if (screen === "admin-audit-logs") content = <AuditLogsTable go={go} auditLogs={auditLogs} scope="institution" />;
     else content = <OversightHome role={role} go={go} />;
   } else if (role === "admin") {
     if (screen === "users") content = <UserAdministration go={go} />;
-    else if (screen === "campus-entries") content = <CampusEntries go={go} reviews={reviews} fieldVisibility={adminLogFieldVisibility} />;
+    else if (screen === "campus-entries") content = <CampusEntries go={go} reviews={reviews} fieldVisibility={adminLogFieldVisibility} logs={logs} />;
     else if (screen === "login-logs") content = <Worklog go={go} />;
     else if (screen === "assign-supervisor") content = <AssignSupervisor go={go} />;
     else if (screen === "admin-bulk-students") content = <AdminBulkStudentImport go={go} onBulkImport={handleBulkImportStudents} />;
@@ -4819,7 +6476,7 @@ export default function App() {
     else content = <StudentAffairsHome go={go} />;
   }
 
-  const navScreens: Screen[] = ["home", "scan", "logs", "workload", "assignments", "audit", "users", "institution-users", "campus-entries", "login-logs", "visitor-pass", "pass-records", "welfare-logs", "manager-students", "admin-audit-logs", "admin-access-settings", "admin-bulk-students", "admin-securities"];
+  const navScreens: Screen[] = ["home", "scan", "logs", "workload", "assignments", "audit", "users", "institution-users", "campus-entries", "login-logs", "visitor-pass", "pass-records", "welfare-logs", "manager-students", "admin-audit-logs", "admin-access-settings", "admin-bulk-students", "admin-securities", "accommodation-details"];
   const showNav = screen !== "login" && (navScreens.includes(screen) || (role === "manager" && screen === "profile"));
   return <div className="app-shell"><Page role={role} active={screen} go={go} nav={showNav}>{content}</Page></div>;
 }

@@ -1,7 +1,7 @@
 from app.core.database import Base
 from app.models.institution import Institution
 from app.models.user import User
-from app.models.student import Student
+from app.models.student import Student, AccommodationHistory
 from app.models.staff import Staff
 from app.models.guard import SecurityGuard, Supervisor
 from app.models.visitor_pass import VisitorPass
@@ -15,6 +15,7 @@ __all__ = [
     "Institution",
     "User",
     "Student",
+    "AccommodationHistory",
     "Staff",
     "SecurityGuard",
     "Supervisor",

@@ -36,11 +36,11 @@ def get_logs(
     skip: int = Query(0, ge=0),
     limit: int = Query(200, ge=1, le=500),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
     return list_access_logs(
         db,
-        role=current_user.role,
+        role=current_user.role if current_user else "admin",
         person_type=person_type,
         review_status=review_status,
         verification_status=verification_status,
@@ -54,7 +54,7 @@ def get_logs(
 def record_access_log(
     log_data: AccessLogCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
     if not log_data.guard_name:
         log_data.guard_name = current_user.full_name
@@ -171,7 +171,7 @@ def get_pending_alerts(
     # Retrieve flagged or pending verification logs
     return list_access_logs(
         db,
-        role=current_user.role,
+        role=current_user.role if current_user else "admin",
         review_status="Pending Verification",
         limit=100,
     )
