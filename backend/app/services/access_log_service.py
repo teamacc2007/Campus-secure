@@ -201,7 +201,7 @@ def review_access_log(
         "decision_made_by": actor_name,
         "supervisor_id": actor_number,
         "supervisor_name": actor_name,
-        "action_taken": action_taken_desc if review.action_type == "Unauthorised" else None,
+        "action_taken": action_taken_desc,
         "decision_timestamp": decision_timestamp,
         "previous_status": prev_status,
         "updated_status": review.action_type,

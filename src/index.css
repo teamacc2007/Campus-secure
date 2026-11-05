@@ -328,7 +328,7 @@ h1, h2, h3, p, dl, dd { margin: 0; }
 .worklog-list .worklog-person { min-width: 0; padding-top: 1px; }
 .worklog-name-button { width: fit-content; padding: 0; border: 0; color: #1d55a0; background: none; font-size: 8px; font-weight: 800; text-align: left; }
 .worklog-name-button:active { color: var(--navy); }
-.worklog-times { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr); padding-top: 9px; border-top: 1px solid #edf0f4; }
+.worklog-times { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr; padding-top: 9px; border-top: 1px solid #edf0f4; }
 .worklog-times > div { display: grid; gap: 3px; text-align: center; border-right: 1px solid #edf0f4; }
 .worklog-times > div:last-child { border: 0; }
 .worklog-times span { color: var(--muted); font-size: 6px; }
@@ -336,7 +336,7 @@ h1, h2, h3, p, dl, dd { margin: 0; }
 .worklog-section-head { min-height: 18px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .worklog-section-head > span { color: var(--muted); font-size: 6px; white-space: nowrap; }
 .worklog-table-wrap { overflow-x: auto; margin-bottom: 12px; background: #fff; border: 1px solid var(--line); border-radius: 13px; box-shadow: 0 5px 15px rgba(24, 43, 69, .04); }
-.worklog-table { width: 720px; border-collapse: collapse; text-align: left; }
+.worklog-table { width: 100%; min-width: 540px; border-collapse: collapse; text-align: left; }
 .worklog-table th { height: 38px; padding: 0 10px; color: #65758b; background: #f1f5f9; border-bottom: 1px solid var(--line); font-size: 7px; font-weight: 800; white-space: nowrap; }
 .worklog-table td { height: 50px; padding: 9px 10px; color: #475870; border-bottom: 1px solid #edf0f4; font-size: 7px; white-space: nowrap; }
 .worklog-table tbody tr:last-child td { border-bottom: 0; }

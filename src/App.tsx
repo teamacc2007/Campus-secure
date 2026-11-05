@@ -2577,8 +2577,8 @@ function OfficerDetailView({
       </section>
       <div className="list-label">WORKLOG HISTORY</div>
       <div className="login-event-list worklog-list officer-history">
-        {officerWorklogs.map(item => (
-          <article key={`${item.name}${item.day}${item.entry}`}>
+        {officerWorklogs.map((item, index) => (
+          <article key={`${item.name}${item.day}${index}`}>
             <div className="login-dot"><FileClock size={16} /></div>
             <div className="worklog-person">
               <strong>{item.day}</strong>
@@ -2586,8 +2586,6 @@ function OfficerDetailView({
               <small>{formatDuration(item.durationMinutes)} logged</small>
             </div>
             <div className="worklog-times">
-              <div><span>Entry</span><strong>{item.entry}</strong></div>
-              <div><span>Exit</span><strong>{item.exit}</strong></div>
               <div><span>Duration</span><strong>{formatDuration(item.durationMinutes)}</strong></div>
             </div>
           </article>
@@ -2639,8 +2637,6 @@ function SecurityWorklogTable({
             <th>S.No</th>
             <th>Name</th>
             <th>Designation</th>
-            <th>Login</th>
-            <th>Logout</th>
             <th>Scans</th>
             <th>Authorized</th>
             <th>Unauthorized</th>
@@ -2662,8 +2658,6 @@ function SecurityWorklogTable({
                     {item.designation}
                   </span>
                 </td>
-                <td>{item.entry}</td>
-                <td>{item.exit}</td>
                 <td><strong>{officerScans.length}</strong></td>
                 <td>
                   <span className="worklog-count authorized">
@@ -3149,7 +3143,9 @@ function Alerts({
   const [readKeys, setReadKeys] = useState<string[]>([]);
   const [alertOrder, setAlertOrder] = useState(() => alertRows.map(recordKey));
   const [selected, setSelected] = useState<LogRecord | null>(null);
-  const [dialog, setDialog] = useState<"unauthorised" | "revoke" | null>(null);
+  const [dialog, setDialog] = useState<"authorised" | "unauthorised" | "revoke" | null>(null);
+  const [authNotes, setAuthNotes] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [reason, setReason] = useState("");
   const [reasonError, setReasonError] = useState(false);
   const [campusLocations, setCampusLocations] = useState<string[]>(defaultCampusLocations);
@@ -3182,11 +3178,12 @@ function Alerts({
     setReadKeys(current => current.includes(key) ? current : [...current, key]);
     setAlertOrder(current => [...current.filter(item => item !== key), key]);
   };
-  const handleAuthorise = () => {
+  const openAuthoriseDialog = () => {
     if (!selected) return;
     const rev = reviewFor(reviews, selected);
     if (rev.status === "Authorised" || rev.status === "Verified" || rev.status === "Revoked") return;
-    updateReview(selected, "Authorised");
+    setAuthNotes("");
+    setDialog("authorised");
   };
 
   const openUnauthDialog = () => {
@@ -3210,8 +3207,19 @@ function Alerts({
   };
 
   const confirmAction = () => {
-    if (!selected || !dialog) return;
-    if (dialog === "unauthorised") {
+    if (!selected || !dialog || isSubmitting) return;
+
+    if (dialog === "authorised") {
+      setIsSubmitting(true);
+      try {
+        const trimmedNotes = authNotes.trim() ? authNotes.trim() : undefined;
+        updateReview(selected, "Authorised", trimmedNotes);
+        setDialog(null);
+        setAuthNotes("");
+      } finally {
+        setIsSubmitting(false);
+      }
+    } else if (dialog === "unauthorised") {
       const errors: Record<string, string> = {};
       if (!unauthFullName.trim()) {
         errors.fullName = "Full name is required.";
@@ -3243,35 +3251,45 @@ function Alerts({
         return;
       }
 
-      const incidentData: IncidentData = {
-        fullName: unauthFullName.trim(),
-        address: unauthAddress.trim(),
-        contactNumber: unauthContactNumber.trim(),
-        vehicleNumber: unauthVehicleNumber.trim() || undefined,
-        location: unauthLocation,
-        dateTime: unauthDateTime,
-        actionTaken: actionTaken.trim(),
-      };
+      setIsSubmitting(true);
+      try {
+        const incidentData: IncidentData = {
+          fullName: unauthFullName.trim(),
+          address: unauthAddress.trim(),
+          contactNumber: unauthContactNumber.trim(),
+          vehicleNumber: unauthVehicleNumber.trim() || undefined,
+          location: unauthLocation,
+          dateTime: unauthDateTime,
+          actionTaken: actionTaken.trim(),
+        };
 
-      updateReview(selected, "Unauthorised", actionTaken.trim(), incidentData);
-      setDialog(null);
-      setFormErrors({});
+        updateReview(selected, "Unauthorised", actionTaken.trim(), incidentData);
+        setDialog(null);
+        setFormErrors({});
+      } finally {
+        setIsSubmitting(false);
+      }
     } else if (dialog === "revoke") {
       if (!reason.trim()) {
         setReasonError(true);
         return;
       }
-      updateReview(selected, "Revoked", reason.trim());
-      setDialog(null);
-      setReason("");
-      setReasonError(false);
+      setIsSubmitting(true);
+      try {
+        updateReview(selected, "Revoked", reason.trim());
+        setDialog(null);
+        setReason("");
+        setReasonError(false);
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
   if (selected) {
     const review = reviewFor(reviews, selected);
     const knownInstitution = !["Not identified", "Not available"].includes(selected.institution);
     return <>
-      <TopBar title="Alert details" subtitle={selected.logId} back={() => { setSelected(null); setDialog(null); }} />
+      <TopBar title="Alert details" subtitle={selected.logId} back={() => { setSelected(null); setDialog(null); setAuthNotes(""); }} />
       <div className="page-content">
         <section className="alert-record-head">
           <div className={`alert-symbol ${selected.accessCategory === "Authorized" ? "blue-bg" : ""}`}>{selected.accessCategory === "Authorized" ? <ShieldCheck size={20} /> : <ShieldAlert size={20} />}</div>
@@ -3316,7 +3334,7 @@ function Alerts({
           <div className="review-actions three-actions">
             <Button
               variant="success"
-              onClick={handleAuthorise}
+              onClick={openAuthoriseDialog}
               icon={<ShieldCheck size={16} />}
               disabled={review.status === "Authorised" || review.status === "Verified" || review.status === "Revoked"}
             >
@@ -3350,9 +3368,17 @@ function Alerts({
             <div className={`dialog-icon ${dialog === "unauthorised" ? "danger" : ""}`}>
               {dialog === "unauthorised" ? <ShieldAlert size={23} /> : <ShieldCheck size={23} />}
             </div>
-            <h2 id="dialog-title">{dialog === "unauthorised" ? "Mark as unauthorised?" : "Revoke unauthorised entry?"}</h2>
+            <h2 id="dialog-title">
+              {dialog === "authorised"
+                ? "Mark as authorised?"
+                : dialog === "unauthorised"
+                ? "Mark as unauthorised?"
+                : "Revoke unauthorised entry?"}
+            </h2>
             <p>
-              {dialog === "unauthorised"
+              {dialog === "authorised"
+                ? "Record any action taken or additional notes before confirming this authorised event."
+                : dialog === "unauthorised"
                 ? "Record the action taken before confirming this unauthorized event."
                 : "Revoke only if this entry is valid. Provide the reason, e.g. host approval granted."}
             </p>
@@ -3361,6 +3387,17 @@ function Alerts({
               <span>{selected.accessCategory} · {selected.guard}</span>
               <small>{selected.block} · {knownInstitution ? selected.institution : "Institution B"}</small>
             </div>
+            {dialog === "authorised" && (
+              <label className="field">
+                <span>Action Taken / Notes (Optional)</span>
+                <textarea
+                  value={authNotes}
+                  onChange={e => setAuthNotes(e.target.value)}
+                  rows={3}
+                  placeholder="Enter action taken or additional notes..."
+                />
+              </label>
+            )}
             {dialog === "unauthorised" && (
               <div className="unauth-form-fields">
                 <label className="field">
@@ -3478,8 +3515,10 @@ function Alerts({
             <div className="dialog-actions">
               <Button
                 variant="secondary"
+                disabled={isSubmitting}
                 onClick={() => {
                   setDialog(null);
+                  setAuthNotes("");
                   setFormErrors({});
                   setReasonError(false);
                 }}
@@ -3487,10 +3526,17 @@ function Alerts({
                 Cancel
               </Button>
               <Button
-                variant={dialog === "revoke" ? "primary" : "warning"}
+                variant={dialog === "authorised" ? "success" : dialog === "revoke" ? "primary" : "warning"}
+                disabled={isSubmitting}
                 onClick={confirmAction}
               >
-                {dialog === "unauthorised" ? "Confirm Unauthorised" : "Confirm revoke"}
+                {isSubmitting
+                  ? "Confirming..."
+                  : dialog === "authorised"
+                  ? "Confirm Authorised"
+                  : dialog === "unauthorised"
+                  ? "Confirm Unauthorised"
+                  : "Confirm revoke"}
               </Button>
             </div>
           </section>
@@ -4564,19 +4610,21 @@ export default function App() {
     const timestamp = new Date().toLocaleString("en-GB", { hour12: false }).replace(",", "");
     const incDate = incidentData?.dateTime ? incidentData.dateTime.split("T")[0] : undefined;
     const incTime = incidentData?.dateTime ? incidentData.dateTime.split("T")[1] : undefined;
+    const cleanReason = reason?.trim() ? reason.trim() : undefined;
+    const actionReason = cleanReason || incidentData?.actionTaken;
 
     const action: ReviewAction = {
       type,
       actor: actorName,
       actorNumber: actorNumber,
       timestamp,
-      reason: reason || incidentData?.actionTaken,
+      reason: actionReason,
       event_id: row.logId || key,
       verification_status: type === "Authorised" ? "Authorized" : "Unauthorized",
       decision_made_by: actorName,
       supervisor_id: actorNumber,
       supervisor_name: actorName,
-      action_taken: type === "Unauthorised" ? (incidentData?.actionTaken || reason) : undefined,
+      action_taken: (type === "Unauthorised" || type === "Authorised") ? (incidentData?.actionTaken || cleanReason) : undefined,
       decision_timestamp: timestamp,
       previous_status: reviewFor(reviews, row).status,
       updated_status: type,
@@ -4623,8 +4671,8 @@ export default function App() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action_type: type,
-        reason: reason || incidentData?.actionTaken,
-        action_taken: incidentData?.actionTaken || reason,
+        reason: actionReason,
+        action_taken: (type === "Unauthorised" || type === "Authorised") ? (incidentData?.actionTaken || cleanReason) : undefined,
         full_name: incidentData?.fullName,
         address: incidentData?.address,
         contact_number: incidentData?.contactNumber,
