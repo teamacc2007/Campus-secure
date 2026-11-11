@@ -13,6 +13,7 @@ import {
   DoorOpen,
   Download,
   Eye,
+  EyeOff,
   FileClock,
   FileSpreadsheet,
   History,
@@ -1951,6 +1952,47 @@ export function AdminBulkStudentImport({
 // -------------------------------------------------------------
 // 4. AUDIT LOGS TABLE & DETAIL INSPECTION (Admin & Manager)
 // -------------------------------------------------------------
+type HideableAuditColumn = "editedBy" | "institution" | "actionDetails" | "comments";
+
+function formatAuditDateParts(timestamp?: string, dateTime?: string): { date: string; time: string; full: string } {
+  const raw = (timestamp || dateTime || "").trim();
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}:\d{2})(?::(\d{2}))?)?/);
+  if (isoMatch) {
+    const [, yyyy, mm, dd, hhmm = "00:00", ss = "00"] = isoMatch;
+    const date = `${dd}/${mm}/${yyyy}`;
+    return { date, time: hhmm, full: `${date} ${hhmm}:${ss}` };
+  }
+  const dmyMatch = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}:\d{2})(?::(\d{2}))?)?/);
+  if (dmyMatch) {
+    const [, dd, mm, yyyy, hhmm = "00:00", ss = "00"] = dmyMatch;
+    const date = `${dd}/${mm}/${yyyy}`;
+    return { date, time: hhmm, full: `${date} ${hhmm}:${ss}` };
+  }
+  const parsed = new Date(dateTime || timestamp || "");
+  if (!Number.isNaN(parsed.getTime())) {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const date = `${pad(parsed.getDate())}/${pad(parsed.getMonth() + 1)}/${parsed.getFullYear()}`;
+    const time = `${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
+    const full = `${date} ${time}:${pad(parsed.getSeconds())}`;
+    return { date, time, full };
+  }
+  return { date: raw.slice(0, 10) || "—", time: raw.slice(11, 16) || "", full: raw || "—" };
+}
+
+const DEFAULT_AUDIT_VISIBLE_COLUMNS: Record<HideableAuditColumn, boolean> = {
+  editedBy: true,
+  institution: true,
+  actionDetails: true,
+  comments: true,
+};
+
+const AUDIT_COLUMN_LABELS: { key: HideableAuditColumn; label: string }[] = [
+  { key: "editedBy", label: "Edited by" },
+  { key: "institution", label: "Institution" },
+  { key: "actionDetails", label: "Action details" },
+  { key: "comments", label: "Comments" },
+];
+
 export function AuditLogsTable({
   go,
   auditLogs,
@@ -1964,9 +2006,53 @@ export function AuditLogsTable({
   const [actionFilter, setActionFilter] = useState("All Actions");
   const [institutionFilter, setInstitutionFilter] = useState(scope === "institution" ? "SRM GROUP OF INSTITUTIONS TRICHY" : "All institutions");
   const [selectedLog, setSelectedLog] = useState<AuditLogItem | null>(null);
+  const [visibleColumns, setVisibleColumns] = useState<Record<HideableAuditColumn, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem("campus_secure_audit_log_columns");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return { ...DEFAULT_AUDIT_VISIBLE_COLUMNS, ...parsed };
+      }
+    } catch {}
+    return DEFAULT_AUDIT_VISIBLE_COLUMNS;
+  });
+
+  const toggleColumn = (col: HideableAuditColumn) => {
+    setVisibleColumns(prev => {
+      const next = { ...prev, [col]: !prev[col] };
+      try {
+        localStorage.setItem("campus_secure_audit_log_columns", JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const hiddenColumnList = AUDIT_COLUMN_LABELS.filter(c => !visibleColumns[c.key]);
+  const visibleOptionalCount = AUDIT_COLUMN_LABELS.length - hiddenColumnList.length;
+
+  const renderMovableHeader = (col: HideableAuditColumn, label: string, className: string) => {
+    if (!visibleColumns[col]) return null;
+    return (
+      <th className={className}>
+        <div className="audit-th-inner">
+          <span>{label}</span>
+          <button
+            type="button"
+            className="audit-th-eye-btn"
+            onClick={() => toggleColumn(col)}
+            aria-label={`Hide ${label} field`}
+            title={`Hide ${label}`}
+          >
+            <Eye size={12} />
+          </button>
+        </div>
+      </th>
+    );
+  };
 
   const filteredLogs = auditLogs.filter(log => {
-    const text = `${log.editedBy} ${log.editorRole} ${log.action} ${log.institution} ${log.actionDetails} ${log.comments}`.toLowerCase();
+    const dt = formatAuditDateParts(log.timestamp, log.dateTime);
+    const text = `${dt.full} ${log.editedBy} ${log.editorRole} ${log.action} ${log.institution} ${log.actionDetails} ${log.comments}`.toLowerCase();
     const matchQuery = !query || text.includes(query.toLowerCase());
     const matchAction = actionFilter === "All Actions" || log.action === actionFilter;
     const matchInst =
@@ -2032,25 +2118,44 @@ export function AuditLogsTable({
           </div>
         </section>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "8px 0" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", margin: "8px 0", flexWrap: "wrap" }}>
           <span style={{ fontSize: "12px", color: "#64748b", fontWeight: "600" }}>
             {filteredLogs.length} audit records
           </span>
           <span style={{ fontSize: "11px", color: "#94a3b8" }}>
-            Swipe horizontally · Tap row for details
+            {visibleOptionalCount > 0 ? "Swipe horizontally · Tap row for details" : "Tap row for details"}
           </span>
         </div>
+
+        {hiddenColumnList.length > 0 && (
+          <div className="audit-hidden-restore-bar">
+            <span className="audit-hidden-label">Hidden fields:</span>
+            {hiddenColumnList.map(col => (
+              <button
+                key={col.key}
+                type="button"
+                className="audit-hidden-chip"
+                onClick={() => toggleColumn(col.key)}
+                aria-label={`Show ${col.label} field`}
+                title={`Show ${col.label}`}
+              >
+                <EyeOff size={12} />
+                <span>{col.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="audit-table-wrap audit-logs-sticky-wrap">
           <table className="audit-table audit-logs-sticky-table">
             <thead>
               <tr>
-                <th className="sticky-col-time">Time</th>
+                <th className="sticky-col-time">Date &amp; Time</th>
                 <th className="sticky-col-action">Action</th>
-                <th>Edited by</th>
-                <th>Institution</th>
-                <th>Action details</th>
-                <th>Comments</th>
+                {renderMovableHeader("editedBy", "Edited by", "audit-col-edited-by")}
+                {renderMovableHeader("institution", "Institution", "audit-col-institution")}
+                {renderMovableHeader("actionDetails", "Action details", "audit-col-details")}
+                {renderMovableHeader("comments", "Comments", "audit-col-comments")}
               </tr>
             </thead>
             <tbody>
@@ -2066,23 +2171,37 @@ export function AuditLogsTable({
                     ? "user"
                     : "settings";
 
+                const dt = formatAuditDateParts(log.timestamp, log.dateTime);
                 return (
                   <tr key={log.id} onClick={() => setSelectedLog(log)}>
-                    <td className="sticky-col-time">{log.timestamp.slice(5, 16)}</td>
+                    <td className="sticky-col-time">
+                      <strong style={{ display: "block", color: "#1e2d43" }}>{dt.date}</strong>
+                      {dt.time && <small style={{ color: "#64748b", display: "block" }}>{dt.time}</small>}
+                    </td>
                     <td className="sticky-col-action">
                       <span className={`action-badge ${badgeClass}`}>{log.action}</span>
                     </td>
-                    <td>
-                      <strong>{log.editedBy}</strong>
-                      <small style={{ color: "#64748b", display: "block" }}>{log.editorRole}</small>
-                    </td>
-                    <td>{log.institution.replace("SRM GROUP OF INSTITUTIONS ", "")}</td>
-                    <td className="audit-single-line-cell" title={log.actionDetails}>
-                      {log.actionDetails}
-                    </td>
-                    <td className="audit-single-line-cell" title={log.comments || "—"}>
-                      {log.comments || "—"}
-                    </td>
+                    {visibleColumns.editedBy && (
+                      <td className="audit-col-edited-by">
+                        <strong>{log.editedBy}</strong>
+                        <small style={{ color: "#64748b", display: "block" }}>{log.editorRole}</small>
+                      </td>
+                    )}
+                    {visibleColumns.institution && (
+                      <td className="audit-col-institution">
+                        {log.institution.replace("SRM GROUP OF INSTITUTIONS ", "")}
+                      </td>
+                    )}
+                    {visibleColumns.actionDetails && (
+                      <td className="audit-single-line-cell audit-col-details" title={log.actionDetails}>
+                        {log.actionDetails}
+                      </td>
+                    )}
+                    {visibleColumns.comments && (
+                      <td className="audit-single-line-cell audit-col-comments" title={log.comments || "—"}>
+                        {log.comments || "—"}
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -2108,7 +2227,7 @@ export function AuditLogsTable({
 
               <section className="info-card" style={{ marginBottom: "14px" }}>
                 <dl>
-                  <div><dt>Timestamp</dt><dd>{selectedLog.timestamp}</dd></div>
+                  <div><dt>Date &amp; Time</dt><dd>{formatAuditDateParts(selectedLog.timestamp, selectedLog.dateTime).full}</dd></div>
                   <div><dt>Edited By</dt><dd>{selectedLog.editedBy}</dd></div>
                   <div><dt>Role</dt><dd>{selectedLog.editorRole}</dd></div>
                   <div><dt>Institution</dt><dd>{selectedLog.institution}</dd></div>
