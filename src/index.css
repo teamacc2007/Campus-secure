@@ -1642,7 +1642,7 @@ h1, h2, h3, p, dl, dd { margin: 0; }
   margin-bottom: 16px;
 }
 
-.bulk-dropzone:hover {
+.bulk-dropzone:hover, .bulk-dropzone.dragging {
   background: #eff6ff;
   border-color: #3b82f6;
 }
@@ -1662,6 +1662,82 @@ h1, h2, h3, p, dl, dd { margin: 0; }
 .action-badge.bulk { background: #fae8ff; color: #86198f; }
 .action-badge.user { background: #ffedd5; color: #c2410c; }
 .action-badge.settings { background: #f1f5f9; color: #475569; }
+
+.audit-logs-sticky-wrap {
+  position: relative;
+  overflow-x: auto;
+}
+
+.audit-logs-sticky-table {
+  width: max-content;
+  min-width: 980px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.audit-logs-sticky-table th,
+.audit-logs-sticky-table td {
+  font-size: 9.5px;
+}
+
+.audit-logs-sticky-table th.sticky-col-time,
+.audit-logs-sticky-table td.sticky-col-time {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  width: 78px;
+  min-width: 78px;
+  max-width: 78px;
+  padding: 9px 8px;
+}
+
+.audit-logs-sticky-table th.sticky-col-action,
+.audit-logs-sticky-table td.sticky-col-action {
+  position: sticky;
+  left: 78px;
+  z-index: 3;
+  width: 156px;
+  min-width: 156px;
+  max-width: 156px;
+  padding: 9px 8px;
+  border-right: 1px solid var(--line);
+  box-shadow: 4px 0 10px -4px rgba(15, 23, 42, 0.16);
+}
+
+.audit-logs-sticky-table thead th.sticky-col-time,
+.audit-logs-sticky-table thead th.sticky-col-action {
+  z-index: 4;
+  background: #f1f5f9;
+}
+
+.audit-logs-sticky-table tbody td.sticky-col-time,
+.audit-logs-sticky-table tbody td.sticky-col-action {
+  background: #ffffff;
+}
+
+.audit-logs-sticky-table tbody tr:hover td.sticky-col-time,
+.audit-logs-sticky-table tbody tr:hover td.sticky-col-action {
+  background: #f8fafc;
+}
+
+.audit-logs-sticky-table tbody tr:active td.sticky-col-time,
+.audit-logs-sticky-table tbody tr:active td.sticky-col-action {
+  background: #edf4ff;
+}
+
+.audit-logs-sticky-table .action-badge {
+  font-size: 8px;
+  letter-spacing: 0.2px;
+  padding: 3px 6px;
+  white-space: nowrap;
+}
+
+.audit-logs-sticky-table td.audit-single-line-cell {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* Accommodation Details Module Styles */
 .student-selector-panel {

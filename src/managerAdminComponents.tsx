@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type ChangeEvent, type FormEvent } from "react";
+import { useState, useRef, useEffect, type ChangeEvent, type DragEvent, type FormEvent } from "react";
 import * as XLSX from "xlsx";
 import {
   AlertTriangle,
@@ -45,14 +45,23 @@ export type AuditLogItem = {
   id: string;
   timestamp: string;
   dateTime: string;
-  actor: string;
-  actorRole: "Institute Manager" | "Admin" | "Campus Supervisor" | "CSO" | "System";
-  actorId?: string;
-  action: "Student Added" | "Student Details Updated" | "Bulk Students Imported" | "User Created" | "User Status Changed" | "Settings Modified" | "Access Permissions Updated";
-  target: string;
+  editedBy: string;
+  editorRole: "Institute Manager" | "Super admin" | "Campus Supervisor" | "CSO" | "Student Welfare" | "System";
+  action:
+    | "Student Added"
+    | "Student Details Updated"
+    | "Accommodation Updated"
+    | "Bulk Students Imported"
+    | "User Created"
+    | "User Details Updated"
+    | "User Status Changed"
+    | "Security Assignment Updated"
+    | "Settings Modified"
+    | "Access Permissions Updated";
   institution: string;
   block?: string;
-  summary: string;
+  actionDetails: string;
+  comments: string;
   changes?: { field: string; oldVal: string; newVal: string }[];
   details?: Record<string, any>;
 };
@@ -130,14 +139,13 @@ export const DEFAULT_AUDIT_LOGS: AuditLogItem[] = [
     id: "AUD-INIT-001",
     timestamp: "2026-11-04 09:15:22",
     dateTime: "2026-11-04T09:15:22",
-    actor: "Priya Raman",
-    actorRole: "Institute Manager",
-    actorId: "MGR-B-0001",
+    editedBy: "Priya Raman",
+    editorRole: "Institute Manager",
     action: "Student Added",
-    target: "Karthik R (23IT1042)",
     institution: "SRM GROUP OF INSTITUTIONS TRICHY",
     block: "Institution B Campus",
-    summary: "Manually registered student and trained face recognition model. Class: IT-II-C, Own Vehicle.",
+    actionDetails: "Added Karthik R (23IT1042) · Class IT-II-C",
+    comments: "Manual intake enrollment verified with ID proof and live photo.",
     changes: [
       { field: "Name", oldVal: "(New Record)", newVal: "Karthik R" },
       { field: "Register Number", oldVal: "(New Record)", newVal: "23IT1042" },
@@ -151,14 +159,13 @@ export const DEFAULT_AUDIT_LOGS: AuditLogItem[] = [
     id: "AUD-INIT-002",
     timestamp: "2026-11-04 10:30:10",
     dateTime: "2026-11-04T10:30:10",
-    actor: "Priya Raman",
-    actorRole: "Institute Manager",
-    actorId: "MGR-B-0001",
+    editedBy: "Priya Raman",
+    editorRole: "Institute Manager",
     action: "Student Details Updated",
-    target: "Sur (23MED0412)",
     institution: "SRM GROUP OF INSTITUTIONS TRICHY",
     block: "Bharathi Hostel",
-    summary: "Updated hostel room assignment from B-202 to B-204.",
+    actionDetails: "Updated Room Number (B-202 → B-204) for Sur (23MED0412)",
+    comments: "Student approved for Bharathi Hostel room transfer request.",
     changes: [
       { field: "Room Number", oldVal: "B-202", newVal: "B-204" },
     ],
@@ -167,27 +174,25 @@ export const DEFAULT_AUDIT_LOGS: AuditLogItem[] = [
     id: "AUD-INIT-003",
     timestamp: "2026-11-03 14:20:00",
     dateTime: "2026-11-03T14:20:00",
-    actor: "Avery Williams",
-    actorRole: "Admin",
-    actorId: "ADM-0001",
+    editedBy: "Avery Williams",
+    editorRole: "Super admin",
     action: "Bulk Students Imported",
-    target: "12 Students",
     institution: "All campus institutions",
     block: "All Blocks",
-    summary: "Imported 12 students via spreadsheet (CampusSecure_Batch_2026.xlsx) and trained face models.",
+    actionDetails: "Imported 12 students via CampusSecure_Batch_2026.xlsx",
+    comments: "Semester batch admission sheet uploaded by central admissions team.",
   },
   {
     id: "AUD-INIT-004",
     timestamp: "2026-11-02 16:45:18",
     dateTime: "2026-11-02T16:45:18",
-    actor: "Avery Williams",
-    actorRole: "Admin",
-    actorId: "ADM-0001",
+    editedBy: "Avery Williams",
+    editorRole: "Super admin",
     action: "Access Permissions Updated",
-    target: "Institute Manager Role",
     institution: "Institution B",
     block: "Main Gate",
-    summary: "Configured editable fields for Institute Manager portal.",
+    actionDetails: "Modified edit permissions for Institute Manager portal",
+    comments: "Locked academic name and register edits to Super admin-only review.",
   },
 ];
 
@@ -238,9 +243,13 @@ export function computeClassCode(dept: string, yr: string, sec: string, reg?: st
 export function ManualAddStudent({
   go,
   onAddStudent,
+  editorName = "Priya Raman",
+  editorRole = "Institute Manager",
 }: {
   go: (screen: Screen) => void;
   onAddStudent: (student: StudentMatch, auditLog: AuditLogItem) => void;
+  editorName?: string;
+  editorRole?: AuditLogItem["editorRole"];
 }) {
   const [name, setName] = useState("");
   const [registerNumber, setRegisterNumber] = useState("");
@@ -256,6 +265,7 @@ export function ManualAddStudent({
   const [vehicleNumber, setVehicleNumber] = useState("TN-45-AZ-9988");
   const [boardingPoint, setBoardingPoint] = useState("Trichy Central Junction");
   const [routeNumber, setRouteNumber] = useState("Route M-14");
+  const [enrollmentComment, setEnrollmentComment] = useState("");
 
   // Photo state
   const [photoSource, setPhotoSource] = useState<"file" | "camera">("file");
@@ -300,7 +310,7 @@ export function ManualAddStudent({
       }
       setCameraActive(true);
     } catch (e: any) {
-      setCameraError("Camera access unavailable. You can upload a photo from files.");
+      setCameraError("Camera access unavailable. You can choose a photo from your gallery.");
       setCameraActive(false);
     }
   };
@@ -393,14 +403,13 @@ export function ManualAddStudent({
         id: `AUD-ADD-${Date.now()}`,
         timestamp: timeStr,
         dateTime: now.toISOString(),
-        actor: "Priya Raman",
-        actorRole: "Institute Manager",
-        actorId: "MGR-B-0001",
+        editedBy: editorName,
+        editorRole,
         action: "Student Added",
-        target: `${newStudent.name} (${newStudent.registerNumber})`,
         institution: "SRM GROUP OF INSTITUTIONS TRICHY",
         block: "Institution B Campus",
-        summary: `Enrolled new student with photo and trained biometric model. Class: ${classCode}, Transport: ${accommodationType === "Day Scholar" ? transportationType : "Hostel"}.`,
+        actionDetails: `Added ${newStudent.name} (${newStudent.registerNumber}) · Class ${classCode}`,
+        comments: enrollmentComment.trim() || "Manual student enrollment & biometric face training.",
         changes: [
           { field: "Full Name", oldVal: "(New Record)", newVal: newStudent.name },
           { field: "Register Number", oldVal: "(New Record)", newVal: newStudent.registerNumber },
@@ -501,6 +510,7 @@ export function ManualAddStudent({
                   setName("");
                   setRegisterNumber("");
                   setPhotoUrl(null);
+                  setEnrollmentComment("");
                 }}
               >
                 <Plus size={17} /> Add another student
@@ -529,15 +539,6 @@ export function ManualAddStudent({
 
       <form className="page-content form-page" onSubmit={handleSubmit}>
         <div className="form-stack guard-form">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: "11px", fontWeight: "700", color: "#64748b", textTransform: "uppercase" }}>
-              Class Preview
-            </span>
-            <span className="class-badge-preview">
-              <Sparkles size={14} /> {classCode}
-            </span>
-          </div>
-
           <label className="field">
             <span>Full Name <b>*</b></span>
             <input
@@ -705,7 +706,7 @@ export function ManualAddStudent({
                 className={`photo-tab-btn ${photoSource === "file" ? "active" : ""}`}
                 onClick={() => setPhotoSource("file")}
               >
-                <ImagePlus size={16} /> Upload File / Gallery
+                <ImagePlus size={16} /> Choose from Gallery
               </button>
               <button
                 type="button"
@@ -729,7 +730,7 @@ export function ManualAddStudent({
                   <>
                     <UploadCloud size={32} color="#64748b" />
                     <span style={{ fontSize: "12px", color: "#475569" }}>
-                      Select face photo from device files
+                      Select face photo from your gallery
                     </span>
                     <label className="btn secondary" style={{ cursor: "pointer", marginTop: "4px" }}>
                       <input
@@ -738,7 +739,7 @@ export function ManualAddStudent({
                         onChange={handleFileUpload}
                         style={{ display: "none" }}
                       />
-                      Browse Image
+                      Choose Image from Gallery
                     </label>
                   </>
                 )}
@@ -787,6 +788,16 @@ export function ManualAddStudent({
               </div>
             )}
           </div>
+
+          <label className="field" style={{ marginTop: "8px" }}>
+            <span>Comments / Reason</span>
+            <textarea
+              rows={2}
+              value={enrollmentComment}
+              onChange={e => setEnrollmentComment(e.target.value)}
+              placeholder="Reason or notes for enrolling this student (e.g. New admission / Transfer)..."
+            />
+          </label>
         </div>
 
         {training && (
@@ -823,11 +834,15 @@ export function ManagerStudentDirectory({
   students,
   onUpdateStudent,
   permissions,
+  editorName = "Priya Raman",
+  editorRole = "Institute Manager",
 }: {
   go: (screen: Screen) => void;
   students: StudentMatch[];
   onUpdateStudent: (student: StudentMatch, auditLog: AuditLogItem) => void;
   permissions: ManagerEditPermissions;
+  editorName?: string;
+  editorRole?: AuditLogItem["editorRole"];
 }) {
   const [query, setQuery] = useState("");
   const [deptFilter, setDeptFilter] = useState("All");
@@ -835,6 +850,8 @@ export function ManagerStudentDirectory({
 
   // Form draft
   const [draft, setDraft] = useState<StudentMatch | null>(null);
+  const [editComment, setEditComment] = useState("");
+  const [commentError, setCommentError] = useState("");
 
   const institutionStudents = students.filter(s =>
     (s.institute || "").toLowerCase().includes("trichy") || (s.institute || "").toLowerCase().includes("institution b")
@@ -850,11 +867,18 @@ export function ManagerStudentDirectory({
   const startEdit = (s: StudentMatch) => {
     setEditingStudent(s);
     setDraft({ ...s });
+    setEditComment("");
+    setCommentError("");
   };
 
   const handleSaveEdit = (e: FormEvent) => {
     e.preventDefault();
     if (!editingStudent || !draft) return;
+
+    if (!editComment.trim()) {
+      setCommentError("Please enter a comment or reason for editing this student's details.");
+      return;
+    }
 
     // Compute diffs for audit log
     const changes: { field: string; oldVal: string; newVal: string }[] = [];
@@ -889,26 +913,33 @@ export function ManagerStudentDirectory({
     const now = new Date();
     const timeStr = now.toISOString().replace("T", " ").slice(0, 19);
 
+    const studentLabel = `${updatedStudent.name} (${updatedStudent.registerNumber})`;
+    const singleLineAction =
+      changes.length === 1
+        ? `Updated ${changes[0].field} (${changes[0].oldVal} → ${changes[0].newVal}) for ${studentLabel}`
+        : changes.length > 1
+        ? `Updated ${changes.slice(0, 2).map(c => c.field).join(", ")}${changes.length > 2 ? ` +${changes.length - 2} more` : ""} for ${studentLabel}`
+        : `Reviewed student details for ${studentLabel}`;
+
     const auditLog: AuditLogItem = {
       id: `AUD-EDIT-${Date.now()}`,
       timestamp: timeStr,
       dateTime: now.toISOString(),
-      actor: "Priya Raman",
-      actorRole: "Institute Manager",
-      actorId: "MGR-B-0001",
+      editedBy: editorName,
+      editorRole,
       action: "Student Details Updated",
-      target: `${updatedStudent.name} (${updatedStudent.registerNumber})`,
       institution: "SRM GROUP OF INSTITUTIONS TRICHY",
       block: "Institution B Campus",
-      summary: changes.length > 0
-        ? `Modified fields: ${changes.map(c => c.field).join(", ")}`
-        : "Re-verified student record details without changes.",
+      actionDetails: singleLineAction,
+      comments: editComment.trim(),
       changes,
     };
 
     onUpdateStudent(updatedStudent, auditLog);
     setEditingStudent(null);
     setDraft(null);
+    setEditComment("");
+    setCommentError("");
   };
 
   return (
@@ -1033,7 +1064,7 @@ export function ManagerStudentDirectory({
                 <label className="field">
                   <span>
                     Full Name
-                    {!permissions.name && <span className="lock-tag"><Lock size={12} /> Locked by Admin</span>}
+                    {!permissions.name && <span className="lock-tag"><Lock size={12} /> Locked by Super admin</span>}
                   </span>
                   <input
                     disabled={!permissions.name}
@@ -1051,7 +1082,7 @@ export function ManagerStudentDirectory({
                 <label className="field">
                   <span>
                     Department
-                    {!permissions.department && <span className="lock-tag"><Lock size={12} /> Locked by Admin</span>}
+                    {!permissions.department && <span className="lock-tag"><Lock size={12} /> Locked by Super admin</span>}
                   </span>
                   <input
                     disabled={!permissions.department}
@@ -1097,7 +1128,7 @@ export function ManagerStudentDirectory({
                 <label className="field">
                   <span>
                     Accommodation Type
-                    {!permissions.accommodationType && <span className="lock-tag"><Lock size={12} /> Locked by Admin</span>}
+                    {!permissions.accommodationType && <span className="lock-tag"><Lock size={12} /> Locked by Super admin</span>}
                   </span>
                   <select
                     disabled={!permissions.accommodationType}
@@ -1145,7 +1176,7 @@ export function ManagerStudentDirectory({
                     <label className="field">
                       <span>
                         Mode of Transport
-                        {!permissions.transportationType && <span className="lock-tag"><Lock size={12} /> Locked by Admin</span>}
+                        {!permissions.transportationType && <span className="lock-tag"><Lock size={12} /> Locked by Super admin</span>}
                       </span>
                       <select
                         disabled={!permissions.transportationType}
@@ -1161,7 +1192,7 @@ export function ManagerStudentDirectory({
                     <label className="field">
                       <span>
                         Location (Residential Area)
-                        {!permissions.residentialLocation && <span className="lock-tag"><Lock size={12} /> Locked by Admin</span>}
+                        {!permissions.residentialLocation && <span className="lock-tag"><Lock size={12} /> Locked by Super admin</span>}
                       </span>
                       <input
                         disabled={!permissions.residentialLocation}
@@ -1185,6 +1216,20 @@ export function ManagerStudentDirectory({
                     </label>
                   </>
                 )}
+
+                <label className="field" style={{ marginTop: "8px" }}>
+                  <span>Comment / Reason for Edit <b>*</b></span>
+                  <textarea
+                    rows={2}
+                    value={editComment}
+                    onChange={e => {
+                      setEditComment(e.target.value);
+                      if (e.target.value.trim()) setCommentError("");
+                    }}
+                    placeholder="Enter the reason or comment for modifying this student's details..."
+                  />
+                  {commentError && <small className="field-error">{commentError}</small>}
+                </label>
 
                 <div style={{ display: "flex", gap: "10px", marginTop: "14px" }}>
                   <button type="button" className="btn secondary" onClick={() => setEditingStudent(null)}>
@@ -1215,12 +1260,16 @@ export function AdminBulkStudentImport({
 }) {
   const [parsedRows, setParsedRows] = useState<StudentMatch[]>([]);
   const [fileName, setFileName] = useState("");
+  const [uploadError, setUploadError] = useState("");
+  const [rowErrors, setRowErrors] = useState<string[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
   const [training, setTraining] = useState(false);
   const [trainProgress, setTrainProgress] = useState(0);
   const [importDone, setImportDone] = useState(false);
+  const [importComment, setImportComment] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Template download function
+  // Template download function (Styled bold headers, larger font, spacious single-cell columns)
   const downloadTemplate = () => {
     const headers = [
       "Full Name",
@@ -1241,202 +1290,396 @@ export function AdminBulkStudentImport({
       "Photo URL",
     ];
 
-    const sampleData = [
-      [
-        "Arun Kumar",
-        "23IT1080",
-        "Information Technology",
-        "II",
-        "2023–2027",
-        "C",
-        "SRM GROUP OF INSTITUTIONS TRICHY",
-        "Day Scholar",
-        "",
-        "",
-        "Own Vehicle",
-        "Thillai Nagar, Trichy",
-        "TN-45-AZ-1122",
-        "",
-        "",
-        "/faces/student_details/22ECE1001_crop.jpg",
-      ],
-      [
-        "Sneha R",
-        "23MED0450",
-        "General Medicine & Surgery",
-        "II",
-        "2023–2028",
-        "A",
-        "SRM GROUP OF INSTITUTIONS TRICHY",
-        "Hosteller",
-        "Bharathi Hostel",
-        "B-310",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "/faces/student_details/22ECE1002_crop.jpg",
-      ],
-      [
-        "Kiran Varma",
-        "22CSE0910",
-        "Computer Science & Engineering",
-        "III",
-        "2022–2026",
-        "B",
-        "Easwari Engineering College",
-        "Day Scholar",
-        "",
-        "",
-        "College Bus",
-        "",
-        "",
-        "Ramapuram Junction",
-        "Route E-01",
-        "/faces/student_details/22ECE1003_crop.jpg",
-      ],
+    const instructionsRows = [
+      ["Column", "Requirement", "Accepted Format / Example"],
+      ["Full Name", "Required", "Student legal name (min 2 letters), e.g. Arun Kumar"],
+      ["Register Number", "Required", "Unique alphanumeric ID containing digits, e.g. 23IT1080"],
+      ["Department", "Required", "e.g. Information Technology, General Medicine & Surgery"],
+      ["Year", "Required", "I, II, III, IV (or 1, 2, 3, 4)"],
+      ["Batch", "Optional", "e.g. 2023-2027"],
+      ["Section", "Required", "Single or short code, e.g. A, B, C"],
+      ["Institution", "Required", "e.g. SRM GROUP OF INSTITUTIONS TRICHY"],
+      ["Accommodation Type", "Required", "Hosteller, Day Scholar, or PG"],
+      ["Hostel Name", "Required if Hosteller", "e.g. Bharathi Hostel"],
+      ["Room Number", "Required if Hosteller", "e.g. B-310"],
+      ["Mode of Transport", "Required if Day Scholar", "Own Vehicle or College Bus"],
+      ["Residential Location", "Required if Own Vehicle", "e.g. Thillai Nagar, Trichy"],
+      ["Vehicle Number", "Required if Own Vehicle", "e.g. TN-45-AZ-1122"],
+      ["Boarding Point", "Required if College Bus", "e.g. Trichy Central Junction"],
+      ["Route Number", "Required if College Bus", "e.g. Route M-14"],
+      ["Photo URL", "Required", "Valid image URL/path or data URI (https://..., /faces/..., data:image/...)"],
     ];
 
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleData]);
+    const wsStudents = XLSX.utils.aoa_to_sheet([headers]);
+    wsStudents["!cols"] = headers.map(h => ({
+      wch: Math.max(Math.ceil(h.length * 1.45) + 12, 26),
+    }));
+    wsStudents["!rows"] = [{ hpt: 36 }];
+
+    const wsGuide = XLSX.utils.aoa_to_sheet(instructionsRows);
+    wsGuide["!cols"] = [{ wch: 30 }, { wch: 32 }, { wch: 76 }];
+    wsGuide["!rows"] = instructionsRows.map((_, i) => ({ hpt: i === 0 ? 34 : 24 }));
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Students");
-    XLSX.writeFile(wb, "CampusSecure_Student_Bulk_Template.xlsx");
+    XLSX.utils.book_append_sheet(wb, wsStudents, "Students");
+    XLSX.utils.book_append_sheet(wb, wsGuide, "Instructions");
+
+    try {
+      const cfb = XLSX.CFB;
+      const rawBuf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+      const pkg = cfb.read(new Uint8Array(rawBuf), { type: "array" });
+      const enc = new TextEncoder();
+      const dec = new TextDecoder();
+
+      // Bold 14pt centered headings with light blue header fill & borders; spacious 11pt vertically centered body cells
+      const customStyles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <fonts count="2">
+    <font><sz val="11"/><color rgb="FF1E293B"/><name val="Calibri"/><family val="2"/></font>
+    <font><b/><sz val="14"/><color rgb="FF0F172A"/><name val="Calibri"/><family val="2"/></font>
+  </fonts>
+  <fills count="3">
+    <fill><patternFill patternType="none"/></fill>
+    <fill><patternFill patternType="gray125"/></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFE8F0FE"/><bgColor indexed="64"/></patternFill></fill>
+  </fills>
+  <borders count="2">
+    <border><left/><right/><top/><bottom/><diagonal/></border>
+    <border>
+      <left style="thin"><color rgb="FFCBD5E1"/></left>
+      <right style="thin"><color rgb="FFCBD5E1"/></right>
+      <top style="thin"><color rgb="FFCBD5E1"/></top>
+      <bottom style="medium"><color rgb="FF2563EB"/></bottom>
+      <diagonal/>
+    </border>
+  </borders>
+  <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+  <cellXfs count="2">
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf>
+    <xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf>
+  </cellXfs>
+  <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+</styleSheet>`;
+
+      const stylesEntry = cfb.find(pkg, "/xl/styles.xml");
+      if (stylesEntry) {
+        stylesEntry.content = enc.encode(customStyles);
+      }
+
+      const styleWorksheet = (pathInPkg: string, freezeTopRow: boolean) => {
+        const entry = cfb.find(pkg, pathInPkg);
+        if (!entry) return;
+        let xml = dec.decode(Uint8Array.from(entry.content));
+        if (freezeTopRow) {
+          xml = xml.replace(
+            "<sheetView workbookViewId=\"0\"/>",
+            "<sheetView workbookViewId=\"0\"><pane ySplit=\"1\" topLeftCell=\"A2\" activePane=\"bottomLeft\" state=\"frozen\"/></sheetView>"
+          );
+        }
+        xml = xml.replace("</sheetViews>", "</sheetViews><sheetFormatPr defaultRowHeight=\"24\" customHeight=\"1\"/>");
+        xml = xml.replace(/(<row r="1"[^>]*>)([\s\S]*?)(<\/row>)/, (_m, open, inner, close) => {
+          return open + inner.replace(/<c r="([A-Z]+1)" /g, '<c r="$1" s="1" ') + close;
+        });
+        entry.content = enc.encode(xml);
+      };
+
+      styleWorksheet("/xl/worksheets/sheet1.xml", true);
+      styleWorksheet("/xl/worksheets/sheet2.xml", true);
+
+      const styledBuf = cfb.write(pkg, { type: "array", fileType: "zip" });
+      const blob = new Blob([new Uint8Array(styledBuf)], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "CampusSecure_Student_Bulk_Template.xlsx";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch {
+      XLSX.writeFile(wb, "CampusSecure_Student_Bulk_Template.xlsx");
+    }
   };
 
-  // Load demo spreadsheet data
-  const loadDemoSpreadsheet = () => {
-    setFileName("CampusSecure_Batch_2026_Enrolled.xlsx");
-    const demoStudents: StudentMatch[] = [
-      {
-        initials: "DK",
-        name: "Deepak Kumar",
-        registerNumber: "23IT0410",
-        department: "Information Technology",
-        year: "II",
-        batch: "2023–2027",
-        section: "C",
-        classCode: "IT-II-C",
-        institute: "SRM GROUP OF INSTITUTIONS TRICHY",
-        similarity: 98,
-        accommodationType: "Day Scholar",
-        transportationType: "Own Vehicle",
-        location: "Thillai Nagar, Trichy",
-        residentialLocation: "Thillai Nagar, Trichy",
-        vehicleNumber: "TN-45-DE-1234",
-        photo: "/faces/student_details/22ECE1004_crop.jpg",
-      },
-      {
-        initials: "SM",
-        name: "Sangeetha M",
-        registerNumber: "23MED0512",
-        department: "General Medicine & Surgery",
-        year: "II",
-        batch: "2023–2028",
-        section: "A",
-        classCode: "MED-II-A",
-        institute: "SRM GROUP OF INSTITUTIONS TRICHY",
-        similarity: 97,
-        accommodationType: "Hosteller",
-        hostelName: "Bharathi Hostel",
-        roomNumber: "B-305",
-        photo: "/faces/student_details/22ECE1005_crop.jpg",
-      },
-      {
-        initials: "VS",
-        name: "Vikram Seth",
-        registerNumber: "22CSE0820",
-        department: "Computer Science & Engineering",
-        year: "III",
-        batch: "2022–2026",
-        section: "B",
-        classCode: "CSE-III-B",
-        institute: "SRM GROUP OF INSTITUTIONS TRICHY",
-        similarity: 96,
-        accommodationType: "Day Scholar",
-        transportationType: "College Bus",
-        boardingPoint: "Trichy Central Junction",
-        routeNumber: "Route M-14",
-        photo: "/faces/student_details/22ECE1006_crop.jpg",
-      },
-    ];
-    setParsedRows(demoStudents);
+  const resetUploadState = () => {
+    setParsedRows([]);
+    setFileName("");
+    setUploadError("");
+    setRowErrors([]);
+    setImportDone(false);
+    setTraining(false);
+    setTrainProgress(0);
+    setImportComment("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const processUploadedFile = (file: File) => {
+    setParsedRows([]);
+    setUploadError("");
+    setRowErrors([]);
+    setImportDone(false);
+    setTraining(false);
+    setTrainProgress(0);
+
+    const ext = file.name.split(".").pop()?.toLowerCase() || "";
+    if (!["xlsx", "xls", "csv"].includes(ext)) {
+      setFileName("");
+      setUploadError("Invalid file type. Please upload a valid Excel (.xlsx, .xls) or CSV (.csv) file.");
+      return;
+    }
+
+    setFileName(file.name);
+
+    const reader = new FileReader();
+    reader.onerror = () => {
+      setParsedRows([]);
+      setUploadError("Could not read the selected file. Please verify it is a valid spreadsheet.");
+    };
+    reader.onload = evt => {
+      try {
+        const buffer = evt.target?.result as ArrayBuffer;
+        const data = new Uint8Array(buffer);
+
+        // Reject spoofed/non-zip .xlsx files (real .xlsx is a ZIP starting with PK 0x50 0x4B)
+        if (ext === "xlsx" && (data.length < 4 || data[0] !== 0x50 || data[1] !== 0x4b)) {
+          setParsedRows([]);
+          setUploadError("Invalid .xlsx file detected. The file is corrupted or not a genuine Excel workbook.");
+          return;
+        }
+
+        const workbook = XLSX.read(data, { type: "array" });
+        if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+          setParsedRows([]);
+          setUploadError("The uploaded workbook contains no sheets.");
+          return;
+        }
+
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const rawJson: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+
+        const nonEmptyRows = rawJson.filter(row =>
+          Array.isArray(row) && row.some(cell => String(cell ?? "").trim() !== "")
+        );
+
+        if (nonEmptyRows.length === 0) {
+          setParsedRows([]);
+          setUploadError("The uploaded spreadsheet is empty.");
+          return;
+        }
+
+        // Strict Header Validation (match by normalized column names)
+        const rawHeaders = nonEmptyRows[0].map(h =>
+          String(h ?? "")
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, " ")
+            .trim()
+        );
+
+        const findCol = (aliases: string[]): number =>
+          rawHeaders.findIndex(h => aliases.includes(h));
+
+        const colIdx = {
+          name: findCol(["full name", "name", "student name"]),
+          regNo: findCol(["register number", "register no", "reg no", "reg number"]),
+          dept: findCol(["department", "dept"]),
+          year: findCol(["year", "year of study", "academic year"]),
+          batch: findCol(["batch"]),
+          section: findCol(["section", "sec"]),
+          institution: findCol(["institution", "institute"]),
+          accommodation: findCol(["accommodation type", "accommodation", "residence type", "residence"]),
+          hostelName: findCol(["hostel name", "hostel"]),
+          roomNumber: findCol(["room number", "room no", "room"]),
+          transport: findCol(["mode of transport", "transportation type", "transport mode", "transport"]),
+          location: findCol(["residential location", "location", "residential address", "area"]),
+          vehicleNumber: findCol(["vehicle number", "vehicle registration number", "vehicle no"]),
+          boardingPoint: findCol(["boarding point", "bus boarding point"]),
+          routeNumber: findCol(["route number", "bus route", "route no"]),
+          photo: findCol(["photo url", "photo", "image url", "image"]),
+        };
+
+        const missingHeaders: string[] = [];
+        if (colIdx.name === -1) missingHeaders.push("Full Name");
+        if (colIdx.regNo === -1) missingHeaders.push("Register Number");
+        if (colIdx.dept === -1) missingHeaders.push("Department");
+        if (colIdx.year === -1) missingHeaders.push("Year");
+        if (colIdx.section === -1) missingHeaders.push("Section");
+        if (colIdx.institution === -1) missingHeaders.push("Institution");
+        if (colIdx.accommodation === -1) missingHeaders.push("Accommodation Type");
+        if (colIdx.photo === -1) missingHeaders.push("Photo URL");
+
+        if (missingHeaders.length > 0) {
+          setParsedRows([]);
+          setUploadError(
+            `Invalid spreadsheet format — missing required column header(s): ${missingHeaders.join(", ")}. Please download and fill the official template.`
+          );
+          return;
+        }
+
+        const dataRows = nonEmptyRows.slice(1);
+        if (dataRows.length === 0) {
+          setParsedRows([]);
+          setUploadError("No student rows found below the header row. Please enter student details before uploading.");
+          return;
+        }
+
+        const seenRegs = new Set<string>();
+        const validStudents: StudentMatch[] = [];
+        const errors: string[] = [];
+
+        dataRows.forEach((r, idx) => {
+          const excelRowNum = idx + 2;
+          const cell = (cIdx: number) => (cIdx >= 0 ? String(r[cIdx] ?? "").trim() : "");
+
+          const name = cell(colIdx.name);
+          const registerNumber = cell(colIdx.regNo).toUpperCase();
+          const department = cell(colIdx.dept);
+          const rawYear = cell(colIdx.year);
+          const batch = cell(colIdx.batch) || "2023–2027";
+          const section = cell(colIdx.section).toUpperCase();
+          const institute = cell(colIdx.institution);
+          const accRaw = cell(colIdx.accommodation);
+          const hostelName = cell(colIdx.hostelName);
+          const roomNumber = cell(colIdx.roomNumber);
+          const transportRaw = cell(colIdx.transport);
+          const residentialLocation = cell(colIdx.location);
+          const vehicleNumber = cell(colIdx.vehicleNumber);
+          const boardingPoint = cell(colIdx.boardingPoint);
+          const routeNumber = cell(colIdx.routeNumber);
+          const photo = cell(colIdx.photo);
+
+          const rowErrs: string[] = [];
+
+          if (!name || !/[a-zA-Z]{2,}/.test(name)) {
+            rowErrs.push("invalid Full Name");
+          }
+          if (!registerNumber || !/^[A-Z0-9\-\/]{4,20}$/.test(registerNumber) || !/\d/.test(registerNumber)) {
+            rowErrs.push("invalid Register Number (must contain alphanumeric ID with digits)");
+          } else if (seenRegs.has(registerNumber)) {
+            rowErrs.push(`duplicate Register Number (${registerNumber})`);
+          }
+          if (!department || !/[a-zA-Z]{2,}/.test(department)) {
+            rowErrs.push("missing/invalid Department");
+          }
+
+          const yearNorm = rawYear.replace(/year/gi, "").trim().toUpperCase();
+          const yearMap: Record<string, string> = { "1": "I", "I": "I", "2": "II", "II": "II", "3": "III", "III": "III", "4": "IV", "IV": "IV" };
+          const year = yearMap[yearNorm];
+          if (!year) {
+            rowErrs.push(`invalid Year ('${rawYear || "empty"}', expected I/II/III/IV)`);
+          }
+
+          if (!section || !/^[A-Z0-9]{1,4}$/.test(section)) {
+            rowErrs.push("missing/invalid Section");
+          }
+          if (!institute || institute.length < 3) {
+            rowErrs.push("missing Institution");
+          }
+
+          const accLower = accRaw.toLowerCase();
+          let accommodationType: "Hosteller" | "Day Scholar" | "PG" | null = null;
+          if (accLower === "hosteller" || accLower === "hostel") accommodationType = "Hosteller";
+          else if (accLower === "day scholar" || accLower === "dayscholar") accommodationType = "Day Scholar";
+          else if (accLower === "pg") accommodationType = "PG";
+          else rowErrs.push(`invalid Accommodation Type ('${accRaw || "empty"}')`);
+
+          let transportationType: "College Bus" | "Own Vehicle" | undefined = undefined;
+          if (accommodationType === "Hosteller") {
+            if (!hostelName) rowErrs.push("missing Hostel Name");
+            if (!roomNumber) rowErrs.push("missing Room Number");
+          } else if (accommodationType === "Day Scholar") {
+            const trLower = transportRaw.toLowerCase();
+            if (trLower.includes("bus")) {
+              transportationType = "College Bus";
+              if (!boardingPoint) rowErrs.push("missing Boarding Point");
+              if (!routeNumber) rowErrs.push("missing Route Number");
+            } else if (trLower.includes("own") || trLower.includes("vehicle")) {
+              transportationType = "Own Vehicle";
+              if (!residentialLocation) rowErrs.push("missing Residential Location");
+              if (!vehicleNumber) rowErrs.push("missing Vehicle Number");
+            } else {
+              rowErrs.push(`invalid Mode of Transport ('${transportRaw || "empty"}', expected 'Own Vehicle' or 'College Bus')`);
+            }
+          }
+
+          const isValidPhoto =
+            Boolean(photo) &&
+            (photo.startsWith("http://") ||
+              photo.startsWith("https://") ||
+              photo.startsWith("data:image/") ||
+              photo.startsWith("/faces/") ||
+              /\.(jpe?g|png|webp)$/i.test(photo));
+          if (!isValidPhoto) {
+            rowErrs.push("missing or invalid Photo URL (expected http(s)://, /faces/..., data:image/..., or image filename)");
+          }
+
+          if (rowErrs.length > 0) {
+            errors.push(`Row ${excelRowNum}: ${rowErrs.join("; ")}`);
+            return;
+          }
+
+          seenRegs.add(registerNumber);
+          const initials = name.split(" ").map(p => p[0]).join("").slice(0, 2).toUpperCase() || "ST";
+          const classCode = computeClassCode(department, year!, section, registerNumber);
+
+          validStudents.push({
+            initials,
+            name,
+            registerNumber,
+            department,
+            year: year!,
+            batch,
+            section,
+            classCode,
+            institute,
+            similarity: 97,
+            accommodationType: accommodationType!,
+            hostelName: accommodationType === "Hosteller" ? hostelName : undefined,
+            roomNumber: accommodationType === "Hosteller" ? roomNumber : undefined,
+            transportationType,
+            residentialLocation: accommodationType === "Day Scholar" && transportationType === "Own Vehicle" ? residentialLocation : undefined,
+            location: accommodationType === "Day Scholar" && transportationType === "Own Vehicle" ? residentialLocation : undefined,
+            vehicleNumber: vehicleNumber || undefined,
+            boardingPoint: boardingPoint || undefined,
+            routeNumber: routeNumber || undefined,
+            photo,
+          });
+        });
+
+        setRowErrors(errors);
+        if (validStudents.length === 0) {
+          setParsedRows([]);
+          setUploadError(
+            `No valid student records found in '${file.name}'. ${errors.length} row(s) failed validation.`
+          );
+          return;
+        }
+
+        setParsedRows(validStudents);
+      } catch (err) {
+        console.error("Error reading spreadsheet", err);
+        setParsedRows([]);
+        setUploadError("Failed to parse file. Please upload a genuine .xlsx, .xls, or .csv student spreadsheet.");
+      }
+    };
+    reader.readAsArrayBuffer(file);
   };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
-    setFileName(file.name);
+    processUploadedFile(file);
+  };
 
-    const reader = new FileReader();
-    reader.onload = evt => {
-      try {
-        const data = new Uint8Array(evt.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: "array" });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        const rawJson: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-        if (rawJson.length <= 1) {
-          alert("The uploaded spreadsheet is empty or has only header row.");
-          return;
-        }
-
-        const rows = rawJson.slice(1);
-        const mapped: StudentMatch[] = rows
-          .filter(r => r[0] && r[1])
-          .map((r, idx) => {
-            const name = String(r[0] || "").trim();
-            const registerNumber = String(r[1] || "").trim().toUpperCase();
-            const department = String(r[2] || "Information Technology").trim();
-            const year = String(r[3] || "II").trim();
-            const batch = String(r[4] || "2023–2027").trim();
-            const section = String(r[5] || "C").trim();
-            const institute = String(r[6] || "SRM GROUP OF INSTITUTIONS TRICHY").trim();
-            const accommodationType = String(r[7] || "").toLowerCase().includes("hostel") ? "Hosteller" : "Day Scholar";
-            const hostelName = r[8] ? String(r[8]).trim() : undefined;
-            const roomNumber = r[9] ? String(r[9]).trim() : undefined;
-            const transportationType = String(r[10] || "").toLowerCase().includes("bus") ? "College Bus" : "Own Vehicle";
-            const residentialLocation = r[11] ? String(r[11]).trim() : "Thillai Nagar, Trichy";
-            const vehicleNumber = r[12] ? String(r[12]).trim() : undefined;
-            const boardingPoint = r[13] ? String(r[13]).trim() : undefined;
-            const routeNumber = r[14] ? String(r[14]).trim() : undefined;
-            const photo = r[15] ? String(r[15]).trim() : `/faces/student_details/22ECE100${(idx % 6) + 1}_crop.jpg`;
-
-            const initials = name.split(" ").map(p => p[0]).join("").slice(0, 2).toUpperCase() || "ST";
-            const classCode = computeClassCode(department, year, section, registerNumber);
-
-            return {
-              initials,
-              name,
-              registerNumber,
-              department,
-              year,
-              batch,
-              section,
-              classCode,
-              institute,
-              similarity: 97,
-              accommodationType,
-              hostelName: accommodationType === "Hosteller" ? hostelName || "Bharathi Hostel" : undefined,
-              roomNumber: accommodationType === "Hosteller" ? roomNumber || "B-101" : undefined,
-              transportationType: accommodationType === "Day Scholar" ? transportationType : undefined,
-              residentialLocation: accommodationType === "Day Scholar" && transportationType === "Own Vehicle" ? residentialLocation : undefined,
-              location: accommodationType === "Day Scholar" && transportationType === "Own Vehicle" ? residentialLocation : undefined,
-              vehicleNumber,
-              boardingPoint,
-              routeNumber,
-              photo,
-            };
-          });
-
-        setParsedRows(mapped);
-      } catch (err) {
-        console.error("Error reading spreadsheet", err);
-        alert("Failed to parse Excel file. Please use standard format.");
-      }
-    };
-    reader.readAsArrayBuffer(file);
+  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processUploadedFile(file);
   };
 
   const handleStartImport = () => {
@@ -1465,14 +1708,13 @@ export function AdminBulkStudentImport({
         id: `AUD-BULK-${Date.now()}`,
         timestamp: timeStr,
         dateTime: now.toISOString(),
-        actor: "Avery Williams",
-        actorRole: "Admin",
-        actorId: "ADM-0001",
+        editedBy: "Avery Williams",
+        editorRole: "Super admin",
         action: "Bulk Students Imported",
-        target: `${parsedRows.length} Students`,
         institution: "All Campus Institutions",
         block: "All Blocks",
-        summary: `Imported ${parsedRows.length} students from spreadsheet '${fileName}' and enrolled biometric face recognition templates.`,
+        actionDetails: `Imported ${parsedRows.length} students via '${fileName || "spreadsheet"}'`,
+        comments: importComment.trim() || `Bulk spreadsheet import (${fileName || "students.xlsx"}) and biometric face enrollment.`,
         changes: parsedRows.map(s => ({
           field: s.registerNumber,
           oldVal: "(New Enrollee)",
@@ -1483,6 +1725,7 @@ export function AdminBulkStudentImport({
       onBulkImport(parsedRows, auditLog);
       setTraining(false);
       setImportDone(true);
+      setImportComment("");
     }, 2000);
   };
 
@@ -1495,7 +1738,7 @@ export function AdminBulkStudentImport({
           </button>
           <div>
             <h1>Import Complete</h1>
-            <p>Admin Portal · Bulk Creation</p>
+            <p>Super admin Portal · Bulk Creation</p>
           </div>
         </div>
         <div className="page-content">
@@ -1548,12 +1791,9 @@ export function AdminBulkStudentImport({
       </div>
 
       <div className="page-content">
-        <div style={{ display: "flex", gap: "8px", marginBottom: "14px" }}>
-          <button className="btn secondary" style={{ flex: 1, fontSize: "12px" }} onClick={downloadTemplate}>
+        <div style={{ marginBottom: "14px" }}>
+          <button className="btn secondary" style={{ width: "100%", fontSize: "12px" }} onClick={downloadTemplate}>
             <Download size={15} /> Download Template (.xlsx)
-          </button>
-          <button className="btn secondary" style={{ flex: 1, fontSize: "12px" }} onClick={loadDemoSpreadsheet}>
-            <Sparkles size={15} /> Load Demo Sheet
           </button>
         </div>
 
@@ -1565,23 +1805,68 @@ export function AdminBulkStudentImport({
           style={{ display: "none" }}
         />
 
-        <div className="bulk-dropzone" onClick={() => fileInputRef.current?.click()}>
+        <div
+          className={`bulk-dropzone ${isDragging ? "dragging" : ""}`}
+          onClick={() => fileInputRef.current?.click()}
+          onDragOver={e => {
+            e.preventDefault();
+            setIsDragging(true);
+          }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={handleDrop}
+        >
           <FileSpreadsheet size={42} color="#3b82f6" />
           <strong style={{ fontSize: "14px", color: "#1e293b" }}>
             {fileName ? fileName : "Upload Student Spreadsheet"}
           </strong>
           <span style={{ fontSize: "12px", color: "#64748b" }}>
-            Click or drag & drop Excel (.xlsx) file with student details and photos
+            Tap to choose an Excel (.xlsx, .xls, .csv) file from your device with student details and photo URLs
           </span>
         </div>
+
+        {uploadError && (
+          <div style={{ padding: "12px 14px", background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c", borderRadius: "12px", fontSize: "12px", marginBottom: "12px" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
+              <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: "1px" }} />
+              <div style={{ flex: 1 }}>
+                <strong style={{ display: "block", marginBottom: rowErrors.length > 0 ? "6px" : 0 }}>{uploadError}</strong>
+                {rowErrors.length > 0 && (
+                  <ul style={{ margin: 0, paddingLeft: "16px", fontSize: "11px", lineHeight: 1.5 }}>
+                    {rowErrors.slice(0, 6).map((err, i) => (
+                      <li key={i}>{err}</li>
+                    ))}
+                    {rowErrors.length > 6 && <li>...and {rowErrors.length - 6} more row error(s)</li>}
+                  </ul>
+                )}
+              </div>
+              <button type="button" className="text-action" style={{ color: "#b91c1c" }} onClick={resetUploadState}>
+                Clear
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!uploadError && rowErrors.length > 0 && (
+          <div style={{ padding: "10px 12px", background: "#fffbeb", border: "1px solid #fde68a", color: "#92400e", borderRadius: "10px", fontSize: "11.5px", marginBottom: "12px" }}>
+            <strong style={{ display: "block", marginBottom: "4px" }}>
+              Skipped {rowErrors.length} invalid row(s):
+            </strong>
+            <ul style={{ margin: 0, paddingLeft: "16px", lineHeight: 1.45 }}>
+              {rowErrors.slice(0, 4).map((err, i) => (
+                <li key={i}>{err}</li>
+              ))}
+              {rowErrors.length > 4 && <li>...and {rowErrors.length - 4} more</li>}
+            </ul>
+          </div>
+        )}
 
         {parsedRows.length > 0 && (
           <div style={{ marginTop: "16px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
               <span style={{ fontSize: "12px", fontWeight: "700", color: "#334155" }}>
-                Found {parsedRows.length} Students Ready for Import
+                Found {parsedRows.length} Valid Student{parsedRows.length === 1 ? "" : "s"} Ready for Import
               </span>
-              <button className="text-action" onClick={() => setParsedRows([])}>
+              <button className="text-action" onClick={resetUploadState}>
                 Clear
               </button>
             </div>
@@ -1641,9 +1926,20 @@ export function AdminBulkStudentImport({
                 </div>
               </div>
             ) : (
-              <button className="btn primary" style={{ width: "100%", marginTop: "12px" }} onClick={handleStartImport}>
-                <ShieldCheck size={18} /> Import All & Train Face Model ({parsedRows.length} students)
-              </button>
+              <>
+                <label className="field" style={{ marginTop: "12px" }}>
+                  <span>Comments / Reason for Import</span>
+                  <textarea
+                    rows={2}
+                    value={importComment}
+                    onChange={e => setImportComment(e.target.value)}
+                    placeholder="Enter reason or notes for this bulk student import (e.g. Semester intake batch)..."
+                  />
+                </label>
+                <button className="btn primary" style={{ width: "100%", marginTop: "10px" }} onClick={handleStartImport}>
+                  <ShieldCheck size={18} /> Import All & Train Face Model ({parsedRows.length} students)
+                </button>
+              </>
             )}
           </div>
         )}
@@ -1670,7 +1966,7 @@ export function AuditLogsTable({
   const [selectedLog, setSelectedLog] = useState<AuditLogItem | null>(null);
 
   const filteredLogs = auditLogs.filter(log => {
-    const text = `${log.actor} ${log.action} ${log.target} ${log.summary} ${log.institution}`.toLowerCase();
+    const text = `${log.editedBy} ${log.editorRole} ${log.action} ${log.institution} ${log.actionDetails} ${log.comments}`.toLowerCase();
     const matchQuery = !query || text.includes(query.toLowerCase());
     const matchAction = actionFilter === "All Actions" || log.action === actionFilter;
     const matchInst =
@@ -1697,7 +1993,7 @@ export function AuditLogsTable({
           <input
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="Search action, actor, target or details..."
+            placeholder="Search action, edited by, details or comments..."
           />
           {query && <button onClick={() => setQuery("")}>Clear</button>}
         </div>
@@ -1723,8 +2019,13 @@ export function AuditLogsTable({
                 <option>All Actions</option>
                 <option>Student Added</option>
                 <option>Student Details Updated</option>
+                <option>Accommodation Updated</option>
                 <option>Bulk Students Imported</option>
+                <option>User Created</option>
+                <option>User Details Updated</option>
                 <option>User Status Changed</option>
+                <option>Security Assignment Updated</option>
+                <option>Settings Modified</option>
                 <option>Access Permissions Updated</option>
               </select>
             </div>
@@ -1736,28 +2037,28 @@ export function AuditLogsTable({
             {filteredLogs.length} audit records
           </span>
           <span style={{ fontSize: "11px", color: "#94a3b8" }}>
-            Click row for details
+            Swipe horizontally · Tap row for details
           </span>
         </div>
 
-        <div className="audit-table-wrap">
-          <table className="audit-table" style={{ width: "740px" }}>
+        <div className="audit-table-wrap audit-logs-sticky-wrap">
+          <table className="audit-table audit-logs-sticky-table">
             <thead>
               <tr>
-                <th>Time</th>
-                <th>Action</th>
-                <th>Actor</th>
+                <th className="sticky-col-time">Time</th>
+                <th className="sticky-col-action">Action</th>
+                <th>Edited by</th>
                 <th>Institution</th>
-                <th>Target</th>
-                <th>Summary</th>
+                <th>Action details</th>
+                <th>Comments</th>
               </tr>
             </thead>
             <tbody>
               {filteredLogs.map(log => {
                 const badgeClass =
-                  log.action === "Student Added"
+                  log.action === "Student Added" || log.action === "User Created"
                     ? "add"
-                    : log.action === "Student Details Updated"
+                    : log.action === "Student Details Updated" || log.action === "Accommodation Updated" || log.action === "User Details Updated" || log.action === "Security Assignment Updated"
                     ? "edit"
                     : log.action === "Bulk Students Imported"
                     ? "bulk"
@@ -1767,18 +2068,20 @@ export function AuditLogsTable({
 
                 return (
                   <tr key={log.id} onClick={() => setSelectedLog(log)}>
-                    <td>{log.timestamp.slice(5, 16)}</td>
-                    <td>
+                    <td className="sticky-col-time">{log.timestamp.slice(5, 16)}</td>
+                    <td className="sticky-col-action">
                       <span className={`action-badge ${badgeClass}`}>{log.action}</span>
                     </td>
                     <td>
-                      <strong>{log.actor}</strong>
-                      <small style={{ color: "#64748b" }}>{log.actorRole}</small>
+                      <strong>{log.editedBy}</strong>
+                      <small style={{ color: "#64748b", display: "block" }}>{log.editorRole}</small>
                     </td>
                     <td>{log.institution.replace("SRM GROUP OF INSTITUTIONS ", "")}</td>
-                    <td><strong>{log.target}</strong></td>
-                    <td style={{ maxWidth: "220px", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {log.summary}
+                    <td className="audit-single-line-cell" title={log.actionDetails}>
+                      {log.actionDetails}
+                    </td>
+                    <td className="audit-single-line-cell" title={log.comments || "—"}>
+                      {log.comments || "—"}
                     </td>
                   </tr>
                 );
@@ -1806,13 +2109,12 @@ export function AuditLogsTable({
               <section className="info-card" style={{ marginBottom: "14px" }}>
                 <dl>
                   <div><dt>Timestamp</dt><dd>{selectedLog.timestamp}</dd></div>
-                  <div><dt>Actor Name</dt><dd>{selectedLog.actor}</dd></div>
-                  <div><dt>Actor Role</dt><dd>{selectedLog.actorRole}</dd></div>
-                  {selectedLog.actorId && <div><dt>Actor ID</dt><dd>{selectedLog.actorId}</dd></div>}
+                  <div><dt>Edited By</dt><dd>{selectedLog.editedBy}</dd></div>
+                  <div><dt>Role</dt><dd>{selectedLog.editorRole}</dd></div>
                   <div><dt>Institution</dt><dd>{selectedLog.institution}</dd></div>
                   {selectedLog.block && <div><dt>Location Block</dt><dd>{selectedLog.block}</dd></div>}
-                  <div><dt>Target Entity</dt><dd>{selectedLog.target}</dd></div>
-                  <div><dt>Summary</dt><dd>{selectedLog.summary}</dd></div>
+                  <div><dt>Action Details</dt><dd style={{ whiteSpace: "normal", textAlign: "right" }}>{selectedLog.actionDetails}</dd></div>
+                  <div><dt>Comments</dt><dd style={{ whiteSpace: "normal", textAlign: "right" }}>{selectedLog.comments || "—"}</dd></div>
                 </dl>
               </section>
 
@@ -1867,15 +2169,17 @@ export function AdminAccessSettings({
 }: {
   go: (screen: Screen) => void;
   fieldVisibility: LogFieldVisibility;
-  onSaveFieldVisibility: (next: LogFieldVisibility) => void;
+  onSaveFieldVisibility: (next: LogFieldVisibility, comment: string) => void;
   permissions: ManagerEditPermissions;
-  onSavePermissions: (next: ManagerEditPermissions) => void;
+  onSavePermissions: (next: ManagerEditPermissions, comment: string) => void;
 }) {
   const [activeTab, setActiveTab] = useState<"visibility" | "manager">("visibility");
 
   // Local drafts
   const [visDraft, setVisDraft] = useState<LogFieldVisibility>({ ...fieldVisibility });
   const [permDraft, setPermDraft] = useState<ManagerEditPermissions>({ ...permissions });
+  const [visComment, setVisComment] = useState("");
+  const [permComment, setPermComment] = useState("");
   const [savedNotice, setSavedNotice] = useState("");
 
   const toggleVis = (key: keyof LogFieldVisibility) => {
@@ -1887,13 +2191,15 @@ export function AdminAccessSettings({
   };
 
   const saveVisibility = () => {
-    onSaveFieldVisibility(visDraft);
+    onSaveFieldVisibility(visDraft, visComment.trim());
+    setVisComment("");
     setSavedNotice("Log & identity field visibility updated successfully!");
     setTimeout(() => setSavedNotice(""), 3000);
   };
 
   const savePermissions = () => {
-    onSavePermissions(permDraft);
+    onSavePermissions(permDraft, permComment.trim());
+    setPermComment("");
     setSavedNotice("Institute Manager edit permissions updated successfully!");
     setTimeout(() => setSavedNotice(""), 3000);
   };
@@ -1940,7 +2246,7 @@ export function AdminAccessSettings({
         </button>
         <div>
           <h1>Access & Visibility Settings</h1>
-          <p>Admin Controls · Profile & Manager Permissions</p>
+          <p>Super admin Controls · Profile & Manager Permissions</p>
         </div>
       </div>
 
@@ -1973,7 +2279,7 @@ export function AdminAccessSettings({
                 Student Log & Scan Field Visibility
               </strong>
               <span style={{ fontSize: "11.5px", color: "#3b82f6" }}>
-                Tick the boxes below to specify which fields appear when viewing student details, log records, or identity scans. Uncheck unnecessary fields to hide them.
+                Tap the boxes below to specify which fields appear when viewing student details, log records, or identity scans. Untick unnecessary fields to hide them.
               </span>
             </div>
 
@@ -2011,6 +2317,16 @@ export function AdminAccessSettings({
               })}
             </div>
 
+            <label className="field" style={{ marginBottom: "10px" }}>
+              <span>Comments / Reason</span>
+              <textarea
+                rows={2}
+                value={visComment}
+                onChange={e => setVisComment(e.target.value)}
+                placeholder="Reason or notes for updating student field visibility..."
+              />
+            </label>
+
             <button className="btn primary" style={{ width: "100%" }} onClick={saveVisibility}>
               <Check size={16} /> Save Field Visibility Settings
             </button>
@@ -2024,7 +2340,7 @@ export function AdminAccessSettings({
                 Institute Manager Edit Access
               </strong>
               <span style={{ fontSize: "11.5px", color: "#b45309" }}>
-                Specify which fields the Institute Manager can modify when editing students. Unchecked fields will be locked and cannot be edited by the manager.
+                Specify which fields the Institute Manager can modify when editing students. Unticked fields will be locked and cannot be edited by the manager.
               </span>
             </div>
 
@@ -2064,6 +2380,16 @@ export function AdminAccessSettings({
                 );
               })}
             </div>
+
+            <label className="field" style={{ marginBottom: "10px" }}>
+              <span>Comments / Reason</span>
+              <textarea
+                rows={2}
+                value={permComment}
+                onChange={e => setPermComment(e.target.value)}
+                placeholder="Reason or notes for modifying Institute Manager edit permissions..."
+              />
+            </label>
 
             <button className="btn primary" style={{ width: "100%" }} onClick={savePermissions}>
               <Check size={16} /> Save Manager Edit Permissions

@@ -7,7 +7,7 @@ from app.schemas.auth import Token
 
 
 def authenticate_user(db: Session, username: str, password: str) -> Optional[User]:
-    user = db.query(User).filter(User.username == username).first()
+    user = db.query(User).filter(User.username == ("admin" if username.strip().lower() in ("super admin", "super-admin", "superadmin") else username)).first()
     if not user:
         return None
     if not verify_password(password, user.hashed_password):

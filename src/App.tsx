@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import * as XLSX from "xlsx";
 import {
   AlertTriangle,
@@ -220,7 +220,7 @@ const roleMeta: Record<Role, { label: string; name: string; initials: string; sc
   "access-supervisor": { label: "Access Supervisor", name: "Arun Sharma", initials: "AS", scope: "Main Gate · College Campus", supervisorNumber: "ACS-B-0012", phoneNumber: "+91 98765 40812" },
   students: { label: "Student Affairs", name: "Daniel Thomas", initials: "DT", scope: "Institution B · Students", phoneNumber: "+91 98765 40216" },
   welfare: { label: "Student Welfare", name: "Dr. Kavitha Rao", initials: "KR", scope: "Institution B · Blockwise student logs", phoneNumber: "+91 98765 40733" },
-  admin: { label: "Admin", name: "Avery Williams", initials: "AW", scope: "All campus institutions" },
+  admin: { label: "Super admin", name: "Avery Williams", initials: "AW", scope: "All campus institutions" },
   cso: { label: "Chief Security Officer", name: "Rohan Mehta", initials: "RM", scope: "Institution B", supervisorNumber: "CSO-0001", phoneNumber: "+91 98765 40377" },
   manager: { label: "Institute Manager", name: "Priya Raman", initials: "PR", scope: "Institution B · Assigned institution", phoneNumber: "+91 98765 40455" },
 };
@@ -630,7 +630,7 @@ function Login({ enter, go }: { enter: (role: Role) => void; go: (screen: Screen
     welfare: "welfare",
     "student welfare": "welfare",
     "student-welfare": "welfare",
-    admin: "admin",
+    admin: "admin", "super admin": "admin", "super-admin": "admin", superadmin: "admin",
     administrator: "admin",
     cso: "cso",
     manager: "manager",
@@ -652,7 +652,7 @@ function Login({ enter, go }: { enter: (role: Role) => void; go: (screen: Screen
       const res = await fetch("http://localhost:8000/api/v1/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: username.trim().toLowerCase(), password }),
+        body: JSON.stringify({ username: matchedRole === "admin" ? "admin" : username.trim().toLowerCase(), password }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -937,7 +937,7 @@ function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) =
     async function initCamera() {
       try {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          throw new Error("Camera API not supported on this device/browser.");
+          throw new Error("Camera access is not supported on this phone.");
         }
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
@@ -2323,7 +2323,7 @@ function BulkVisitorPass({ go, initialEvent, issuePasses }: { go: (screen: Scree
         <section className="bulk-import-card"><div className="bulk-section-icon excel"><FileSpreadsheet size={24} /></div><div><h2>Student-list Template</h2><p>Contains Name, Number, Address, and Photo File Path. Event details are not repeated in Excel.</p></div><Button variant="secondary" onClick={downloadBulkTemplate} icon={<Download size={17} />}>Download Sample Excel</Button></section>
         <section className="bulk-upload-card" onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); acceptFile(event.dataTransfer.files?.[0]); }}>
           <input className="hidden-file-input" ref={fileInput} type="file" accept=".xlsx" onChange={chooseFile} />
-          {!file ? <><div className="bulk-section-icon"><Upload size={24} /></div><h2>Upload Excel</h2><p>Upload the completed Excel file containing student names, student numbers, and optional photo paths.</p><button className="bulk-browse-button" onClick={() => fileInput.current?.click()}><Upload size={15} />Upload Excel</button><small>Drag and drop or browse · .xlsx only · Maximum {bulkUploadMaxBytes / 1024 / 1024} MB</small></> : <div className="bulk-selected-file"><div><FileSpreadsheet size={23} /></div><span><strong>{file.name}</strong><small>{fileSize} · {progress}</small></span><Status tone={progress === "Import Failed" ? "red" : progress === "Import Complete" ? "green" : "blue"}>{progress}</Status></div>}
+          {!file ? <><div className="bulk-section-icon"><Upload size={24} /></div><h2>Upload Excel</h2><p>Upload the completed Excel file containing student names, student numbers, and optional photo paths.</p><button className="bulk-browse-button" onClick={() => fileInput.current?.click()}><Upload size={15} />Upload Excel</button><small>Tap Upload Excel to choose a file from your device · .xlsx only · Maximum {bulkUploadMaxBytes / 1024 / 1024} MB</small></> : <div className="bulk-selected-file"><div><FileSpreadsheet size={23} /></div><span><strong>{file.name}</strong><small>{fileSize} · {progress}</small></span><Status tone={progress === "Import Failed" ? "red" : progress === "Import Complete" ? "green" : "blue"}>{progress}</Status></div>}
           {fileError && <div className="bulk-file-error"><AlertTriangle size={14} />{fileError}</div>}
         </section>
         {file && <div className="bulk-file-actions"><Button variant="secondary" onClick={() => fileInput.current?.click()} icon={<RefreshCw size={16} />}>Replace File</Button><Button onClick={importFile} disabled={progress === "Reading Excel File" || progress === "Validating Student Records"} icon={<FileSpreadsheet size={17} />}>{progress === "Reading Excel File" || progress === "Validating Student Records" ? progress : "Import Students"}</Button></div>}
@@ -3198,46 +3198,133 @@ function SupervisorHome({ go, reviews, logs }: { go: (screen: Screen) => void; r
   </>;
 }
 
-function Assignments({ go }: { go: (screen: Screen) => void }) {
+function Assignments({
+  go,
+  onAddAuditLog,
+  editorName = "Meera Nair",
+  editorRole = "Campus Supervisor",
+}: {
+  go: (screen: Screen) => void;
+  onAddAuditLog?: (log: AuditLogItem) => void;
+  editorName?: string;
+  editorRole?: AuditLogItem["editorRole"];
+}) {
   const [editing, setEditing] = useState<number | null>(null);
+  const [selectedOfficer, setSelectedOfficer] = useState("Vikram Das");
   const [startTime, setStartTime] = useState("08:00");
   const [endTime, setEndTime] = useState("16:00");
+  const [reassignReason, setReassignReason] = useState("");
+  const [reasonError, setReasonError] = useState("");
   const [guards, setGuards] = useState([["Main Gate", "Arun Kumar", "08:00–16:00"], ["Block A", "Kavya Rao", "08:00–16:00"], ["Block B", "Joseph Mathew", "12:00–20:00"], ["Library Block", "Imran Ali", "08:00–16:00"], ["Hostel Gate", "Neha Singh", "16:00–00:00"]]);
   const reassign = (index: number) => {
-    setGuards(current => current.map((guard, guardIndex) => guardIndex === index ? [guard[0], "Vikram Das", `${startTime}–${endTime}`] : guard));
+    if (!reassignReason.trim()) {
+      setReasonError("Please enter a comment or reason for reassignment.");
+      return;
+    }
+    const prev = guards[index];
+    const nextShift = `${startTime}–${endTime}`;
+    setGuards(current => current.map((guard, guardIndex) => guardIndex === index ? [guard[0], selectedOfficer, nextShift] : guard));
+    if (onAddAuditLog) {
+      const now = new Date();
+      onAddAuditLog({
+        id: `AUD-ASG-${Date.now()}`,
+        timestamp: now.toISOString().replace("T", " ").slice(0, 19),
+        dateTime: now.toISOString(),
+        editedBy: editorName,
+        editorRole,
+        action: "Security Assignment Updated",
+        institution: "Institution B",
+        block: prev[0],
+        actionDetails: `Reassigned ${prev[0]} from ${prev[1]} to ${selectedOfficer} (${nextShift})`,
+        comments: reassignReason.trim(),
+        changes: [
+          { field: "Assigned Officer", oldVal: prev[1], newVal: selectedOfficer },
+          { field: "Shift Timing", oldVal: prev[2], newVal: nextShift },
+        ],
+      });
+    }
     setEditing(null);
+    setReassignReason("");
+    setReasonError("");
   };
   const toggleReassignment = (index: number) => {
     if (editing === index) {
       setEditing(null);
+      setReassignReason("");
+      setReasonError("");
       return;
     }
     const [currentStart, currentEnd] = guards[index][2].split("–");
+    setSelectedOfficer("Vikram Das");
     setStartTime(currentStart);
     setEndTime(currentEnd);
+    setReassignReason("");
+    setReasonError("");
     setEditing(index);
   };
   return <>
     <TopBar title="Security assignments" subtitle="Institution B · 5 blocks" back={() => go("home")} />
     <div className="page-content">
-      <div className="assignment-list">{guards.map((guard, index) => <section key={guard[0]}><div className="block-icon"><Building2 size={20} /></div><div><span>{guard[0]}</span><strong>{guard[1]}</strong><small>{guard[2]} · On duty</small></div><button onClick={() => toggleReassignment(index)}>{editing === index ? "Cancel" : "Reassign"}</button>{editing === index && <div className="reassign-panel"><Field label="Available security officer"><select defaultValue="Vikram Das"><option>Vikram Das</option><option>Sarah John</option><option>Ravi Menon</option></select></Field><div className="two-fields"><label className="field"><span>Start Time</span><input type="time" value={startTime} onChange={event => setStartTime(event.target.value)} /></label><label className="field"><span>End Time</span><input type="time" value={endTime} onChange={event => setEndTime(event.target.value)} /></label></div><Button onClick={() => reassign(index)}>Confirm reassignment</Button></div>}</section>)}</div>
+      <div className="assignment-list">{guards.map((guard, index) => <section key={guard[0]}><div className="block-icon"><Building2 size={20} /></div><div><span>{guard[0]}</span><strong>{guard[1]}</strong><small>{guard[2]} · On duty</small></div><button onClick={() => toggleReassignment(index)}>{editing === index ? "Cancel" : "Reassign"}</button>{editing === index && <div className="reassign-panel"><Field label="Available security officer"><select value={selectedOfficer} onChange={e => setSelectedOfficer(e.target.value)}><option>Vikram Das</option><option>Sarah John</option><option>Ravi Menon</option></select></Field><div className="two-fields"><label className="field"><span>Start Time</span><input type="time" value={startTime} onChange={event => setStartTime(event.target.value)} /></label><label className="field"><span>End Time</span><input type="time" value={endTime} onChange={event => setEndTime(event.target.value)} /></label></div><label className="field"><span>Comment / Reason for Edit <b>*</b></span><textarea rows={2} value={reassignReason} onChange={e => { setReassignReason(e.target.value); if (e.target.value.trim()) setReasonError(""); }} placeholder="Enter reason for security reassignment..." />{reasonError && <small className="field-error">{reasonError}</small>}</label><Button onClick={() => reassign(index)}>Confirm reassignment</Button></div>}</section>)}</div>
       <Button variant="secondary" onClick={() => go("create-guard")} icon={<UserPlus size={17} />}>Create new security account</Button>
     </div>
   </>;
 }
 
-function CreateGuard({ go }: { go: (screen: Screen) => void }) {
+function CreateGuard({
+  go,
+  onAddAuditLog,
+  editorName = "Meera Nair",
+  editorRole = "Campus Supervisor",
+}: {
+  go: (screen: Screen) => void;
+  onAddAuditLog?: (log: AuditLogItem) => void;
+  editorName?: string;
+  editorRole?: AuditLogItem["editorRole"];
+}) {
   const [created, setCreated] = useState(false);
+  const [guardName, setGuardName] = useState("Vikram Das");
+  const [guardId, setGuardId] = useState("GRD-B-1086");
+  const [assignedPost, setAssignedPost] = useState("Block A · Relief duty");
+  const [shiftStart, setShiftStart] = useState("08:00");
+  const [shiftEnd, setShiftEnd] = useState("16:00");
+  const [supervisorNotes, setSupervisorNotes] = useState("Relief coverage for Block A.");
+  const handleCreateGuard = (event: FormEvent) => {
+    event.preventDefault();
+    if (onAddAuditLog) {
+      const now = new Date();
+      onAddAuditLog({
+        id: `AUD-GRD-${Date.now()}`,
+        timestamp: now.toISOString().replace("T", " ").slice(0, 19),
+        dateTime: now.toISOString(),
+        editedBy: editorName,
+        editorRole,
+        action: "User Created",
+        institution: "Institution B",
+        block: assignedPost,
+        actionDetails: `Created security account ${guardName} (${guardId}) at ${assignedPost}`,
+        comments: supervisorNotes.trim() || "New security account onboarding and shift allocation.",
+        changes: [
+          { field: "Full Name", oldVal: "(New Account)", newVal: guardName },
+          { field: "Employee ID", oldVal: "(New Account)", newVal: guardId },
+          { field: "Assigned Post", oldVal: "(New Account)", newVal: assignedPost },
+          { field: "Shift", oldVal: "(New Account)", newVal: `${shiftStart}–${shiftEnd}` },
+        ],
+      });
+    }
+    setCreated(true);
+    window.scrollTo(0, 0);
+  };
   if (created) return <div className="success-page">
     <div className="success-symbol"><UserCheck size={38} /></div>
     <Status tone="green">SECURITY ACCOUNT CREATED</Status>
     <h1>Security user added</h1>
-    <p>Vikram Das can now sign in. The duty assignment has been added to the Campus Supervisor audit log.</p>
+    <p>{guardName} can now sign in. The duty assignment has been added to the audit logs.</p>
     <section className="success-receipt">
-      <div><span>Security officer</span><strong>Vikram Das</strong></div>
-      <div><span>Security employee ID</span><strong>GRD-B-1086</strong></div>
-      <div><span>Assigned post</span><strong>Block A · Relief duty</strong></div>
-      <div><span>Shift</span><strong>08:00–16:00</strong></div>
+      <div><span>Security officer</span><strong>{guardName}</strong></div>
+      <div><span>Security employee ID</span><strong>{guardId}</strong></div>
+      <div><span>Assigned post</span><strong>{assignedPost}</strong></div>
+      <div><span>Shift</span><strong>{shiftStart}–{shiftEnd}</strong></div>
     </section>
     <Button onClick={() => go("assignments")}>Return to security assignments</Button>
     <Button variant="secondary" onClick={() => setCreated(false)}>Create another security user</Button>
@@ -3245,11 +3332,11 @@ function CreateGuard({ go }: { go: (screen: Screen) => void }) {
 
   return <>
     <TopBar title="Create security account" subtitle="Institution B · Campus Supervisor action" back={() => go("assignments")} />
-    <form className="page-content form-page" onSubmit={(event) => { event.preventDefault(); setCreated(true); window.scrollTo(0, 0); }}>
+    <form className="page-content form-page" onSubmit={handleCreateGuard}>
       <div className="form-section-title"><span>1</span><div><strong>Security identity</strong></div></div>
       <div className="form-stack guard-form">
-        <label className="field"><span>Full name <b>*</b></span><input required placeholder="Enter the officer's legal name" defaultValue="Vikram Das" /></label>
-        <label className="field"><span>Security employee ID <b>*</b></span><input required placeholder="e.g. GRD-B-1086" defaultValue="GRD-B-1086" /></label>
+        <label className="field"><span>Full name <b>*</b></span><input required placeholder="Enter the officer's legal name" value={guardName} onChange={e => setGuardName(e.target.value)} /></label>
+        <label className="field"><span>Security employee ID <b>*</b></span><input required placeholder="e.g. GRD-B-1086" value={guardId} onChange={e => setGuardId(e.target.value)} /></label>
         <label className="field"><span>Employment type <b>*</b></span><select required defaultValue="Full-time"><option>Full-time</option><option>Contract</option><option>Relief security</option></select></label>
         <label className="field"><span>Date of joining <b>*</b></span><input required type="date" defaultValue="2025-06-16" /></label>
       </div>
@@ -3262,12 +3349,12 @@ function CreateGuard({ go }: { go: (screen: Screen) => void }) {
       <div className="form-section-title"><span>3</span><div><strong>Duty assignment</strong></div></div>
       <div className="form-stack guard-form">
         <label className="field"><span>Institution <b>*</b></span><input required value="Institution B" readOnly /></label>
-        <label className="field"><span>Assigned block or gate <b>*</b></span><select required defaultValue="Block A · Relief duty"><option>Block A · Relief duty</option><option>Main Gate · Relief duty</option><option>Block B · Relief duty</option><option>Library Block · Relief duty</option><option>Hostel Gate · Relief duty</option></select></label>
+        <label className="field"><span>Assigned block or gate <b>*</b></span><select required value={assignedPost} onChange={e => setAssignedPost(e.target.value)}><option>Block A · Relief duty</option><option>Main Gate · Relief duty</option><option>Block B · Relief duty</option><option>Library Block · Relief duty</option><option>Hostel Gate · Relief duty</option></select></label>
         <div className="two-fields">
-          <label className="field"><span>Shift starts <b>*</b></span><input required type="time" defaultValue="08:00" /></label>
-          <label className="field"><span>Shift ends <b>*</b></span><input required type="time" defaultValue="16:00" /></label>
+          <label className="field"><span>Shift starts <b>*</b></span><input required type="time" value={shiftStart} onChange={e => setShiftStart(e.target.value)} /></label>
+          <label className="field"><span>Shift ends <b>*</b></span><input required type="time" value={shiftEnd} onChange={e => setShiftEnd(e.target.value)} /></label>
         </div>
-        <label className="field"><span>Campus Supervisor notes</span><textarea rows={3} placeholder="Optional onboarding or assignment notes" defaultValue="Relief coverage for Block A." /></label>
+        <label className="field"><span>Comments / Reason</span><textarea rows={3} placeholder="Optional onboarding or assignment notes" value={supervisorNotes} onChange={e => setSupervisorNotes(e.target.value)} /></label>
       </div>
       <label className="confirmation-check"><input required type="checkbox" defaultChecked /><span>I confirm that the employment details and initial duty assignment are correct. <b>*</b></span></label>
       <Button type="submit" icon={<UserPlus size={17} />}>Create security account</Button>
@@ -4048,7 +4135,7 @@ function ForgotPassword({ go }: { go: (screen: Screen) => void }) {
 function AccessDenied({ role, go }: { role: Role; go: (screen: Screen) => void }) {
   return <>
     <TopBar title="Access denied" subtitle={roleMeta[role].label} back={() => go("home")} />
-    <div className="page-content"><div className="empty-state"><Lock size={28} /><strong>You do not have permission</strong><span>This area is reserved for Admin. Your role cannot open administrative configuration or user management. This attempt has been recorded in the audit history.</span></div>
+    <div className="page-content"><div className="empty-state"><Lock size={28} /><strong>You do not have permission</strong><span>This area is reserved for Super admin. Your role cannot open administrative configuration or user management. This attempt has been recorded in the audit history.</span></div>
       <Button onClick={() => go("home")}>Return to dashboard</Button></div>
   </>;
 }
@@ -4163,12 +4250,12 @@ function StudentAffairsHome({ go }: { go: (screen: Screen) => void }) {
 
 function AdminHome({ go }: { go: (screen: Screen) => void }) {
   return <>
-    <TopBar title="Campus Secure" subtitle="Admin Portal" action={<Status tone="green">All institutions</Status>} />
+    <TopBar title="Campus Secure" subtitle="Super admin Portal" action={<Status tone="green">All institutions</Status>} />
     <div className="page-content"><ProfileHead role="admin" go={go} />
       <section className="admin-hero"><div><span>TODAY'S CAMPUS ENTRIES</span><strong>8,426</strong></div><BarChart3 size={50} /></section>
       <div className="dashboard-stats three"><div><strong>42</strong><small>Portal users</small></div><div><strong>8,426</strong><small>Authorized</small></div><div><strong>27</strong><small>Unauthorized</small></div></div>
       <section className="chart-card"><div className="chart-head"><div><span>ENTRY TREND</span><strong>52,840</strong></div><small>Last 7 days</small></div><div className="login-chart admin-chart">{[62, 76, 59, 86, 78, 45, 51].map((height, index) => <div key={index}><i style={{ height: `${height}%` }} /><span>{["M", "T", "W", "T", "F", "S", "S"][index]}</span></div>)}</div></section>
-      <div className="section-heading compact"><div><h2>Admin tools</h2></div></div>
+      <div className="section-heading compact"><div><h2>Super admin tools</h2></div></div>
       <div className="admin-list">
         <button onClick={() => go("admin-bulk-students")}>
           <span className="amber-icon"><UploadCloud size={21} /></span>
@@ -4192,7 +4279,7 @@ function AdminHome({ go }: { go: (screen: Screen) => void }) {
         </button>
         <button onClick={() => go("admin-audit-logs")}>
           <span><History size={21} /></span>
-          <div><strong>Audit logs history</strong><small>Table view with row click detail inspection</small></div>
+          <div><strong>Audit logs history</strong><small>Table view with tap-to-inspect details</small></div>
           <ChevronRight size={18} />
         </button>
         <button onClick={() => go("admin-access-settings")}>
@@ -4215,11 +4302,21 @@ function AdminHome({ go }: { go: (screen: Screen) => void }) {
   </>;
 }
 
-function UserAdministration({ go }: { go: (screen: Screen) => void }) {
+function UserAdministration({
+  go,
+  onAddAuditLog,
+}: {
+  go: (screen: Screen) => void;
+  onAddAuditLog?: (log: AuditLogItem) => void;
+}) {
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState(false);
   const [createdRole, setCreatedRole] = useState<(typeof adminPortalDesignations)[number]>(adminPortalDesignations[0]);
   const [createdInstitution, setCreatedInstitution] = useState(institutions[0]);
+  const [createName, setCreateName] = useState("");
+  const [createPhone, setCreatePhone] = useState("");
+  const [createEmail, setCreateEmail] = useState("");
+  const [createComment, setCreateComment] = useState("");
   const [query, setQuery] = useState("");
   const [institutionFilter, setInstitutionFilter] = useState("All institutions");
   const [designationFilter, setDesignationFilter] = useState("All designations");
@@ -4230,22 +4327,105 @@ function UserAdministration({ go }: { go: (screen: Screen) => void }) {
     { initials: "KR", name: "Karthik Rao", role: "Campus Supervisor", email: "karthik.rao@campus.edu", institution: "Institution A", active: true },
   ]);
   const [draft, setDraft] = useState(users[0]);
+  const [editComment, setEditComment] = useState("");
+  const [editCommentError, setEditCommentError] = useState("");
   const nextEmpId = `EMP-${String(1001 + users.length).padStart(4, "0")}`;
   const filteredUsers = users.filter(user => `${user.name} ${user.role} ${user.email} ${user.institution}`.toLowerCase().includes(query.toLowerCase()) && (institutionFilter === "All institutions" || user.institution === institutionFilter) && (designationFilter === "All designations" || user.role === designationFilter));
   const editUser = (user: typeof users[number]) => {
     setEditingEmail(editingEmail === user.email ? null : user.email);
     setDraft({ ...user });
+    setEditComment("");
+    setEditCommentError("");
   };
   const saveUser = () => {
     if (!editingEmail) return;
-    setUsers(current => current.map(user => user.email === editingEmail ? { ...draft, initials: draft.name.split(" ").map(part => part[0]).join("").slice(0, 2).toUpperCase() } : user));
+    if (!editComment.trim()) {
+      setEditCommentError("Please enter a comment or reason for editing this user.");
+      return;
+    }
+    const existing = users.find(u => u.email === editingEmail);
+    const updatedUser = {
+      ...draft,
+      initials: draft.name.split(" ").map(part => part[0]).join("").slice(0, 2).toUpperCase() || "US",
+    };
+    setUsers(current => current.map(user => user.email === editingEmail ? updatedUser : user));
+
+    if (existing && onAddAuditLog) {
+      const changes: { field: string; oldVal: string; newVal: string }[] = [];
+      if (existing.name !== updatedUser.name) changes.push({ field: "Full Name", oldVal: existing.name, newVal: updatedUser.name });
+      if (existing.email !== updatedUser.email) changes.push({ field: "Official Email", oldVal: existing.email, newVal: updatedUser.email });
+      if (existing.role !== updatedUser.role) changes.push({ field: "Role", oldVal: existing.role, newVal: updatedUser.role });
+      if (existing.institution !== updatedUser.institution) changes.push({ field: "Institution", oldVal: existing.institution, newVal: updatedUser.institution });
+      if (existing.active !== updatedUser.active) {
+        changes.push({
+          field: "Account Status",
+          oldVal: existing.active ? "Active" : "Disabled",
+          newVal: updatedUser.active ? "Active" : "Disabled",
+        });
+      }
+      const statusOnlyChanged = existing.active !== updatedUser.active;
+      const now = new Date();
+      const changeSummary = changes.length > 0
+        ? `Updated ${changes.slice(0, 2).map(c => c.field).join(", ")}${changes.length > 2 ? ` +${changes.length - 2} more` : ""} for ${updatedUser.name}`
+        : `Updated user account details for ${updatedUser.name}`;
+      onAddAuditLog({
+        id: `AUD-USR-${Date.now()}`,
+        timestamp: now.toISOString().replace("T", " ").slice(0, 19),
+        dateTime: now.toISOString(),
+        editedBy: "Avery Williams",
+        editorRole: "Super admin",
+        action: statusOnlyChanged ? "User Status Changed" : "User Details Updated",
+        institution: updatedUser.institution,
+        actionDetails: changeSummary,
+        comments: editComment.trim(),
+        changes,
+      });
+    }
+
     setEditingEmail(null);
+    setEditComment("");
+    setEditCommentError("");
+  };
+  const handleCreateUser = (event: FormEvent) => {
+    event.preventDefault();
+    const trimmedName = createName.trim() || "New Portal User";
+    const trimmedEmail = createEmail.trim() || `${trimmedName.toLowerCase().replace(/\s+/g, ".")}@campus.edu`;
+    const initials = trimmedName.split(" ").map(p => p[0]).join("").slice(0, 2).toUpperCase() || "NU";
+    setUsers(prev => [
+      { initials, name: trimmedName, role: createdRole, email: trimmedEmail, institution: createdInstitution, active: true },
+      ...prev,
+    ]);
+    if (onAddAuditLog) {
+      const now = new Date();
+      onAddAuditLog({
+        id: `AUD-UC-${Date.now()}`,
+        timestamp: now.toISOString().replace("T", " ").slice(0, 19),
+        dateTime: now.toISOString(),
+        editedBy: "Avery Williams",
+        editorRole: "Super admin",
+        action: "User Created",
+        institution: createdInstitution,
+        actionDetails: `Created portal user ${trimmedName} (${createdRole})`,
+        comments: createComment.trim() || "Portal account provisioned and role assigned.",
+        changes: [
+          { field: "Full Name", oldVal: "(New User)", newVal: trimmedName },
+          { field: "Role", oldVal: "(New User)", newVal: createdRole },
+          { field: "Institution", oldVal: "(New User)", newVal: createdInstitution },
+          { field: "Official Email", oldVal: "(New User)", newVal: trimmedEmail },
+        ],
+      });
+    }
+    setCreateName("");
+    setCreatePhone("");
+    setCreateEmail("");
+    setCreateComment("");
+    setCreated(true);
   };
   if (created) return <div className="success-page"><div className="success-symbol"><UserCheck size={38} /></div><Status tone="green">USER CREATED</Status><h1>Portal account created</h1><p>An account invitation was sent to the user's official email address.</p><section className="success-receipt"><div><span>Employee ID</span><strong>{nextEmpId}</strong></div><div><span>Role</span><strong>{createdRole}</strong></div><div><span>Institution</span><strong>{createdInstitution}</strong></div><div><span>Status</span><strong>Invitation pending</strong></div></section><Button onClick={() => { setCreated(false); setCreating(false); }}>Return to users</Button></div>;
-  if (creating) return <><TopBar title="Create portal user" subtitle="Admin action" back={() => setCreating(false)} /><form className="page-content form-page" onSubmit={event => { event.preventDefault(); setCreated(true); }}><div className="form-stack guard-form"><label className="field"><span>Employee ID</span><input readOnly value={nextEmpId} aria-label="Employee ID, generated automatically" /><small>Generated automatically when the user is created</small></label><label className="field"><span>Full name <b>*</b></span><input required placeholder="Enter official name" /></label><label className="field"><span>Phone number <b>*</b></span><input required type="tel" inputMode="tel" placeholder="+91 98765 43210" /></label><label className="field"><span>Role <b>*</b></span><select required value={createdRole} onChange={event => setCreatedRole(event.target.value as typeof createdRole)}>{adminPortalDesignations.map(item => <option key={item}>{item}</option>)}</select></label><label className="field"><span>Institution</span><select value={createdInstitution} onChange={event => setCreatedInstitution(event.target.value)}>{institutions.map(item => <option key={item}>{item}</option>)}</select></label><label className="field"><span>Official email</span><input type="email" placeholder="name@campus.edu" /></label><label className="field"><span>Department / office</span><input placeholder="e.g. Campus Security" /></label></div><label className="confirmation-check"><input required type="checkbox" /><span>I confirm this person is authorised to receive the selected role. <b>*</b></span></label><Button type="submit" icon={<Mail size={17} />}>Create account & send invite</Button></form></>;
+  if (creating) return <><TopBar title="Create portal user" subtitle="Super admin action" back={() => setCreating(false)} /><form className="page-content form-page" onSubmit={handleCreateUser}><div className="form-stack guard-form"><label className="field"><span>Employee ID</span><input readOnly value={nextEmpId} aria-label="Employee ID, generated automatically" /><small>Generated automatically when the user is created</small></label><label className="field"><span>Full name <b>*</b></span><input required value={createName} onChange={e => setCreateName(e.target.value)} placeholder="Enter official name" /></label><label className="field"><span>Phone number <b>*</b></span><input required type="tel" inputMode="tel" value={createPhone} onChange={e => setCreatePhone(e.target.value)} placeholder="+91 98765 43210" /></label><label className="field"><span>Role <b>*</b></span><select required value={createdRole} onChange={event => setCreatedRole(event.target.value as typeof createdRole)}>{adminPortalDesignations.map(item => <option key={item}>{item}</option>)}</select></label><label className="field"><span>Institution</span><select value={createdInstitution} onChange={event => setCreatedInstitution(event.target.value)}>{institutions.map(item => <option key={item}>{item}</option>)}</select></label><label className="field"><span>Official email</span><input type="email" value={createEmail} onChange={e => setCreateEmail(e.target.value)} placeholder="name@campus.edu" /></label><label className="field"><span>Department / office</span><input placeholder="e.g. Campus Security" /></label><label className="field"><span>Comments / Reason</span><textarea rows={2} value={createComment} onChange={e => setCreateComment(e.target.value)} placeholder="Reason or notes for provisioning this account..." /></label></div><label className="confirmation-check"><input required type="checkbox" /><span>I confirm this person is authorised to receive the selected role. <b>*</b></span></label><Button type="submit" icon={<Mail size={17} />}>Create account & send invite</Button></form></>;
   return <>
     <TopBar title="Portal users" back={() => go("home")} action={<button className="icon-btn primary" onClick={() => setCreating(true)}><Plus size={19} /></button>} />
-    <div className="page-content"><div className="search-input"><Search size={17} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search name, email, role or institution" />{query && <button onClick={() => setQuery("")}>Clear</button>}</div><section className="filter-panel user-admin-filters"><div className="user-filter-reset"><button onClick={() => { setInstitutionFilter("All institutions"); setDesignationFilter("All designations"); }}>Reset</button></div><div className="filter-fields"><Field label="Institution"><select value={institutionFilter} onChange={event => setInstitutionFilter(event.target.value)}><option>All institutions</option>{institutions.map(item => <option key={item}>{item}</option>)}</select></Field><Field label="Designation"><select value={designationFilter} onChange={event => setDesignationFilter(event.target.value)}><option>All designations</option>{adminPortalDesignations.map(item => <option key={item}>{item}</option>)}</select></Field></div></section><div className="portal-user-list">{filteredUsers.map(user => <section key={user.email}><div className="person-avatar">{user.initials}</div><div><strong>{user.name}</strong><span>{user.email}</span><small>{user.role} · {user.institution}</small></div><Status tone={user.active ? "green" : "red"}>{user.active ? "Active" : "Disabled"}</Status><button className="user-edit-button" onClick={() => editUser(user)} aria-label={`Edit ${user.name}`} aria-expanded={editingEmail === user.email}><MoreVertical size={18} /></button>{editingEmail === user.email && <div className="portal-user-editor"><div className="audit-detail-title">EDIT USER DETAILS</div><div className="form-stack"><label className="field"><span>Full name</span><input value={draft.name} onChange={event => setDraft(current => ({ ...current, name: event.target.value }))} /></label><label className="field"><span>Official email</span><input type="email" value={draft.email} onChange={event => setDraft(current => ({ ...current, email: event.target.value }))} /></label><label className="field"><span>Role</span><select value={draft.role} onChange={event => setDraft(current => ({ ...current, role: event.target.value }))}>{adminPortalDesignations.map(item => <option key={item}>{item}</option>)}</select></label><label className="field"><span>Institution</span><select value={draft.institution} onChange={event => setDraft(current => ({ ...current, institution: event.target.value }))}>{institutions.map(item => <option key={item}>{item}</option>)}</select></label></div><div className={`account-status-control ${draft.active ? "active" : "disabled"}`}><div><strong>Account status</strong><span>{draft.active ? "Active" : "Disabled"}</span></div><button type="button" className="status-switch" role="switch" aria-checked={draft.active} aria-label={`Set account ${draft.active ? "disabled" : "active"}`} onClick={() => setDraft(current => ({ ...current, active: !current.active }))}><i /></button></div><div className="editor-actions"><Button variant="secondary" onClick={() => setEditingEmail(null)}>Cancel</Button><Button onClick={saveUser}>Save changes</Button></div></div>}</section>)}</div><Button variant="secondary" onClick={() => setCreating(true)} icon={<UserPlus size={17} />}>Create portal user</Button></div>
+    <div className="page-content"><div className="search-input"><Search size={17} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search name, email, role or institution" />{query && <button onClick={() => setQuery("")}>Clear</button>}</div><section className="filter-panel user-admin-filters"><div className="user-filter-reset"><button onClick={() => { setInstitutionFilter("All institutions"); setDesignationFilter("All designations"); }}>Reset</button></div><div className="filter-fields"><Field label="Institution"><select value={institutionFilter} onChange={event => setInstitutionFilter(event.target.value)}><option>All institutions</option>{institutions.map(item => <option key={item}>{item}</option>)}</select></Field><Field label="Designation"><select value={designationFilter} onChange={event => setDesignationFilter(event.target.value)}><option>All designations</option>{adminPortalDesignations.map(item => <option key={item}>{item}</option>)}</select></Field></div></section><div className="portal-user-list">{filteredUsers.map(user => <section key={user.email}><div className="person-avatar">{user.initials}</div><div><strong>{user.name}</strong><span>{user.email}</span><small>{user.role} · {user.institution}</small></div><Status tone={user.active ? "green" : "red"}>{user.active ? "Active" : "Disabled"}</Status><button className="user-edit-button" onClick={() => editUser(user)} aria-label={`Edit ${user.name}`} aria-expanded={editingEmail === user.email}><MoreVertical size={18} /></button>{editingEmail === user.email && <div className="portal-user-editor"><div className="audit-detail-title">EDIT USER DETAILS</div><div className="form-stack"><label className="field"><span>Full name</span><input value={draft.name} onChange={event => setDraft(current => ({ ...current, name: event.target.value }))} /></label><label className="field"><span>Official email</span><input type="email" value={draft.email} onChange={event => setDraft(current => ({ ...current, email: event.target.value }))} /></label><label className="field"><span>Role</span><select value={draft.role} onChange={event => setDraft(current => ({ ...current, role: event.target.value }))}>{adminPortalDesignations.map(item => <option key={item}>{item}</option>)}</select></label><label className="field"><span>Institution</span><select value={draft.institution} onChange={event => setDraft(current => ({ ...current, institution: event.target.value }))}>{institutions.map(item => <option key={item}>{item}</option>)}</select></label><label className="field"><span>Comment / Reason for Edit <b>*</b></span><textarea rows={2} value={editComment} onChange={event => { setEditComment(event.target.value); if (event.target.value.trim()) setEditCommentError(""); }} placeholder="Enter reason for editing this portal user..." />{editCommentError && <small className="field-error">{editCommentError}</small>}</label></div><div className={`account-status-control ${draft.active ? "active" : "disabled"}`}><div><strong>Account status</strong><span>{draft.active ? "Active" : "Disabled"}</span></div><button type="button" className="status-switch" role="switch" aria-checked={draft.active} aria-label={`Set account ${draft.active ? "disabled" : "active"}`} onClick={() => setDraft(current => ({ ...current, active: !current.active }))}><i /></button></div><div className="editor-actions"><Button variant="secondary" onClick={() => setEditingEmail(null)}>Cancel</Button><Button onClick={saveUser}>Save changes</Button></div></div>}</section>)}</div><Button variant="secondary" onClick={() => setCreating(true)} icon={<UserPlus size={17} />}>Create portal user</Button></div>
   </>;
 }
 
@@ -4549,7 +4729,13 @@ function CampusEntries({
   </>;
 }
 
-function AssignSupervisor({ go }: { go: (screen: Screen) => void }) {
+function AssignSupervisor({
+  go,
+  onAddAuditLog,
+}: {
+  go: (screen: Screen) => void;
+  onAddAuditLog?: (log: AuditLogItem) => void;
+}) {
   const supervisors = ["Meera Nair", "Karthik Rao"];
   const blocksByInstitution: Record<string, string[]> = {
     "Institution A": ["North Gate", "Academic Block", "Science Block", "Auditorium"],
@@ -4561,20 +4747,47 @@ function AssignSupervisor({ go }: { go: (screen: Screen) => void }) {
   const [institution, setInstitution] = useState(institutions[1]);
   const [block, setBlock] = useState(blocksByInstitution[institutions[1]][0]);
   const [days, setDays] = useState("30");
+  const [assignComment, setAssignComment] = useState("");
   const [done, setDone] = useState(false);
   const changeInstitution = (nextInstitution: string) => {
     setInstitution(nextInstitution);
     setBlock(blocksByInstitution[nextInstitution][0]);
   };
-  if (done) return <div className="success-page"><div className="success-symbol"><UserCheck size={38} /></div><Status tone="green">ASSIGNED</Status><h1>Campus Supervisor assigned</h1><p>{supervisor} now supervises {block} in {institution}.</p><section className="success-receipt"><div><span>Campus Supervisor</span><strong>{supervisor}</strong></div><div><span>Institution</span><strong>{institution}</strong></div><div><span>Block</span><strong>{block}</strong></div><div><span>Duration</span><strong>{days} {Number(days) === 1 ? "day" : "days"}</strong></div></section><Button onClick={() => { setDone(false); go("home"); }}>Back to overview</Button></div>;
+  const handleAssignSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    if (onAddAuditLog) {
+      const now = new Date();
+      onAddAuditLog({
+        id: `AUD-SUP-${Date.now()}`,
+        timestamp: now.toISOString().replace("T", " ").slice(0, 19),
+        dateTime: now.toISOString(),
+        editedBy: "Avery Williams",
+        editorRole: "Super admin",
+        action: "Security Assignment Updated",
+        institution,
+        block,
+        actionDetails: `Assigned supervisor ${supervisor} to ${block} (${days} days)`,
+        comments: assignComment.trim() || `Campus supervisor rotation scheduled for ${days} days.`,
+        changes: [
+          { field: "Supervisor", oldVal: "(Previous Roster)", newVal: supervisor },
+          { field: "Institution", oldVal: "—", newVal: institution },
+          { field: "Assigned Block", oldVal: "—", newVal: block },
+          { field: "Duration", oldVal: "—", newVal: `${days} days` },
+        ],
+      });
+    }
+    setDone(true);
+  };
+  if (done) return <div className="success-page"><div className="success-symbol"><UserCheck size={38} /></div><Status tone="green">ASSIGNED</Status><h1>Campus Supervisor assigned</h1><p>{supervisor} now supervises {block} in {institution}.</p><section className="success-receipt"><div><span>Campus Supervisor</span><strong>{supervisor}</strong></div><div><span>Institution</span><strong>{institution}</strong></div><div><span>Block</span><strong>{block}</strong></div><div><span>Duration</span><strong>{days} {Number(days) === 1 ? "day" : "days"}</strong></div></section><Button onClick={() => { setDone(false); setAssignComment(""); go("home"); }}>Back to overview</Button></div>;
   return <>
-    <TopBar title="Assign Campus Supervisor" subtitle="Admin action" back={() => go("home")} />
-    <form className="page-content form-page" onSubmit={event => { event.preventDefault(); setDone(true); }}>
+    <TopBar title="Assign Campus Supervisor" subtitle="Super admin action" back={() => go("home")} />
+    <form className="page-content form-page" onSubmit={handleAssignSubmit}>
       <div className="form-stack guard-form">
         <Field label="Campus Supervisor *"><select value={supervisor} onChange={event => setSupervisor(event.target.value)}>{supervisors.map(item => <option key={item}>{item}</option>)}</select></Field>
         <Field label="Institution *"><select value={institution} onChange={event => changeInstitution(event.target.value)}>{institutions.map(item => <option key={item}>{item}</option>)}</select></Field>
         <Field label="Block *"><select value={block} onChange={event => setBlock(event.target.value)}>{blocksByInstitution[institution].map(item => <option key={item}>{item}</option>)}</select></Field>
         <label className="field"><span>Duration (days) <b>*</b></span><input required type="number" min={1} step={1} inputMode="numeric" value={days} onChange={event => setDays(event.target.value)} placeholder="e.g. 30" /></label>
+        <label className="field"><span>Comments / Reason</span><textarea rows={2} value={assignComment} onChange={event => setAssignComment(event.target.value)} placeholder="Reason or notes for assigning this supervisor..." /></label>
       </div>
       <Button type="submit" icon={<Check size={17} />}>Assign Campus Supervisor</Button>
     </form>
@@ -4685,7 +4898,10 @@ function AccommodationDetails({
   back: () => void;
   role: Role;
   students: StudentMatch[];
-  onUpdateStudent?: (student: StudentMatch) => void;
+  onUpdateStudent?: (
+    student: StudentMatch,
+    changeMeta?: { actionDetails: string; comments: string; changes: { field: string; oldVal: string; newVal: string }[] }
+  ) => void;
 }) {
   const [selectedReg, setSelectedReg] = useState<string>(students[0]?.registerNumber ?? "23MED0412");
   const [selectedStudentOverride, setSelectedStudentOverride] = useState<StudentMatch | null>(null);
@@ -4834,6 +5050,7 @@ function AccommodationDetails({
   const [hostelBlock, setHostelBlock] = useState("");
   const [roomNumber, setRoomNumber] = useState("");
   const [hostelAddress, setHostelAddress] = useState("");
+  const [hostelNotes, setHostelNotes] = useState("");
 
   // PG Fields
   const [pgName, setPgName] = useState("");
@@ -4866,6 +5083,7 @@ function AccommodationDetails({
     setHostelBlock(apiData?.hostel_block ?? targetStudent.hostelBlock ?? "");
     setRoomNumber(apiData?.room_number ?? targetStudent.roomNumber ?? "");
     setHostelAddress(apiData?.hostel_address ?? targetStudent.hostelAddress ?? "");
+    setHostelNotes(apiData?.accommodation_notes ?? targetStudent.accommodationNotes ?? "");
 
     setPgName(apiData?.pg_name ?? targetStudent.pgName ?? "");
     setPgAddress(apiData?.pg_address ?? targetStudent.pgAddress ?? "");
@@ -4996,7 +5214,7 @@ function AccommodationDetails({
       vehicle_type: residenceType === "Day Scholar" && transportationType === "Own Vehicle" ? vehicleType.trim() : null,
       vehicle_number: residenceType === "Day Scholar" && transportationType === "Own Vehicle" ? vehicleNumber.trim() : null,
       transport_description: residenceType === "Day Scholar" && transportationType === "Other" ? transportDescription.trim() : null,
-      notes: (residenceType === "PG" ? pgNotes.trim() : residenceType === "Day Scholar" ? dayScholarNotes.trim() : "") || null,
+      notes: (residenceType === "PG" ? pgNotes.trim() : residenceType === "Day Scholar" ? dayScholarNotes.trim() : hostelNotes.trim()) || null,
       effective_date: todayFormatted,
       updated_by: updaterName,
     };
@@ -5044,13 +5262,40 @@ function AccommodationDetails({
       vehicleType: (residenceType === "Day Scholar" && transportationType === "Own Vehicle") ? vehicleType.trim() : undefined,
       vehicleNumber: (residenceType === "Day Scholar" && transportationType === "Own Vehicle") ? vehicleNumber.trim() : undefined,
       transportDescription: (residenceType === "Day Scholar" && transportationType === "Other") ? transportDescription.trim() : undefined,
-      accommodationNotes: (residenceType === "PG" ? pgNotes.trim() : residenceType === "Day Scholar" ? dayScholarNotes.trim() : undefined),
+      accommodationNotes: (residenceType === "PG" ? pgNotes.trim() : residenceType === "Day Scholar" ? dayScholarNotes.trim() : hostelNotes.trim()) || undefined,
       residenceUpdatedAt: nowStr,
       residenceUpdatedBy: updaterName,
     };
 
+    const changes: { field: string; oldVal: string; newVal: string }[] = [];
+    const checkAccDiff = (field: string, oldV?: string, newV?: string) => {
+      if ((oldV || "") !== (newV || "")) {
+        changes.push({ field, oldVal: oldV || "(empty)", newVal: newV || "(empty)" });
+      }
+    };
+    checkAccDiff("Residence Type", student.accommodationType, residenceType);
+    if (residenceType === "Hosteller") {
+      checkAccDiff("Hostel Name", student.hostelName, updatedStudent.hostelName);
+      checkAccDiff("Room Number", student.roomNumber, updatedStudent.roomNumber);
+    } else if (residenceType === "PG") {
+      checkAccDiff("PG Name", student.pgName, updatedStudent.pgName);
+      checkAccDiff("PG Contact", student.pgContact, updatedStudent.pgContact);
+    } else {
+      checkAccDiff("Transportation Type", student.transportationType, updatedStudent.transportationType);
+      checkAccDiff("Residential Address", student.residentialAddress, updatedStudent.residentialAddress);
+    }
+    const actionDetailsLine =
+      student.accommodationType !== residenceType
+        ? `Changed residence (${student.accommodationType} → ${residenceType}) for ${updatedStudent.name} (${updatedStudent.registerNumber})`
+        : `Updated ${residenceType} accommodation details for ${updatedStudent.name} (${updatedStudent.registerNumber})`;
+    const enteredComment = updatedStudent.accommodationNotes || `Updated ${residenceType} residence details.`;
+
     if (onUpdateStudent) {
-      onUpdateStudent(updatedStudent);
+      onUpdateStudent(updatedStudent, {
+        actionDetails: actionDetailsLine,
+        comments: enteredComment,
+        changes,
+      });
     }
 
     if (updatedBackendHistory) {
@@ -5289,6 +5534,12 @@ function AccommodationDetails({
                         <strong>{student.hostelAddress}</strong>
                       </div>
                     )}
+                    {student.accommodationNotes && (
+                      <div className="residence-detail-row multiline">
+                        <span>Comments / Notes</span>
+                        <strong>{student.accommodationNotes}</strong>
+                      </div>
+                    )}
                   </>
                 )}
 
@@ -5464,6 +5715,16 @@ function AccommodationDetails({
                       placeholder="Enter hostel campus location or full address"
                     />
                   </label>
+
+                  <label className="field">
+                    <span>Comments / Reason</span>
+                    <textarea
+                      rows={2}
+                      value={hostelNotes}
+                      onChange={e => setHostelNotes(e.target.value)}
+                      placeholder="Reason or remarks for hostel allocation or change..."
+                    />
+                  </label>
                 </div>
               )}
 
@@ -5523,12 +5784,12 @@ function AccommodationDetails({
                   </label>
 
                   <label className="field">
-                    <span>Additional Notes (Optional)</span>
+                    <span>Comments / Reason (Optional)</span>
                     <textarea
                       rows={2}
                       value={pgNotes}
                       onChange={e => setPgNotes(e.target.value)}
-                      placeholder="Any relevant warden remarks or local guardian details..."
+                      placeholder="Any relevant warden remarks or reason for change..."
                     />
                   </label>
                 </div>
@@ -5671,12 +5932,12 @@ function AccommodationDetails({
                   )}
 
                   <label className="field">
-                    <span>Additional Notes (Optional)</span>
+                    <span>Comments / Reason (Optional)</span>
                     <textarea
                       rows={2}
                       value={dayScholarNotes}
                       onChange={e => setDayScholarNotes(e.target.value)}
-                      placeholder="Any specific instructions or emergency guardian notes..."
+                      placeholder="Reason or notes for day scholar residence details..."
                     />
                   </label>
                 </div>
@@ -5788,17 +6049,45 @@ export default function App() {
     return studentMatches;
   });
 
-  // Audit logs state with persistence
+  // Audit logs state with persistence (normalizing any legacy stored entries)
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>(() => {
     try {
       const saved = localStorage.getItem("campus_secure_audit_logs");
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((item: any) => ({
+            id: item.id || `AUD-${Date.now()}`,
+            timestamp: item.timestamp || new Date().toISOString().replace("T", " ").slice(0, 19),
+            dateTime: item.dateTime || new Date().toISOString(),
+            editedBy: item.editedBy || item.actor || item.userName || "System",
+            editorRole: ((item.editorRole || item.actorRole) === "Admin" ? "Super admin" : (item.editorRole || item.actorRole)) || (item.module === "Student Welfare" ? "Student Welfare" : "Super admin"),
+            action: item.action === "UPDATE_ACCOMMODATION" ? "Accommodation Updated" : item.action || "Student Details Updated",
+            institution: item.institution || "SRM GROUP OF INSTITUTIONS TRICHY",
+            block: item.block,
+            actionDetails:
+              item.actionDetails ||
+              item.details ||
+              (item.target && item.summary
+                ? `${item.target} — ${item.summary}`
+                : item.summary || item.target || "Record modified"),
+            comments: item.comments || "—",
+            changes: Array.isArray(item.changes) ? item.changes : undefined,
+            details: item.details && typeof item.details === "object" ? item.details : undefined,
+          }));
+        }
       }
     } catch (e) {}
     return DEFAULT_AUDIT_LOGS;
   });
+
+  const addAuditLog = (auditLog: AuditLogItem) => {
+    setAuditLogs(prev => {
+      const updated = [auditLog, ...prev];
+      try { localStorage.setItem("campus_secure_audit_logs", JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+  };
 
   // Admin log field display visibility settings
   const [adminLogFieldVisibility, setAdminLogFieldVisibility] = useState<LogFieldVisibility>(() => {
@@ -5920,33 +6209,67 @@ export default function App() {
     });
   };
 
-  const handleSaveFieldVisibility = (next: LogFieldVisibility) => {
+  const handleSaveFieldVisibility = (next: LogFieldVisibility, comment?: string) => {
+    const prev = adminLogFieldVisibility;
+    const changes: { field: string; oldVal: string; newVal: string }[] = [];
+    (Object.keys(next) as (keyof LogFieldVisibility)[]).forEach(key => {
+      if (prev[key] !== next[key]) {
+        changes.push({
+          field: String(key),
+          oldVal: prev[key] ? "Visible" : "Hidden",
+          newVal: next[key] ? "Visible" : "Hidden",
+        });
+      }
+    });
     setAdminLogFieldVisibility(next);
     try { localStorage.setItem("campus_secure_log_field_visibility", JSON.stringify(next)); } catch (e) {}
+    const now = new Date();
+    addAuditLog({
+      id: `AUD-VIS-${Date.now()}`,
+      timestamp: now.toISOString().replace("T", " ").slice(0, 19),
+      dateTime: now.toISOString(),
+      editedBy: "Avery Williams",
+      editorRole: "Super admin",
+      action: "Settings Modified",
+      institution: "SRM GROUP OF INSTITUTIONS TRICHY",
+      block: "Campus Wide",
+      actionDetails: changes.length > 0
+        ? `Updated log display visibility (${changes.length} field${changes.length > 1 ? "s" : ""})`
+        : "Saved student log field visibility configuration",
+      comments: (comment && comment.trim()) || "Updated Student Log & Scan Field Visibility settings.",
+      changes,
+    });
   };
 
-  const handleSaveManagerPermissions = (next: ManagerEditPermissions) => {
+  const handleSaveManagerPermissions = (next: ManagerEditPermissions, comment?: string) => {
+    const prev = managerEditPermissions;
+    const changes: { field: string; oldVal: string; newVal: string }[] = [];
+    (Object.keys(next) as (keyof ManagerEditPermissions)[]).forEach(key => {
+      if (prev[key] !== next[key]) {
+        changes.push({
+          field: String(key),
+          oldVal: prev[key] ? "Editable" : "Locked",
+          newVal: next[key] ? "Editable" : "Locked",
+        });
+      }
+    });
     setManagerEditPermissions(next);
     try { localStorage.setItem("campus_secure_manager_edit_permissions", JSON.stringify(next)); } catch (e) {}
     const now = new Date();
-    const timeStr = now.toISOString().replace("T", " ").slice(0, 19);
-    const auditLog: AuditLogItem = {
+    addAuditLog({
       id: `AUD-PERM-${Date.now()}`,
-      timestamp: timeStr,
+      timestamp: now.toISOString().replace("T", " ").slice(0, 19),
       dateTime: now.toISOString(),
-      actor: "Avery Williams",
-      actorRole: "Admin",
-      actorId: "ADM-0001",
+      editedBy: "Avery Williams",
+      editorRole: "Super admin",
       action: "Access Permissions Updated",
-      target: "Institute Manager Role",
       institution: "SRM GROUP OF INSTITUTIONS TRICHY",
       block: "Campus Wide",
-      summary: "Admin updated field editing permissions for Institute Manager portal.",
-    };
-    setAuditLogs(prev => {
-      const updated = [auditLog, ...prev];
-      try { localStorage.setItem("campus_secure_audit_logs", JSON.stringify(updated)); } catch (e) {}
-      return updated;
+      actionDetails: changes.length > 0
+        ? `Updated Institute Manager permissions (${changes.length} field${changes.length > 1 ? "s" : ""})`
+        : "Saved edit access permissions for Institute Manager role",
+      comments: (comment && comment.trim()) || "Updated field editing permissions for Institute Manager portal.",
+      changes,
     });
   };
   const [logs, setLogs] = useState<LogRecord[]>(() => {
@@ -6409,8 +6732,8 @@ export default function App() {
     else if (screen === "identity") content = <IdentityResult role="supervisor" go={go} identityCase={identityCase} verificationMethod={verificationMethod} student={matchedStudent} capturedPhoto={capturedPhoto} fieldVisibility={adminLogFieldVisibility} />;
     else if (screen === "unauthorised") content = <UnauthorizedForm role="supervisor" go={go} capturedPhoto={capturedPhoto} onRecordEvent={recordUnauthorizedEvent} />;
     else if (screen === "success") content = <Success role="supervisor" go={go} />;
-    else if (screen === "assignments") content = <Assignments go={go} />;
-    else if (screen === "create-guard") content = <CreateGuard go={go} />;
+    else if (screen === "assignments") content = <Assignments go={go} onAddAuditLog={addAuditLog} editorName={roleMeta.supervisor.name} editorRole="Campus Supervisor" />;
+    else if (screen === "create-guard") content = <CreateGuard go={go} onAddAuditLog={addAuditLog} editorName={roleMeta.supervisor.name} editorRole="Campus Supervisor" />;
     else if (screen === "audit" || screen === "logs") content = <Audit go={go} reviews={reviews} logs={logs} />;
     else content = <SupervisorHome go={go} reviews={reviews} logs={logs} />;
   } else if (role === "cso") {
@@ -6419,13 +6742,13 @@ export default function App() {
     else if (screen === "identity") content = <IdentityResult role="cso" go={go} identityCase={identityCase} verificationMethod={verificationMethod} student={matchedStudent} capturedPhoto={capturedPhoto} fieldVisibility={adminLogFieldVisibility} />;
     else if (screen === "unauthorised") content = <UnauthorizedForm role="cso" go={go} capturedPhoto={capturedPhoto} onRecordEvent={recordUnauthorizedEvent} />;
     else if (screen === "success") content = <Success role="cso" go={go} />;
-    else if (screen === "assignments") content = <Assignments go={go} />;
-    else if (screen === "create-guard") content = <CreateGuard go={go} />;
+    else if (screen === "assignments") content = <Assignments go={go} onAddAuditLog={addAuditLog} editorName={roleMeta.cso.name} editorRole="CSO" />;
+    else if (screen === "create-guard") content = <CreateGuard go={go} onAddAuditLog={addAuditLog} editorName={roleMeta.cso.name} editorRole="CSO" />;
     else if (screen === "audit" || screen === "logs") content = <Audit go={go} reviews={reviews} scope="cso" logs={logs} />;
     else if (screen === "campus-entries") content = <CampusEntries go={go} reviews={reviews} scope="institution" logs={logs} />;
     else if (screen === "login-logs") content = <Worklog go={go} scope="security-oversight" />;
-    else if (screen === "manager-students") content = <ManagerStudentDirectory go={go} students={studentsList} onUpdateStudent={handleUpdateStudent} permissions={managerEditPermissions} />;
-    else if (screen === "add-student") content = <ManualAddStudent go={go} onAddStudent={handleAddStudent} />;
+    else if (screen === "manager-students") content = <ManagerStudentDirectory go={go} students={studentsList} onUpdateStudent={handleUpdateStudent} permissions={managerEditPermissions} editorName={roleMeta.cso.name} editorRole="CSO" />;
+    else if (screen === "add-student") content = <ManualAddStudent go={go} onAddStudent={handleAddStudent} editorName={roleMeta.cso.name} editorRole="CSO" />;
     else content = <OversightHome role="cso" go={go} />;
   } else if (role === "welfare") {
     if (screen === "welfare-logs") content = <WelfareBlockLogs reviews={reviews} />;
@@ -6435,18 +6758,25 @@ export default function App() {
         back={back}
         role={role}
         students={studentsList}
-        onUpdateStudent={(updatedStudent) => {
-          const nowStr = new Date().toLocaleString();
+        onUpdateStudent={(updatedStudent, changeMeta) => {
+          const now = new Date();
           const auditLog: AuditLogItem = {
             id: `AUD-ACC-${Date.now()}`,
-            timestamp: nowStr,
-            userId: roleMeta["welfare"]?.phoneNumber || "WEL-B-0012",
-            userName: roleMeta["welfare"]?.name || "Dr. Kavitha Rao",
-            action: "UPDATE_ACCOMMODATION",
-            module: "Student Welfare",
-            target: `${updatedStudent.name} (${updatedStudent.registerNumber})`,
-            details: `Residence changed to ${updatedStudent.accommodationType}`,
-            severity: "info",
+            timestamp: now.toISOString().replace("T", " ").slice(0, 19),
+            dateTime: now.toISOString(),
+            editedBy: roleMeta["welfare"]?.name || "Dr. Kavitha Rao",
+            editorRole: "Student Welfare",
+            action: "Accommodation Updated",
+            institution: "SRM GROUP OF INSTITUTIONS TRICHY",
+            block: updatedStudent.hostelName || "Institution B Campus",
+            actionDetails:
+              changeMeta?.actionDetails ||
+              `Updated residence to ${updatedStudent.accommodationType} for ${updatedStudent.name} (${updatedStudent.registerNumber})`,
+            comments:
+              changeMeta?.comments ||
+              updatedStudent.accommodationNotes ||
+              `Updated ${updatedStudent.accommodationType} residence details.`,
+            changes: changeMeta?.changes,
           };
           handleUpdateStudent(updatedStudent, auditLog);
         }}
@@ -6454,17 +6784,17 @@ export default function App() {
     );
     else content = <WelfareHome go={go} />;
   } else if (role === "manager") {
-    if (screen === "manager-students") content = <ManagerStudentDirectory go={go} students={studentsList} onUpdateStudent={handleUpdateStudent} permissions={managerEditPermissions} />;
-    else if (screen === "add-student") content = <ManualAddStudent go={go} onAddStudent={handleAddStudent} />;
+    if (screen === "manager-students") content = <ManagerStudentDirectory go={go} students={studentsList} onUpdateStudent={handleUpdateStudent} permissions={managerEditPermissions} editorName={roleMeta.manager.name} editorRole="Institute Manager" />;
+    else if (screen === "add-student") content = <ManualAddStudent go={go} onAddStudent={handleAddStudent} editorName={roleMeta.manager.name} editorRole="Institute Manager" />;
     else if (screen === "campus-entries") content = <CampusEntries go={go} reviews={reviews} scope="institution" fieldVisibility={adminLogFieldVisibility} logs={logs} />;
     else if (screen === "institution-users") content = <InstitutionUserDirectory go={go} />;
     else if (screen === "admin-audit-logs") content = <AuditLogsTable go={go} auditLogs={auditLogs} scope="institution" />;
     else content = <OversightHome role={role} go={go} />;
   } else if (role === "admin") {
-    if (screen === "users") content = <UserAdministration go={go} />;
+    if (screen === "users") content = <UserAdministration go={go} onAddAuditLog={addAuditLog} />;
     else if (screen === "campus-entries") content = <CampusEntries go={go} reviews={reviews} fieldVisibility={adminLogFieldVisibility} logs={logs} />;
     else if (screen === "login-logs") content = <Worklog go={go} />;
-    else if (screen === "assign-supervisor") content = <AssignSupervisor go={go} />;
+    else if (screen === "assign-supervisor") content = <AssignSupervisor go={go} onAddAuditLog={addAuditLog} />;
     else if (screen === "admin-bulk-students") content = <AdminBulkStudentImport go={go} onBulkImport={handleBulkImportStudents} />;
     else if (screen === "admin-audit-logs") content = <AuditLogsTable go={go} auditLogs={auditLogs} scope="admin" />;
     else if (screen === "admin-access-settings") content = <AdminAccessSettings go={go} fieldVisibility={adminLogFieldVisibility} onSaveFieldVisibility={handleSaveFieldVisibility} permissions={managerEditPermissions} onSavePermissions={handleSaveManagerPermissions} />;
