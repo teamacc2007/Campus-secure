@@ -2840,7 +2840,14 @@ const reviewFor = (reviews: Record<string, ReviewRecord>, row: LogRecord): Revie
       actions: row.reviewActions,
     };
   }
-  return rev ?? { status: (row.reviewStatus as ReviewStatus) ?? "Pending Verification", actions: [] };
+  if (row.logId) {
+    if (reviews[row.logId] && reviews[row.logId].actions && reviews[row.logId].actions.length > 0) {
+      return reviews[row.logId];
+    }
+    const foundEntry = Object.entries(reviews).find(([k]) => k.includes(row.logId!));
+    if (foundEntry && foundEntry[1]?.actions && foundEntry[1].actions.length > 0) return foundEntry[1];
+  }
+  return rev ?? (row.logId ? reviews[row.logId] : undefined) ?? { status: (row.reviewStatus as ReviewStatus) ?? "Pending Verification", actions: [] };
 };
 const reviewTone = (status: ReviewStatus) => status === "Verified" || status === "Authorised" || status === "Revoked" ? "green" : status === "Unauthorised" ? "red" : "amber";
 const recordCategory = (reviews: Record<string, ReviewRecord>, row: LogRecord) =>
@@ -2972,11 +2979,17 @@ function getUnauthorizedReviewAction(reviews: Record<string, ReviewRecord>, row:
 export function getUnauthorizedAction(reviews: Record<string, ReviewRecord>, row: LogRecord): string {
   const action = getUnauthorizedReviewAction(reviews, row);
   if (action?.action_taken && action.action_taken.trim()) return action.action_taken.trim();
-  if (action?.reason && action.reason.trim()) return action.reason.trim();
+  if (action?.reason && action.reason.trim()) {
+    const trimmed = action.reason.trim();
+    const lower = trimmed.toLowerCase();
+    if (!lower.startsWith("face unrecognized") && !lower.includes("face recognition score")) {
+      return trimmed;
+    }
+  }
   if (row.actionTaken && row.actionTaken.trim()) return row.actionTaken.trim();
   const general = getActionTaken(reviews, row);
   if (general && general !== "—" && general !== "Not Available") return general;
-  return "Denied entry by security";
+  return "Not Available";
 }
 
 export function getUnauthorizedName(row: LogRecord, reviews: Record<string, ReviewRecord>): string {
@@ -3035,7 +3048,7 @@ export function getUnauthorizedDateTime(row: LogRecord, reviews: Record<string, 
 export function exportRecordsToCsv(rows: LogRecord[], reviews: Record<string, ReviewRecord>, isUnauthorized = false) {
   const isUnauth = isUnauthorized || (rows.length > 0 && rows.every(r => recordCategory(reviews, r) === "Unauthorized" || r.accessCategory === "Unauthorized" || r.decision === "Denied"));
   if (isUnauth) {
-    const headers = ["S.No", "Name", "Address", "Contact Number", "Location", "Vehicle Number", "Date & Time"];
+    const headers = ["S.No", "Name", "Address", "Contact Number", "Location", "Vehicle Number", "Action Taken", "Date & Time"];
     const csvRows = [headers.join(",")];
     rows.forEach((row, index) => {
       const name = getUnauthorizedName(row, reviews);
@@ -3043,6 +3056,7 @@ export function exportRecordsToCsv(rows: LogRecord[], reviews: Record<string, Re
       const contact = getUnauthorizedContact(row, reviews);
       const location = getUnauthorizedLocation(row, reviews);
       const vehicle = getUnauthorizedVehicle(row, reviews);
+      const actionTaken = getUnauthorizedAction(reviews, row);
       const dateTime = getUnauthorizedDateTime(row, reviews);
       const line = [
         index + 1,
@@ -3051,6 +3065,7 @@ export function exportRecordsToCsv(rows: LogRecord[], reviews: Record<string, Re
         `"${contact.replace(/"/g, '""')}"`,
         `"${location.replace(/"/g, '""')}"`,
         `"${vehicle.replace(/"/g, '""')}"`,
+        `"${actionTaken.replace(/"/g, '""')}"`,
         `"${dateTime.replace(/"/g, '""')}"`,
       ];
       csvRows.push(line.join(","));
@@ -3169,6 +3184,7 @@ function AuditTable({
               <th>Contact Number</th>
               <th>Location</th>
               <th>Vehicle Number</th>
+              <th>Action Taken</th>
               <th>Date &amp; Time</th>
             </tr>
           </thead>
@@ -3179,6 +3195,7 @@ function AuditTable({
               const contact = getUnauthorizedContact(row, reviews);
               const location = getUnauthorizedLocation(row, reviews);
               const vehicle = getUnauthorizedVehicle(row, reviews);
+              const actionTaken = getUnauthorizedAction(reviews, row);
               const dateTime = getUnauthorizedDateTime(row, reviews);
 
               return (
@@ -3200,6 +3217,7 @@ function AuditTable({
                   <td>{contact}</td>
                   <td title={location}>{location}</td>
                   <td>{vehicle}</td>
+                  <td title={actionTaken} className="action-taken-cell"><strong>{actionTaken}</strong></td>
                   <td>{dateTime}</td>
                 </tr>
               );
@@ -3649,6 +3667,7 @@ function UnauthorisedEntriesTable({
               <th>Contact Number</th>
               <th>Location</th>
               <th>Vehicle Number</th>
+              <th>Action Taken</th>
               <th>Date &amp; Time</th>
             </tr>
           </thead>
@@ -3659,6 +3678,7 @@ function UnauthorisedEntriesTable({
               const contact = getUnauthorizedContact(row, reviews);
               const location = getUnauthorizedLocation(row, reviews);
               const vehicle = getUnauthorizedVehicle(row, reviews);
+              const actionTaken = getUnauthorizedAction(reviews, row);
               const dateTime = getUnauthorizedDateTime(row, reviews);
 
               return (
@@ -3678,6 +3698,7 @@ function UnauthorisedEntriesTable({
                   <td>{contact}</td>
                   <td title={location}>{location}</td>
                   <td>{vehicle}</td>
+                  <td title={actionTaken} className="action-taken-cell"><strong>{actionTaken}</strong></td>
                   <td>{dateTime}</td>
                 </tr>
               );
