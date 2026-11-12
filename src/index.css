@@ -1699,9 +1699,12 @@ h1, h2, h3, p, dl, dd { margin: 0; }
 }
 
 .audit-col-edited-by { min-width: 145px; }
+.audit-col-edited-by strong { display: block; margin-bottom: 2px; color: #1e2d43; font-size: 9.5px; }
 .audit-col-institution { min-width: 135px; }
 .audit-col-details { min-width: 240px; }
 .audit-col-comments { min-width: 220px; }
+.audit-col-time { min-width: 96px; }
+.audit-col-time strong { display: block; margin-bottom: 2px; color: #1e2d43; font-size: 9.5px; }
 
 .audit-th-inner {
   display: inline-flex;
@@ -1764,47 +1767,55 @@ h1, h2, h3, p, dl, dd { margin: 0; }
   font-size: 9.5px;
 }
 
-.audit-logs-sticky-table th.sticky-col-time,
-.audit-logs-sticky-table td.sticky-col-time {
+.audit-logs-sticky-table th.sticky-col-sno,
+.audit-logs-sticky-table td.sticky-col-sno {
   position: sticky;
   left: 0;
   z-index: 3;
-  width: 84px;
-  min-width: 84px;
-  max-width: 84px;
-  padding: 9px 8px;
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
+  padding: 9px 6px;
+  text-align: center;
+  border-right: 1px solid #edf0f4;
+}
+
+.audit-logs-sticky-table tbody td.sticky-col-sno {
+  color: #64748b;
+  font-weight: 600;
+  font-size: 11px;
 }
 
 .audit-logs-sticky-table th.sticky-col-action,
 .audit-logs-sticky-table td.sticky-col-action {
   position: sticky;
-  left: 84px;
+  left: 48px;
   z-index: 3;
-  width: 156px;
-  min-width: 156px;
-  max-width: 156px;
+  width: 166px;
+  min-width: 166px;
+  max-width: 166px;
   padding: 9px 8px;
   border-right: 1px solid var(--line);
   box-shadow: 4px 0 10px -4px rgba(15, 23, 42, 0.16);
 }
 
-.audit-logs-sticky-table thead th.sticky-col-time,
+.audit-logs-sticky-table thead th.sticky-col-sno,
 .audit-logs-sticky-table thead th.sticky-col-action {
   z-index: 4;
   background: #f1f5f9;
 }
 
-.audit-logs-sticky-table tbody td.sticky-col-time,
+.audit-logs-sticky-table tbody td.sticky-col-sno,
 .audit-logs-sticky-table tbody td.sticky-col-action {
   background: #ffffff;
 }
 
-.audit-logs-sticky-table tbody tr:hover td.sticky-col-time,
+.audit-logs-sticky-table tbody tr:hover td.sticky-col-sno,
 .audit-logs-sticky-table tbody tr:hover td.sticky-col-action {
   background: #f8fafc;
 }
 
-.audit-logs-sticky-table tbody tr:active td.sticky-col-time,
+.audit-logs-sticky-table tbody tr:active td.sticky-col-sno,
 .audit-logs-sticky-table tbody tr:active td.sticky-col-action {
   background: #edf4ff;
 }

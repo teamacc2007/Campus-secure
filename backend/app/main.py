@@ -93,6 +93,68 @@ def ensure_accommodation_columns():
 
 ensure_accommodation_columns()
 
+
+def seed_default_users_if_empty():
+    try:
+        from app.core.database import SessionLocal
+        from app.models.institution import Institution
+        from app.models.user import User
+        from app.core.security import get_password_hash
+
+        with SessionLocal() as db:
+            inst = db.query(Institution).filter(
+                (Institution.short_code == "SRMTRICHY") | (Institution.short_code == "TSRMMCHRC")
+            ).first()
+            if not inst:
+                inst = Institution(
+                    name="SRM GROUP OF INSTITUTIONS TRICHY",
+                    short_code="SRMTRICHY",
+                    campus_code="SRM-TRICHY-01",
+                    address="SRM Nagar, Irungalur, Tiruchirappalli, Tamil Nadu 621105",
+                )
+                db.add(inst)
+                db.commit()
+                db.refresh(inst)
+
+            existing_users = {u.username.lower(): u for u in db.query(User).all()}
+            demo_users = [
+                ("admin", "A. Balaji", "admin", "admin@srmtrichy.edu.in", "9876543218"),
+                ("manager", "Dr. M. Senthil", "manager", "manager@srmtrichy.edu.in", "9876543220"),
+                ("security", "G. Selvam", "security", "security@srmtrichy.edu.in", "9876543210"),
+                ("warden", "Dr. K. Raman", "warden", "warden@srmtrichy.edu.in", "9876543211"),
+                ("staff", "Prof. S. Venkatesh", "staff", "staff@srmtrichy.edu.in", "9876543212"),
+                ("supervisor", "M. Rajesh", "supervisor", "supervisor@srmtrichy.edu.in", "9876543213"),
+                ("access", "P. Anitha", "access-supervisor", "access@srmtrichy.edu.in", "9876543214"),
+                ("access-supervisor", "P. Anitha", "access-supervisor", "access-supervisor@srmtrichy.edu.in", "9876543215"),
+                ("students", "Dr. V. Meenakshi", "students", "students@srmtrichy.edu.in", "9876543216"),
+                ("welfare", "Dr. R. Karthik", "welfare", "welfare@srmtrichy.edu.in", "9876543217"),
+                ("cso", "Col. R. Sundaram", "cso", "cso@srmtrichy.edu.in", "9876543219"),
+            ]
+            created = 0
+            hp = get_password_hash("12345")
+            for u_name, f_name, r, em, ph in demo_users:
+                if u_name not in existing_users:
+                    u = User(
+                        username=u_name,
+                        full_name=f_name,
+                        role=r,
+                        email=em,
+                        phone=ph,
+                        hashed_password=hp,
+                        institution_id=inst.id,
+                        is_active=True,
+                    )
+                    db.add(u)
+                    created += 1
+            if created > 0:
+                db.commit()
+                print(f"[Seed] Created {created} default role accounts.")
+    except Exception as e:
+        print(f"[Seed] Initial users seeding check: {e}")
+
+
+seed_default_users_if_empty()
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
@@ -106,6 +168,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_origin_regex=r"https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

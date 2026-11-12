@@ -1,5 +1,8 @@
 import { useState, useRef, useEffect, useMemo, type ChangeEvent, type DragEvent, type FormEvent } from "react";
 import * as XLSX from "xlsx";
+import { API_BASE_URL } from "./apiConfig";
+import { saveOrShareBlob } from "./mobileDownloads";
+import { ensureCameraPermission } from "./cameraPermissions";
 import {
   AlertTriangle,
   Building2,
@@ -307,6 +310,7 @@ export function ManualAddStudent({
   const startCamera = async () => {
     setCameraError("");
     try {
+      await ensureCameraPermission();
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(t => t.stop());
       }
@@ -829,7 +833,7 @@ export function ManualAddStudent({
         )}
 
         <button type="submit" className="btn primary" disabled={training} style={{ marginTop: "12px" }}>
-          <ShieldCheck size={18} /> {training ? "Training Model..." : "Enroll Student & Train Model"}
+          <ShieldCheck size={18} /> {training ? "Training Model..." : "Enroll Student"}
         </button>
       </form>
     </>
@@ -898,7 +902,7 @@ export function ManagerStudentDirectory({
     let active = true;
     const fetchDbStudents = async () => {
       try {
-        const resp = await fetch("http://localhost:8000/api/v1/students/?institution_id=1");
+        const resp = await fetch(`${API_BASE_URL}/api/v1/students/?institution_id=1`);
         if (resp.ok && active) {
           const data = await resp.json();
           if (Array.isArray(data)) {
@@ -1104,7 +1108,7 @@ export function ManagerStudentDirectory({
 
     setIsSending(true);
     try {
-      const resp = await fetch("http://127.0.0.1:8000/api/v1/manager-requests/", {
+      const resp = await fetch(`${API_BASE_URL}/api/v1/manager-requests/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2034,16 +2038,21 @@ export function AdminBulkStudentImport({
       const blob = new Blob([new Uint8Array(styledBuf)], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "CampusSecure_Student_Bulk_Template.xlsx";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      void saveOrShareBlob(
+        blob,
+        "CampusSecure_Student_Bulk_Template.xlsx",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
     } catch {
-      XLSX.writeFile(wb, "CampusSecure_Student_Bulk_Template.xlsx");
+      const wbOut = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+      const blob = new Blob([new Uint8Array(wbOut)], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      void saveOrShareBlob(
+        blob,
+        "CampusSecure_Student_Bulk_Template.xlsx",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
     }
   };
 
@@ -2797,13 +2806,13 @@ export function AuditLogsTable({
           <table className="audit-table audit-logs-sticky-table">
             <thead>
               <tr>
-                <th style={{ width: "50px", textAlign: "center" }}>S.No</th>
-                <th className="sticky-col-time">Date &amp; Time</th>
+                <th className="sticky-col-sno">S.No</th>
                 <th className="sticky-col-action">Action</th>
                 {renderMovableHeader("editedBy", "Edited by", "audit-col-edited-by")}
                 {renderMovableHeader("institution", "Institution", "audit-col-institution")}
                 {renderMovableHeader("actionDetails", "Action details", "audit-col-details")}
                 {renderMovableHeader("comments", "Comments", "audit-col-comments")}
+                <th className="audit-col-time">Date &amp; Time</th>
               </tr>
             </thead>
             <tbody>
@@ -2826,12 +2835,8 @@ export function AuditLogsTable({
                 const dt = formatAuditDateParts(log.timestamp, log.dateTime);
                 return (
                   <tr key={log.id} onClick={() => setSelectedLog(log)}>
-                    <td style={{ textAlign: "center", color: "#64748b", fontWeight: "600", fontSize: "12px", width: "50px" }}>
+                    <td className="sticky-col-sno">
                       {idx + 1}
-                    </td>
-                    <td className="sticky-col-time">
-                      <strong style={{ display: "block", color: "#1e2d43" }}>{dt.date}</strong>
-                      {dt.time && <small style={{ color: "#64748b", display: "block" }}>{dt.time}</small>}
                     </td>
                     <td className="sticky-col-action">
                       <span className={`action-badge ${badgeClass}`}>{log.action}</span>
@@ -2857,6 +2862,10 @@ export function AuditLogsTable({
                         {log.comments || "—"}
                       </td>
                     )}
+                    <td className="audit-col-time">
+                      <strong style={{ display: "block", color: "#1e2d43" }}>{dt.date}</strong>
+                      {dt.time && <small style={{ color: "#64748b", display: "block" }}>{dt.time}</small>}
+                    </td>
                   </tr>
                 );
               })}

@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     # Security
     SECRET_KEY: str = "secret-key-campus-secure-2026-production-salt-key-do-not-leak"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 525600
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # Database
@@ -45,9 +45,12 @@ class Settings(BaseSettings):
     # CORS
     BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost",
+        "https://localhost",
+        "capacitor://localhost",
         "http://localhost:8443",
         "http://localhost:3000",
         "http://localhost:5173",
+        "https://campus-secure.vercel.app",
         "*",
     ]
 

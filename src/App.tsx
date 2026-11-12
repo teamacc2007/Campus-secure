@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import * as XLSX from "xlsx";
+import { API_BASE_URL } from "./apiConfig";
+import { getInitialLocalSession, getStoredSession, saveSession, clearSession, type StoredSession } from "./authSession";
+import { saveOrShareBlob } from "./mobileDownloads";
+import { ensureCameraPermission } from "./cameraPermissions";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -634,7 +638,7 @@ function Button({
   return <button type={type} className={`btn btn-${variant}`} onClick={onClick} disabled={disabled}>{icon}{children}</button>;
 }
 
-function Status({ tone, children }: { tone: "green" | "blue" | "amber" | "red" | "gray"; children: ReactNode }) {
+function Status({ tone, children }: { tone: "green" | "blue" | "amber" | "red" | "gray" | "purple"; children: ReactNode }) {
   return <span className={`status status-${tone}`}><i />{children}</span>;
 }
 
@@ -746,68 +750,58 @@ function Page({ children, nav, role, active, go }: { children: ReactNode; nav?: 
   return <main className={`phone-page ${nav ? "with-nav" : ""}`}>{children}{nav && <BottomNav role={role} active={active} go={go} />}</main>;
 }
 
-function Login({ enter, go }: { enter: (role: Role) => void; go: (screen: Screen) => void }) {
-  const [username, setUsername] = useState("");
+function Login({ enter, go }: { enter: (role: Role, session?: StoredSession) => void; go: (screen: Screen) => void }) {
+  const [mailId, setMailId] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
-  const credentials: Record<string, Role> = {
-    security: "security",
-    guard: "security",
-    warden: "warden",
-    "hostel warden": "warden",
-    "hostel-warden": "warden",
-    staff: "staff",
-    faculty: "staff",
-    supervisor: "supervisor",
-    "campus supervisor": "supervisor",
-    "campus-supervisor": "supervisor",
-    "access supervisor": "access-supervisor",
-    "access-supervisor": "access-supervisor",
-    access: "access-supervisor",
-    students: "students",
-    student: "students",
-    "student affair": "students",
-    "student affairs": "students",
-    "student-affairs": "students",
-    welfare: "welfare",
-    "student welfare": "welfare",
-    "student-welfare": "welfare",
-    admin: "admin", "super admin": "admin", "super-admin": "admin", superadmin: "admin",
-    administrator: "admin",
-    cso: "cso",
-    manager: "manager",
-    "institute manager": "manager",
-    "institute-manager": "manager",
-  };
+  const [submitting, setSubmitting] = useState(false);
+
+  const validRoles = new Set<Role>([
+    "security", "warden", "staff", "supervisor", "access-supervisor",
+    "students", "welfare", "admin", "cso", "manager",
+  ]);
+
   const signIn = async () => {
-    if (!username.trim() || !password) {
-      setError(!username.trim() ? "Username is required." : "Password is required.");
-      return;
-    }
-    const matchedRole = credentials[username.trim().toLowerCase()];
-    if (!matchedRole || password !== "12345") {
-      setError("Incorrect username or password. Please try again.");
+    const emailInput = mailId.trim().toLowerCase();
+    if (!emailInput || !password) {
+      setError(!emailInput ? "Mail ID is required." : "Password is required.");
       return;
     }
     setError("");
+    setSubmitting(true);
     try {
-      const res = await fetch("http://localhost:8000/api/v1/auth/login", {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: matchedRole === "admin" ? "admin" : username.trim().toLowerCase(), password }),
+        body: JSON.stringify({ username: emailInput, password }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.access_token) {
-          localStorage.setItem("campus_token", data.access_token);
-        }
+      if (!res.ok) {
+        setError("Incorrect mail ID or password. Please try again.");
+        setSubmitting(false);
+        return;
       }
-    } catch (e) {
-      // offline/fallback
+      const data = await res.json();
+      const rawRole = (data.role || "security") as Role;
+      const matchedRole: Role = validRoles.has(rawRole) ? rawRole : "security";
+      const nextSession: StoredSession = {
+        role: matchedRole,
+        username: data.username || emailInput,
+        email: data.email || (emailInput.includes("@") ? emailInput : `${data.username || emailInput}@srmtrichy.edu.in`),
+        fullName: data.full_name || roleMeta[matchedRole].name,
+        token: data.access_token,
+        refreshToken: data.refresh_token,
+        timestamp: Date.now(),
+      };
+      await saveSession(nextSession);
+      setSubmitting(false);
+      enter(matchedRole, nextSession);
+    } catch {
+      setSubmitting(false);
+      setError("Unable to reach server. Please check your internet connection and try again.");
     }
-    enter(matchedRole);
   };
+
   return <main className="phone-page login-page">
     <section className="login-brand">
       <div className="login-college-emblem">
@@ -822,11 +816,11 @@ function Login({ enter, go }: { enter: (role: Role) => void; go: (screen: Screen
     </section>
     <section className="login-card">
       <span className="overline">OFFICIAL ACCESS</span><h2>Sign in</h2>
-      <label className="field"><span>Username</span><input value={username} onChange={event => setUsername(event.target.value)} placeholder="Enter username" autoCapitalize="none" /></label>
-      <label className="field"><span>Password</span><div className="password-input"><input type={showPassword ? "text" : "password"} value={password} onChange={event => setPassword(event.target.value)} placeholder="Enter password" /><button onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? "Hide password" : "Show password"}><Eye size={17} /></button></div></label>
+      <label className="field"><span>Mail ID</span><input type="email" value={mailId} onChange={event => setMailId(event.target.value)} onKeyDown={e => { if (e.key === "Enter") void signIn(); }} placeholder="Enter mail ID (e.g. manager@srmtrichy.edu.in)" autoCapitalize="none" autoComplete="email" /></label>
+      <label className="field"><span>Password</span><div className="password-input"><input type={showPassword ? "text" : "password"} value={password} onChange={event => setPassword(event.target.value)} onKeyDown={e => { if (e.key === "Enter") void signIn(); }} placeholder="Enter password" autoComplete="current-password" /><button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? "Hide password" : "Show password"}><Eye size={17} /></button></div></label>
       <button className="text-action forgot-link" onClick={() => go("forgot")}>Forgot password?</button>
       {error && <div className="login-error"><AlertTriangle size={14} />{error}</div>}
-      <Button onClick={signIn}>Sign in securely<ChevronRight size={17} /></Button>
+      <Button onClick={() => void signIn()} disabled={submitting}>{submitting ? "Signing in..." : "Sign in securely"}<ChevronRight size={17} /></Button>
     </section>
   </main>;
 }
@@ -1071,7 +1065,7 @@ function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) =
     let active = true;
     async function loadBackendHistory() {
       try {
-        const resp = await fetch("http://localhost:8000/api/v1/access-logs/unrecognized?limit=30");
+        const resp = await fetch(`${API_BASE_URL}/api/v1/access-logs/unrecognized?limit=30`);
         if (resp.ok) {
           const data = await resp.json();
           if (active && Array.isArray(data) && data.length > 0) {
@@ -1125,6 +1119,7 @@ function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) =
 
     async function initCamera() {
       try {
+        await ensureCameraPermission();
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           throw new Error("Camera access is not supported on this phone.");
         }
@@ -1192,7 +1187,7 @@ function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) =
 
           if (role === "security" || role === "warden" || role === "supervisor" || role === "cso") {
             try {
-              const resp = await fetch("http://localhost:8000/api/v1/ai/verify-face", {
+              const resp = await fetch(`${API_BASE_URL}/api/v1/ai/verify-face`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -1317,7 +1312,7 @@ function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) =
 
         if (role === "security" || role === "warden" || role === "supervisor" || role === "cso") {
           try {
-            const resp = await fetch("http://localhost:8000/api/v1/ai/verify-face", {
+            const resp = await fetch(`${API_BASE_URL}/api/v1/ai/verify-face`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -1529,7 +1524,7 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role, c
   useEffect(() => {
     if (student?.registerNumber) {
       let isMounted = true;
-      fetch(`http://localhost:8000/api/v1/students/by-register/${encodeURIComponent(student.registerNumber)}`)
+      fetch(`${API_BASE_URL}/api/v1/students/by-register/${encodeURIComponent(student.registerNumber)}`)
         .then(res => res.ok ? res.json() : null)
         .then(data => {
           if (data && isMounted) {
@@ -2213,7 +2208,12 @@ async function downloadVisitorPassPdf(pass: VisitorPass) {
   pdf.setFontSize(8);
   pdf.text("Present this pass at the authorized campus access point.", pageWidth / 2, 288, { align: "center" });
   const safeName = pass.visitorName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-  pdf.save(`visitor-pass-${safeName || pass.passNumber.toLowerCase()}-${pass.passNumber}.pdf`);
+  const pdfBlob = pdf.output("blob");
+  void saveOrShareBlob(
+    pdfBlob,
+    `visitor-pass-${safeName || pass.passNumber.toLowerCase()}-${pass.passNumber}.pdf`,
+    "application/pdf"
+  );
 }
 
 function VisitorPassForm({ createPass }: { createPass: (pass: VisitorPassDraft) => void }) {
@@ -2391,7 +2391,15 @@ function downloadBulkTemplate() {
   const sheet = XLSX.utils.aoa_to_sheet([bulkTemplateColumns as any, ...rows]);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, "student-list");
-  XLSX.writeFile(workbook, "CampusSecure_Student_Entry_Template.xlsx");
+  const wbOut = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+  const wbBlob = new Blob([new Uint8Array(wbOut)], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  void saveOrShareBlob(
+    wbBlob,
+    "CampusSecure_Student_Entry_Template.xlsx",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  );
 }
 
 function BulkVisitorPass({ go, initialEvent, issuePasses }: { go: (screen: Screen) => void; initialEvent: EventDetails; issuePasses: (passes: VisitorPassDraft[]) => VisitorPass[] }) {
@@ -3082,13 +3090,11 @@ export function exportRecordsToCsv(rows: LogRecord[], reviews: Record<string, Re
       csvRows.push(line.join(","));
     });
     const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `unauthorized_records_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    void saveOrShareBlob(
+      blob,
+      `unauthorized_records_${new Date().toISOString().slice(0, 10)}.csv`,
+      "text/csv;charset=utf-8;"
+    );
     return;
   }
 
@@ -3122,13 +3128,11 @@ export function exportRecordsToCsv(rows: LogRecord[], reviews: Record<string, Re
     csvRows.push(line.join(","));
   });
   const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.setAttribute("href", url);
-  link.setAttribute("download", `campus_records_${new Date().toISOString().slice(0, 10)}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  void saveOrShareBlob(
+    blob,
+    `campus_records_${new Date().toISOString().slice(0, 10)}.csv`,
+    "text/csv;charset=utf-8;"
+  );
 }
 
 const missingValues = ["", "not available", "not identified", "unknown", "n/a", "null", "undefined", "—", "-"];
@@ -3784,7 +3788,7 @@ function SupervisorHome({ go, reviews, logs }: { go: (screen: Screen) => void; r
 
   useEffect(() => {
     let isMounted = true;
-    fetch("http://localhost:8000/api/v1/access-logs/unauthorized-count")
+    fetch(`${API_BASE_URL}/api/v1/access-logs/unauthorized-count`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data && typeof data.count === "number" && isMounted) {
@@ -3998,7 +4002,7 @@ function Audit({
 
   useEffect(() => {
     let active = true;
-    let url = `http://localhost:8000/api/v1/access-logs/supervisor-unauthorized?from_date=${auditFrom}&to_date=${auditTo}`;
+    let url = `${API_BASE_URL}/api/v1/access-logs/supervisor-unauthorized?from_date=${auditFrom}&to_date=${auditTo}`;
 
     fetch(url)
       .then(res => (res.ok ? res.json() : Promise.reject(res)))
@@ -4285,8 +4289,8 @@ function Alerts({
     if (role === "admin" || role === "manager") {
       const url =
         role === "manager"
-          ? "http://127.0.0.1:8000/api/v1/manager-requests/?manager_username=manager"
-          : "http://127.0.0.1:8000/api/v1/manager-requests/";
+          ? `${API_BASE_URL}/api/v1/manager-requests/?manager_username=manager`
+          : `${API_BASE_URL}/api/v1/manager-requests/`;
       fetch(url)
         .then(res => (res.ok ? res.json() : []))
         .then(data => {
@@ -4311,7 +4315,7 @@ function Alerts({
     if (role === "admin" && req.status === "Sent") {
       try {
         const resp = await fetch(
-          `http://127.0.0.1:8000/api/v1/manager-requests/${req.request_id}/view?admin_name=Avery%20Williams&admin_username=admin`,
+          `${API_BASE_URL}/api/v1/manager-requests/${req.request_id}/view?admin_name=Avery%20Williams&admin_username=admin`,
           { method: "POST" }
         );
         if (resp.ok) {
@@ -4347,7 +4351,7 @@ function Alerts({
     setIsReplying(true);
     setReplyError(null);
     try {
-      const resp = await fetch(`http://127.0.0.1:8000/api/v1/manager-requests/${selectedRequest.request_id}/reply`, {
+      const resp = await fetch(`${API_BASE_URL}/api/v1/manager-requests/${selectedRequest.request_id}/reply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -4390,7 +4394,7 @@ function Alerts({
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/v1/access-logs/locations")
+    fetch(`${API_BASE_URL}/api/v1/access-logs/locations`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
@@ -5798,7 +5802,7 @@ function CampusEntries({
 
   useEffect(() => {
     let active = true;
-    fetch("http://localhost:8000/api/v1/access-logs/?limit=300")
+    fetch(`${API_BASE_URL}/api/v1/access-logs/?limit=300`)
       .then(res => (res.ok ? res.json() : null))
       .then((data: any[]) => {
         if (!active || !Array.isArray(data)) return;
@@ -6204,8 +6208,8 @@ function AccommodationDetails({
       try {
         const q = searchQuery.trim();
         const url = q
-          ? `http://localhost:8000/api/v1/students/?query=${encodeURIComponent(q)}&institution_id=1`
-          : `http://localhost:8000/api/v1/students/?institution_id=1`;
+          ? `${API_BASE_URL}/api/v1/students/?query=${encodeURIComponent(q)}&institution_id=1`
+          : `${API_BASE_URL}/api/v1/students/?institution_id=1`;
         const res = await fetch(url);
         if (res.ok && active) {
           const data = await res.json();
@@ -6369,7 +6373,7 @@ function AccommodationDetails({
 
   const fetchBackendData = async (reg: string) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/students/accommodation/${encodeURIComponent(reg)}`);
+      const res = await fetch(`${API_BASE_URL}/api/v1/students/accommodation/${encodeURIComponent(reg)}`);
       if (res.ok) {
         const data = await res.json();
         if (data.history && Array.isArray(data.history)) {
@@ -6485,7 +6489,7 @@ function AccommodationDetails({
 
     let updatedBackendHistory: AccommodationHistoryItem[] | null = null;
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/students/accommodation/${encodeURIComponent(student.registerNumber)}`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/students/accommodation/${encodeURIComponent(student.registerNumber)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -7266,8 +7270,16 @@ function AccommodationDetails({
   );
 }
 
-function Profile({ role, go, back }: { role: Role; go: (screen: Screen) => void; back: () => void }) {
+function Profile({ role, session, back, onLogout }: { role: Role; session: StoredSession | null; back: () => void; onLogout: () => void }) {
   const meta = roleMeta[role];
+  const displayName = session?.fullName || meta.name;
+  const initials = displayName
+    .split(" ")
+    .filter(Boolean)
+    .map(w => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase() || meta.initials;
   return <>
     <TopBar title="Profile" subtitle="Account & access tools" back={back} />
     <div className="page-content">
@@ -7281,19 +7293,33 @@ function Profile({ role, go, back }: { role: Role; go: (screen: Screen) => void;
           <small>TRICHY</small>
         </div>
       </div>
-      <section className="profile-card"><div className="profile-avatar large">{meta.initials}</div><h1>{meta.name}</h1><p>{meta.label}</p><Status tone="green">Active session</Status></section>
+      <section className="profile-card"><div className="profile-avatar large">{initials}</div><h1>{displayName}</h1><p>{meta.label}</p><Status tone="green">Active session</Status></section>
       <div className="profile-scope"><span>AUTHORIZED SCOPE</span><strong>{meta.scope}</strong></div>
+      {session?.email && <div className="profile-detail-row"><span>Mail ID</span><strong>{session.email}</strong></div>}
       {(role === "security" || role === "warden" || role === "staff") && <div className="profile-detail-row"><span>Phone Number</span><strong>{meta.phoneNumber}</strong></div>}
       {role === "supervisor" && <div className="profile-detail-row"><span>Phone Number</span><strong>{meta.phoneNumber}</strong></div>}
       {(role === "students" || role === "welfare" || role === "cso" || role === "manager" || role === "access-supervisor") && <div className="profile-detail-row"><span>Phone Number</span><strong>{meta.phoneNumber}</strong></div>}
-      <Button variant="danger" onClick={() => go("login")} icon={<LogOut size={17} />}>Log out</Button>
+      <Button variant="danger" onClick={onLogout} icon={<LogOut size={17} />}>Log out</Button>
     </div>
   </>;
 }
 
 export default function App() {
-  const [role, setRole] = useState<Role>("security");
-  const [screen, setScreen] = useState<Screen>("login");
+  const [session, setSession] = useState<StoredSession | null>(() => getInitialLocalSession());
+  const [role, setRole] = useState<Role>(() => getInitialLocalSession()?.role || "security");
+  const [screen, setScreen] = useState<Screen>(() => (getInitialLocalSession() ? "home" : "login"));
+
+  useEffect(() => {
+    let active = true;
+    getStoredSession().then(saved => {
+      if (active && saved && saved.role) {
+        setSession(prev => prev || saved);
+        setRole(saved.role);
+        setScreen(prev => (prev === "login" ? "home" : prev));
+      }
+    });
+    return () => { active = false; };
+  }, []);
   const [identityCase, setIdentityCase] = useState<IdentityCase>("student");
   const [verificationMethod, setVerificationMethod] = useState<VerificationMethod>("face");
   const [matchedStudent, setMatchedStudent] = useState<StudentMatch>(studentMatches[0]);
@@ -7388,7 +7414,7 @@ export default function App() {
       const token = localStorage.getItem("campus_token");
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
-      await fetch("http://localhost:8000/api/v1/students/", {
+      await fetch(`${API_BASE_URL}/api/v1/students/`, {
         method: "POST",
         headers,
         body: JSON.stringify({
@@ -7433,7 +7459,7 @@ export default function App() {
       const token = localStorage.getItem("campus_token");
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
-      await fetch(`http://localhost:8000/api/v1/students/accommodation/${encodeURIComponent(updatedStudent.registerNumber)}`, {
+      await fetch(`${API_BASE_URL}/api/v1/students/accommodation/${encodeURIComponent(updatedStudent.registerNumber)}`, {
         method: "PUT",
         headers,
         body: JSON.stringify({
@@ -7628,12 +7654,12 @@ export default function App() {
       log_id: logId,
     };
 
-    fetch("http://127.0.0.1:8000/api/v1/access-logs/unauthorized", {
+    fetch(`${API_BASE_URL}/api/v1/access-logs/unauthorized`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(postPayload),
     }).catch(() => {
-      fetch("http://localhost:8000/api/v1/access-logs/unauthorized", {
+      fetch(`${API_BASE_URL}/api/v1/access-logs/unauthorized`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(postPayload),
@@ -7663,7 +7689,7 @@ export default function App() {
 
   useEffect(() => {
     let active = true;
-    fetch("http://localhost:8000/api/v1/access-logs/?limit=300")
+    fetch(`${API_BASE_URL}/api/v1/access-logs/?limit=300`)
       .then(res => res.ok ? res.json() : [])
       .then((data: any[]) => {
         if (!active || !Array.isArray(data)) return;
@@ -7698,7 +7724,17 @@ export default function App() {
     setScreen(previous);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
-  const enter = (nextRole: Role) => { setRole(nextRole); go("home"); };
+  const enter = (nextRole: Role, nextSession?: StoredSession) => {
+    if (nextSession) setSession(nextSession);
+    setRole(nextRole);
+    go("home");
+  };
+  const handleLogout = async () => {
+    await clearSession();
+    setSession(null);
+    setStack([]);
+    go("login");
+  };
   const completeScan = (capturedImage: string | null, matchResult?: StudentMatch | null, scores?: Record<string, number> | null) => {
     setCapturedPhoto(capturedImage);
     setBiometricScores(scores ?? null);
@@ -7762,7 +7798,7 @@ export default function App() {
     const regTrimmed = registerNumber.trim().toUpperCase();
     if (role === "security" || role === "warden" || role === "supervisor" || role === "cso") {
       try {
-        const resp = await fetch("http://localhost:8000/api/v1/ai/verify-face", {
+        const resp = await fetch(`${API_BASE_URL}/api/v1/ai/verify-face`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -7893,7 +7929,7 @@ export default function App() {
 
     // Persist to PostgreSQL backend database
     const targetId = row.logId || key;
-    fetch(`http://localhost:8000/api/v1/access-logs/${encodeURIComponent(targetId)}/review`, {
+    fetch(`${API_BASE_URL}/api/v1/access-logs/${encodeURIComponent(targetId)}/review`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -7980,7 +8016,7 @@ export default function App() {
   else if (screen === "forgot") content = <ForgotPassword go={go} />;
   else if (["users", "assign-supervisor"].includes(screen) && role !== "admin") content = <AccessDenied role={role} go={go} />;
   else if (screen === "login-logs" && role !== "admin" && role !== "cso") content = <AccessDenied role={role} go={go} />;
-  else if (screen === "profile") content = <Profile role={role} go={go} back={back} />;
+  else if (screen === "profile") content = <Profile role={role} session={session} back={back} onLogout={() => { void handleLogout(); }} />;
   else if (screen === "alerts") content = <Alerts role={role} go={go} back={back} reviews={reviews} updateReview={updateReview} logs={logs} deleteLog={deleteLog} onAddAuditLog={addAuditLog} />;
   else if (role === "security" || role === "warden" || role === "staff") {
     if (screen === "home") content = <LevelOneHome role={role} go={go} />;

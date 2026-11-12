@@ -7,7 +7,18 @@ from app.schemas.auth import Token
 
 
 def authenticate_user(db: Session, username: str, password: str) -> Optional[User]:
-    user = db.query(User).filter(User.username == ("admin" if username.strip().lower() in ("super admin", "super-admin", "superadmin") else username)).first()
+    identifier = username.strip().lower()
+    if not identifier:
+        return None
+    canonical = "admin" if identifier in ("super admin", "super-admin", "superadmin") else identifier
+    user = (
+        db.query(User)
+        .filter(
+            (User.email.ilike(identifier))
+            | (User.username.ilike(canonical))
+        )
+        .first()
+    )
     if not user:
         return None
     if not verify_password(password, user.hashed_password):
@@ -28,6 +39,7 @@ def generate_user_tokens(user: User) -> Token:
         role=user.role,
         extra_claims={
             "username": user.username,
+            "email": user.email,
             "full_name": user.full_name,
             "institution_id": user.institution_id,
         },
@@ -39,5 +51,6 @@ def generate_user_tokens(user: User) -> Token:
         role=user.role,
         user_id=user.id,
         username=user.username,
+        email=user.email,
         full_name=user.full_name,
     )

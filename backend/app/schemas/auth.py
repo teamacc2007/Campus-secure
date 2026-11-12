@@ -14,6 +14,7 @@ class Token(BaseModel):
     role: str
     user_id: int
     username: str
+    email: Optional[str] = None
     full_name: str
 
 
