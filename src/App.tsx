@@ -3045,8 +3045,19 @@ export function getUnauthorizedDateTime(row: LogRecord, reviews: Record<string, 
   return formatUnauthorizedDateTime(val);
 }
 
+export const isRowUnauthorized = (row: LogRecord, rev: ReviewRecord): boolean => {
+  if (rev.status === "Unauthorised") return true;
+  if (rev.status === "Authorised" || rev.status === "Verified" || rev.status === "Revoked") return false;
+  return (
+    row.accessCategory === "Unauthorized" ||
+    row.personType === "Unauthorised" ||
+    row.decision === "Denied" ||
+    row.event === "Denied"
+  );
+};
+
 export function exportRecordsToCsv(rows: LogRecord[], reviews: Record<string, ReviewRecord>, isUnauthorized = false) {
-  const isUnauth = isUnauthorized || (rows.length > 0 && rows.every(r => recordCategory(reviews, r) === "Unauthorized" || r.accessCategory === "Unauthorized" || r.decision === "Denied"));
+  const isUnauth = isUnauthorized;
   if (isUnauth) {
     const headers = ["S.No", "Name", "Address", "Contact Number", "Location", "Vehicle Number", "Action Taken", "Date & Time"];
     const csvRows = [headers.join(",")];
@@ -3086,19 +3097,20 @@ export function exportRecordsToCsv(rows: LogRecord[], reviews: Record<string, Re
   rows.forEach((row, index) => {
     const rev = reviewFor(reviews, row);
     const category = recordCategory(reviews, row);
-    const actionTaken = getActionTaken(reviews, row);
+    const isUnauthRow = isRowUnauthorized(row, rev);
+    const actionTaken = isUnauthRow ? getUnauthorizedAction(reviews, row) : getActionTaken(reviews, row);
     const dec = getDecisionDetails(reviews, row);
     const decBy = dec ? `"${dec.actor} (${dec.role} · ${dec.actorNumber})"` : '"—"';
     const decTime = dec ? `"${dec.timestamp}"` : '"—"';
     const line = [
       index + 1,
-      `"${(row.name || "").replace(/"/g, '""')}"`,
-      `"${(row.id || "—").replace(/"/g, '""')}"`,
-      `"${(row.department || "—").replace(/"/g, '""')}"`,
-      `"${(row.institution || "—").replace(/"/g, '""')}"`,
-      `"${(row.year || "—").replace(/"/g, '""')}"`,
-      `"${category}"`,
-      `"${(accommodationOf(row) || "—").replace(/"/g, '""')}"`,
+      `"${((isUnauthRow ? getUnauthorizedName(row, reviews) : row.name) || "").replace(/"/g, '""')}"`,
+      isUnauthRow ? '""' : `"${(row.id || "—").replace(/"/g, '""')}"`,
+      isUnauthRow ? '""' : `"${(row.department || "—").replace(/"/g, '""')}"`,
+      isUnauthRow ? '""' : `"${(row.institution || "—").replace(/"/g, '""')}"`,
+      isUnauthRow ? '""' : `"${(row.year || "—").replace(/"/g, '""')}"`,
+      `"${isUnauthRow ? "Unauthorized" : category}"`,
+      isUnauthRow ? '""' : `"${(accommodationOf(row) || "—").replace(/"/g, '""')}"`,
       `"${rev.status}"`,
       `"${row.dateTime}"`,
       `"${(row.block || "").replace(/"/g, '""')}"`,
@@ -3149,27 +3161,10 @@ function AuditTable({
   const revocation = selected ? latestRevocation(reviews, selected) : undefined;
   const isRevoked = review?.status === "Revoked";
 
-  const isUnauthorizedView =
-    isUnauthorizedOnly ||
-    (rows.length > 0 &&
-      rows.every(row => {
-        const cat = recordCategory(reviews, row);
-        return (
-          cat === "Unauthorized" ||
-          row.accessCategory === "Unauthorized" ||
-          row.decision === "Denied" ||
-          row.event === "Denied" ||
-          row.personType === "Unauthorised"
-        );
-      }));
+  const isUnauthorizedView = isUnauthorizedOnly;
 
   const isSelectedUnauthorized =
-    selected &&
-    (selected.accessCategory === "Unauthorized" ||
-      selected.decision === "Denied" ||
-      selected.personType === "Unauthorised" ||
-      selected.event === "Denied" ||
-      recordCategory(reviews, selected) === "Unauthorized");
+    selected && isRowUnauthorized(selected, reviewFor(reviews, selected));
 
   return <>
     {title && <div className="list-label">{rows.length} RECORDS · {title}</div>}
@@ -3243,26 +3238,41 @@ function AuditTable({
             {rows.map((row, index) => {
               const rowReview = reviewFor(reviews, row);
               const category = recordCategory(reviews, row);
-              const actionTakenText = getActionTaken(reviews, row);
+              const isUnauthRow = isRowUnauthorized(row, rowReview);
+              const actionTakenText = isUnauthRow
+                ? getUnauthorizedAction(reviews, row)
+                : getActionTaken(reviews, row);
+              const unauthName = getUnauthorizedName(row, reviews);
+
               return (
-                <tr key={`${row.name}${row.time}${index}`} onClick={() => setSelected(row)}>
+                <tr
+                  key={`${row.logId || row.name}-${row.dateTime || row.time}-${index}`}
+                  onClick={() => setSelected(row)}
+                  className="clickable-row"
+                >
                   <td>{index + 1}</td>
                   <td>
-                    <strong>{logValue(row.name)}</strong>
+                    <strong>{isUnauthRow ? unauthName : logValue(row.name)}</strong>
                     {!plainNames && (
                       <div className="record-badges">
-                        <Status tone={row.tone}>{row.event}</Status>
-                        <Status tone={category === "Authorized" || category === "Revoked" ? "green" : category === "Visitors" ? "amber" : "red"}>{category}</Status>
-                        <Status tone={reviewTone(rowReview.status)}>{rowReview.status}</Status>
+                        {isUnauthRow ? (
+                          <Status tone="red">Unauthorized</Status>
+                        ) : (
+                          <>
+                            <Status tone={row.tone}>{row.event}</Status>
+                            <Status tone={category === "Authorized" || category === "Revoked" ? "green" : category === "Visitors" ? "amber" : "red"}>{category}</Status>
+                            <Status tone={reviewTone(rowReview.status)}>{rowReview.status}</Status>
+                          </>
+                        )}
                       </div>
                     )}
                   </td>
-                  <td>{logValue(row.id)}</td>
-                  <td>{logValue(row.department)}</td>
-                  <td>{logValue(row.institution)}</td>
-                  <td>{logValue(row.year?.replace("Year ", ""))}</td>
-                  <td>{category}</td>
-                  <td>{logValue(accommodationOf(row))}</td>
+                  <td>{isUnauthRow ? "" : logValue(row.id)}</td>
+                  <td>{isUnauthRow ? "" : logValue(row.department)}</td>
+                  <td>{isUnauthRow ? "" : logValue(row.institution)}</td>
+                  <td>{isUnauthRow ? "" : logValue(row.year?.replace("Year ", ""))}</td>
+                  <td>{isUnauthRow ? "Unauthorized" : category}</td>
+                  <td>{isUnauthRow ? "" : logValue(accommodationOf(row))}</td>
                   <td className="action-taken-cell" title={actionTakenText}>{actionTakenText}</td>
                 </tr>
               );
