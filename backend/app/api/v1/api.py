@@ -9,6 +9,7 @@ from app.api.v1.access_logs import router as access_logs_router
 from app.api.v1.users import router as users_router
 from app.api.v1.notifications import router as notifications_router
 from app.api.v1.ai_recognition import router as ai_router
+from app.api.v1.manager_requests import router as manager_requests_router
 
 api_router = APIRouter()
 
@@ -22,3 +23,4 @@ api_router.include_router(access_logs_router)
 api_router.include_router(users_router)
 api_router.include_router(notifications_router)
 api_router.include_router(ai_router)
+api_router.include_router(manager_requests_router)

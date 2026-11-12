@@ -9,6 +9,7 @@ from app.models.access_log import AccessLog
 from app.models.audit_log import AuditLog
 from app.models.notification import Notification
 from app.models.biometric import BiometricTemplate
+from app.models.manager_request import ManagerRequest
 
 __all__ = [
     "Base",
@@ -24,4 +25,5 @@ __all__ = [
     "AuditLog",
     "Notification",
     "BiometricTemplate",
+    "ManagerRequest",
 ]

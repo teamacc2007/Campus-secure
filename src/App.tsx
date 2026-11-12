@@ -35,9 +35,11 @@ import {
   QrCode,
   ScanFace,
   Search,
+  Send,
   Shield,
   ShieldAlert,
   ShieldCheck,
+  CheckCircle2,
   TicketCheck,
   Trash2,
   Upload,
@@ -325,7 +327,148 @@ const studentMatches: StudentMatch[] = [
     transportationType: "Own Vehicle",
     vehicleNumber: "TN-45-AZ-9988",
     residentialLocation: "Thillai Nagar, Trichy",
+    phoneNumber: "+91 98765 12044",
     photo: "/faces/student_details/22ECE1001_crop.jpg",
+  },
+  {
+    initials: "PK",
+    name: "Praveen Kumar",
+    registerNumber: "22IT1015",
+    dateOfBirth: "19 August 2004",
+    department: "Information Technology",
+    year: "III",
+    section: "A",
+    classCode: "IT-III-A",
+    batch: "2022–2026",
+    institute: "SRM GROUP OF INSTITUTIONS TRICHY",
+    similarity: 96,
+    accommodationType: "Hosteller",
+    hostelName: "Bharathi Hostel",
+    roomNumber: "B-305",
+    phoneNumber: "+91 98765 12045",
+    photo: "/faces/student_details/22ECE1002_crop.jpg",
+  },
+  {
+    initials: "DS",
+    name: "Divya S",
+    registerNumber: "21IT1008",
+    dateOfBirth: "03 November 2003",
+    department: "Information Technology",
+    year: "IV",
+    section: "B",
+    classCode: "IT-IV-B",
+    batch: "2021–2025",
+    institute: "SRM GROUP OF INSTITUTIONS TRICHY",
+    similarity: 95,
+    accommodationType: "PG",
+    pgName: "Sri Lakshmi PG, Trichy",
+    phoneNumber: "+91 98765 12046",
+    photo: "/faces/student_details/22ECE1003_crop.jpg",
+  },
+  {
+    initials: "AS",
+    name: "Ankit Sharma",
+    registerNumber: "24IT1060",
+    dateOfBirth: "25 February 2006",
+    department: "Information Technology",
+    year: "I",
+    section: "A",
+    classCode: "IT-I-A",
+    batch: "2024–2028",
+    institute: "SRM GROUP OF INSTITUTIONS TRICHY",
+    similarity: 95,
+    accommodationType: "Day Scholar",
+    transportationType: "College Bus",
+    routeNumber: "Route M-08",
+    boardingPoint: "Central Bus Stand",
+    phoneNumber: "+91 98765 12047",
+    photo: "/faces/student_details/22ECE1004_crop.jpg",
+  },
+  {
+    initials: "KR",
+    name: "Kavitha R",
+    registerNumber: "22MBBS041",
+    dateOfBirth: "14 May 2004",
+    department: "MBBS",
+    year: "III",
+    section: "A",
+    classCode: "MBBS-III-A",
+    batch: "2022–2027",
+    institute: "SRM GROUP OF INSTITUTIONS TRICHY",
+    similarity: 96,
+    accommodationType: "Hosteller",
+    hostelName: "Kaveri Hostel",
+    roomNumber: "304",
+    phoneNumber: "+91 98765 12042",
+  },
+  {
+    initials: "AK",
+    name: "Ananya Krishnan",
+    registerNumber: "23ECE0721",
+    dateOfBirth: "22 August 2005",
+    department: "Electronics & Communication",
+    year: "II",
+    section: "B",
+    classCode: "ECE-II-B",
+    batch: "2023–2027",
+    institute: "SRM GROUP OF INSTITUTIONS TRICHY",
+    similarity: 95,
+    accommodationType: "Day Scholar",
+    transportationType: "College Bus",
+    routeNumber: "Route 12",
+    boardingPoint: "Central Bus Stand",
+    phoneNumber: "+91 98765 12721",
+  },
+  {
+    initials: "RM",
+    name: "Rahul Menon",
+    registerNumber: "22CSE1048",
+    dateOfBirth: "10 November 2003",
+    department: "Computer Science & Engineering",
+    year: "III",
+    section: "A",
+    classCode: "CSE-III-A",
+    batch: "2022–2026",
+    institute: "SRM GROUP OF INSTITUTIONS TRICHY",
+    similarity: 97,
+    accommodationType: "Day Scholar",
+    transportationType: "Own Vehicle",
+    vehicleNumber: "TN-45-AZ-9988",
+    phoneNumber: "+91 98765 12048",
+  },
+  {
+    initials: "MF",
+    name: "Mohammed Farhan",
+    registerNumber: "21BPT019",
+    dateOfBirth: "05 February 2003",
+    department: "Physiotherapy",
+    year: "IV",
+    section: "A",
+    classCode: "BPT-IV-A",
+    batch: "2021–2025",
+    institute: "SRM GROUP OF INSTITUTIONS TRICHY",
+    similarity: 94,
+    accommodationType: "Hosteller",
+    hostelName: "Ponni Hostel",
+    roomNumber: "112",
+    phoneNumber: "+91 98765 12019",
+  },
+  {
+    initials: "PS",
+    name: "Pooja Sundaram",
+    registerNumber: "24NUR005",
+    dateOfBirth: "18 September 2006",
+    department: "B.Sc Nursing",
+    year: "I",
+    section: "B",
+    classCode: "NUR-I-B",
+    batch: "2024–2028",
+    institute: "SRM GROUP OF INSTITUTIONS TRICHY",
+    similarity: 95,
+    accommodationType: "Hosteller",
+    hostelName: "Kaveri Hostel",
+    roomNumber: "208",
+    phoneNumber: "+91 98765 12005",
   },
   {
     initials: "D1",
@@ -802,7 +945,7 @@ function Logs({ role, reviews, logs }: { role: Role; reviews: Record<string, Rev
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [activeType, setActiveType] = useState("All");
   const [fromDate, setFromDate] = useState(dateOnlyFilters ? "2025-06-16" : "2025-06-16T08:00");
-  const [toDate, setToDate] = useState(dateOnlyFilters ? "2025-06-16" : "2025-06-16T18:00");
+  const [toDate, setToDate] = useState(() => (dateOnlyFilters ? new Date().toISOString().slice(0, 10) : `${new Date().toISOString().slice(0, 10)}T23:59`));
   const [category, setCategory] = useState("All Categories");
   const [institution, setInstitution] = useState("All visible institutions");
   const [department, setDepartment] = useState("All departments");
@@ -813,7 +956,7 @@ function Logs({ role, reviews, logs }: { role: Role; reviews: Record<string, Rev
   const types = role === "students" ? ["All", "Entry", "Exit", "Denied"] : ["All", "Entry", "Exit", "Visitor", "Denied"];
   const currentLogs = logs ?? logRows;
   const scopedRows = currentLogs.filter(row => {
-    if (role === "security" && row.block !== "Main Gate") return false;
+    if (role === "security" && row.block !== "Main Gate" && row.block !== "Main Entrance") return false;
     if (role === "security" && row.personType === "External") return false;
     if (role === "warden" && (row.institution !== "Institution B" || row.hostel !== "Bharathi Hostel" || row.guard !== roleMeta.warden.name)) return false;
     if (role === "staff" && (row.institution !== "Institution B" || row.block !== "Block A")) return false;
@@ -831,7 +974,7 @@ function Logs({ role, reviews, logs }: { role: Role; reviews: Record<string, Rev
   const resetFilters = () => {
     setActiveType("All");
     setFromDate(dateOnlyFilters ? "2025-06-16" : "2025-06-16T08:00");
-    setToDate(dateOnlyFilters ? "2025-06-16" : "2025-06-16T18:00");
+    setToDate(dateOnlyFilters ? new Date().toISOString().slice(0, 10) : `${new Date().toISOString().slice(0, 10)}T23:59`);
     setCategory("All Categories");
     setInstitution("All visible institutions");
     setDepartment("All departments");
@@ -853,8 +996,54 @@ function Logs({ role, reviews, logs }: { role: Role; reviews: Record<string, Rev
           <Field label="Block"><select value={block} onChange={event => setBlock(event.target.value)}><option>All Institution B blocks</option><option>Main Gate</option><option>Block A</option><option>Block B</option><option>Library Block</option></select></Field>
         </div><Button onClick={() => setFiltersOpen(false)} icon={<Filter size={15} />}>Apply filters</Button>
       </section>}
-      <div className={`log-summary ${role === "students" ? "two-column" : ""}`}>{levelOneRole || role === "students" ? <><div><strong>{scopedRows.filter(row => recordCategory(reviews, row) === "Authorized").length}</strong><span>Authorized</span></div><div><strong>{scopedRows.filter(row => recordCategory(reviews, row) === "Unauthorized").length}</strong><span>Unauthorized</span></div>{levelOneRole && <div><strong>{scopedRows.filter(row => recordCategory(reviews, row) === "Revoked").length}</strong><span>Revoked</span></div>}</> : <><div><strong>{scopedRows.filter(row => row.event === "Entry").length}</strong><span>Entries</span></div><div><strong>{scopedRows.filter(row => row.event === "Exit").length}</strong><span>Exits</span></div><div><strong>{scopedRows.filter(row => ["Visitor", "Internal visit"].includes(row.event)).length}</strong><span>Visits</span></div></>}</div>
-      <AuditTable rows={scopedRows} reviews={reviews} title={role === "warden" ? "" : levelOneRole ? "ASSIGNED SCOPE LOG" : "CAMPUS RECORDS"} plainNames={role === "students" || role === "warden"} />
+      <div className={`log-summary ${role === "students" ? "two-column" : ""}`}>
+        {levelOneRole || role === "students" ? (
+          <>
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => setCategory(category === "Authorized" ? "All Categories" : "Authorized")}
+              className={`overview-card-clickable ${category === "Authorized" ? "active-filter-green" : ""}`}
+            >
+              <strong>{scopedRows.filter(row => recordCategory(reviews, row) === "Authorized").length}</strong>
+              <span>Authorized</span>
+            </div>
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => setCategory(category === "Unauthorized" ? "All Categories" : "Unauthorized")}
+              className={`overview-card-clickable ${category === "Unauthorized" ? "active-filter-red" : ""}`}
+            >
+              <strong>{scopedRows.filter(row => recordCategory(reviews, row) === "Unauthorized").length}</strong>
+              <span>Unauthorized</span>
+            </div>
+            {levelOneRole && (
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => setCategory(category === "Revoked" ? "All Categories" : "Revoked")}
+                className={`overview-card-clickable ${category === "Revoked" ? "active-filter-red" : ""}`}
+              >
+                <strong>{scopedRows.filter(row => recordCategory(reviews, row) === "Revoked").length}</strong>
+                <span>Revoked</span>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div><strong>{scopedRows.filter(row => row.event === "Entry").length}</strong><span>Entries</span></div>
+            <div><strong>{scopedRows.filter(row => row.event === "Exit").length}</strong><span>Exits</span></div>
+            <div><strong>{scopedRows.filter(row => ["Visitor", "Internal visit"].includes(row.event)).length}</strong><span>Visits</span></div>
+          </>
+        )}
+      </div>
+      <AuditTable
+        rows={scopedRows}
+        reviews={reviews}
+        title={role === "warden" ? "" : levelOneRole ? "ASSIGNED SCOPE LOG" : "CAMPUS RECORDS"}
+        plainNames={role === "students" || role === "warden"}
+        isUnauthorizedOnly={category === "Unauthorized"}
+      />
       {scopedRows.length === 0 && <div className="empty-state"><History size={25} /><strong>No matching records</strong><span>Change a filter or expand the date range.</span></div>}
     </div>
   </>;
@@ -1225,20 +1414,6 @@ function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) =
             </div>
           </section>
         )}
-        <section className="info-card alert-info">
-          <div className="card-kicker"><FileClock size={15} />ORIGINAL SECURITY RECORD</div>
-          <dl>
-            <div><dt>Original event category</dt><dd>{selectedHistoryRecord.accessCategory}</dd></div>
-            <div><dt>Event</dt><dd>{selectedHistoryRecord.event}</dd></div>
-            {selectedHistoryRecord.phoneNumber && <div><dt>Phone number</dt><dd>{selectedHistoryRecord.phoneNumber}</dd></div>}
-            <div><dt>Security officer</dt><dd>{selectedHistoryRecord.guard}</dd></div>
-            <div><dt>Security number</dt><dd>{selectedHistoryRecord.guardNumber}</dd></div>
-            <div><dt>Institution</dt><dd>{knownInstitution ? selectedHistoryRecord.institution : "SRM GROUP OF INSTITUTIONS TRICHY"}</dd></div>
-            <div><dt>Gate / Location</dt><dd>{selectedHistoryRecord.block}</dd></div>
-            <div><dt>Date & time</dt><dd>{formatScanDateTime(selectedHistoryRecord.dateTime)}</dd></div>
-            <div><dt>Current verification status</dt><dd>Unrecognized</dd></div>
-          </dl>
-        </section>
       </div>
     </>;
   }
@@ -1514,10 +1689,26 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role, c
   </>;
 }
 
-function UnrecognizedResult({ go, verifyRegister, role, capturedPhoto, biometricScores }: { go: (screen: Screen) => void; verifyRegister: (registerNumber: string) => boolean | Promise<boolean>; role: "security" | "warden" | "staff" | "supervisor" | "cso"; capturedPhoto: string | null; biometricScores: Record<string, number> | null }) {
+function UnrecognizedResult({
+  go,
+  verifyRegister,
+  role,
+  capturedPhoto,
+  biometricScores,
+  onRecordEvent,
+}: {
+  go: (screen: Screen) => void;
+  verifyRegister: (registerNumber: string) => boolean | Promise<boolean>;
+  role: "security" | "warden" | "staff" | "supervisor" | "cso";
+  capturedPhoto: string | null;
+  biometricScores: Record<string, number> | null;
+  onRecordEvent?: (photo: string | null, notes?: string, phoneNumber?: string, fullName?: string) => void;
+}) {
   const [registerNumber, setRegisterNumber] = useState("");
   const [notVerified, setNotVerified] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<string | null>(null);
+  const [recordedSuccess, setRecordedSuccess] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
 
   // Filter: ONLY show candidates with genuine similarity >= 60%
   const candidateList = studentMatches
@@ -1540,6 +1731,43 @@ function UnrecognizedResult({ go, verifyRegister, role, capturedPhoto, biometric
     }
     setNotVerified(true);
   };
+
+  const handleMarkUnauthorized = () => {
+    if (role === "security" || role === "warden") {
+      setIsRecording(true);
+      const loc = role === "warden" ? "Bharathi Hostel" : "Main Gate";
+      const user = role === "warden" ? "Warden" : "Security Officer";
+      const defaultNotes = `Face unrecognized. Identity could not be verified by ${user} at ${loc}.`;
+
+      if (onRecordEvent) {
+        onRecordEvent(capturedPhoto, defaultNotes, undefined, "Unrecognized person");
+      }
+      setIsRecording(false);
+      setRecordedSuccess(true);
+    } else {
+      go("unauthorised");
+    }
+  };
+
+  if (recordedSuccess) {
+    return (
+      <div className="success-page">
+        <div className="success-symbol warning-symbol">
+          <ShieldAlert size={38} />
+        </div>
+        <Status tone="amber">CAMPUS SUPERVISOR NOTIFIED</Status>
+        <h1>Unauthorized Event Recorded</h1>
+        <p>Campus Supervisor has been notified.</p>
+        <Button onClick={() => { setRecordedSuccess(false); go("scan"); }}>
+          Scan next person
+        </Button>
+        <Button variant="secondary" onClick={() => { setRecordedSuccess(false); go("home"); }}>
+          Return home
+        </Button>
+      </div>
+    );
+  }
+
   return <>
     <TopBar title="Face not recognized" subtitle="Verify with register number" back={() => go("scan")} />
     <div className="page-content">
@@ -1603,7 +1831,17 @@ function UnrecognizedResult({ go, verifyRegister, role, capturedPhoto, biometric
         <Button type="submit" icon={<IdCard size={17} />}>Verify register number</Button>
       </form>
       {notVerified && <section className="unverified-card"><div><ShieldAlert size={21} /></div><div><span>UNAUTHORIZED PERSON</span><strong>Register number not verified</strong><p>No active campus identity was found. Do not permit entry.</p></div></section>}
-      <div className="unauthorized-action"><p>Can&apos;t verify this person?</p><Button variant="danger" onClick={() => go("unauthorised")} icon={<ShieldAlert size={17} />}>Mark as unauthorized</Button></div>
+      <div className="unauthorized-action">
+        <p>Can&apos;t verify this person?</p>
+        <Button
+          variant="danger"
+          onClick={handleMarkUnauthorized}
+          disabled={isRecording}
+          icon={<ShieldAlert size={17} />}
+        >
+          {isRecording ? "Recording..." : "Mark as unauthorized"}
+        </Button>
+      </div>
     </div>
   </>;
 }
@@ -2450,6 +2688,8 @@ type LogRecord = {
   routeNumber?: string;
   logId?: string;
   phoneNumber?: string;
+  address?: string;
+  location?: string;
   hostName?: string;
   visitPurpose?: string;
   exitTime?: string;
@@ -2469,7 +2709,112 @@ type LogRecord = {
   reviewedAt?: string;
 };
 
+// Explicit mock records for development & UI testing matching required specification
+export const sampleMockUnauthorizedRecords: LogRecord[] = [
+  {
+    initials: "AK",
+    name: "Arun Kumar",
+    id: "UNREC-4011",
+    institution: "Institution B",
+    department: "Not Available",
+    block: "Main Entrance",
+    time: "09:15",
+    dateTime: "2026-11-11T09:15:00",
+    event: "Denied",
+    tone: "red",
+    personType: "Unauthorised",
+    category: "Unauthorised visitor",
+    accessCategory: "Unauthorized",
+    logId: "DEN-20261111-4011",
+    address: "12, Anna Nagar, Trichy",
+    phoneNumber: "9876543210",
+    vehicleNumber: "TN 45 AB 1234",
+    guard: "G. Selvam",
+    guardNumber: "SG-101",
+    guardNotes: "Attempted entry without valid campus access credentials at Main Entrance.",
+    entries: 1,
+    decision: "Denied",
+    actionTaken: "Person denied entry",
+  },
+  {
+    initials: "UV",
+    name: "Unknown Visitor",
+    id: "UNREC-4012",
+    institution: "Institution B",
+    department: "Not Available",
+    block: "Library Entrance",
+    time: "10:30",
+    dateTime: "2026-11-11T10:30:00",
+    event: "Denied",
+    tone: "red",
+    personType: "Unauthorised",
+    category: "Unauthorised visitor",
+    accessCategory: "Unauthorized",
+    logId: "DEN-20261111-4012",
+    address: undefined,
+    phoneNumber: undefined,
+    vehicleNumber: undefined,
+    guard: "Imran Ali",
+    guardNumber: "GRD-B-0044",
+    guardNotes: "Unknown visitor attempted entry to Library without registration.",
+    entries: 1,
+    decision: "Denied",
+    actionTaken: "Person escorted out of premises",
+  },
+  {
+    initials: "RS",
+    name: "Rahul S",
+    id: "UNREC-4013",
+    institution: "Institution B",
+    department: "Not Available",
+    block: "Parking Area",
+    time: "11:45",
+    dateTime: "2026-11-11T11:45:00",
+    event: "Denied",
+    tone: "red",
+    personType: "Unauthorised",
+    category: "Unauthorised visitor",
+    accessCategory: "Unauthorized",
+    logId: "DEN-20261111-4013",
+    address: "24, Thillai Nagar, Trichy",
+    phoneNumber: "9876543211",
+    vehicleNumber: "TN 48 CD 5678",
+    guard: "Joseph Mathew",
+    guardNumber: "GRD-B-0038",
+    guardNotes: "Unregistered vehicle attempted to enter faculty parking area.",
+    entries: 1,
+    decision: "Denied",
+    actionTaken: "Vehicle checked and turned away",
+  },
+  {
+    initials: "SK",
+    name: "Suresh Kumar",
+    id: "UNREC-4014",
+    institution: "Institution B",
+    department: "Not Available",
+    block: "Academic Block",
+    time: "14:20",
+    dateTime: "2026-11-11T14:20:00",
+    event: "Denied",
+    tone: "red",
+    personType: "Unauthorised",
+    category: "Unauthorised visitor",
+    accessCategory: "Unauthorized",
+    logId: "DEN-20261111-4014",
+    address: "8, Cantonment, Trichy",
+    phoneNumber: "9876543212",
+    vehicleNumber: undefined,
+    guard: "Kavya Rao",
+    guardNumber: "GRD-B-0031",
+    guardNotes: "Individual roaming in Academic Block without visitor pass.",
+    entries: 1,
+    decision: "Denied",
+    actionTaken: "Security team informed; redirected to visitor desk",
+  },
+];
+
 const logRows: LogRecord[] = [
+  ...sampleMockUnauthorizedRecords,
   { initials: "AK", name: "Ananya Krishnan", id: "23ECE0721", institution: "Institution B", department: "Electronics", block: "Main Gate", time: "10:42", dateTime: "2025-06-16T10:42", event: "Entry", tone: "green", personType: "Student", category: "Internal · Institution B", accessCategory: "Authorized", year: "Year II", batch: "2023–2027", residence: "Hosteller", hostel: "Bharathi Hostel", room: "B-214", logId: "ENT-•••-4082", guard: "Arun Kumar", guardNumber: "GRD-B-0017", decision: "Authorised" },
   { initials: "AK", name: "Ananya Krishnan", id: "23ECE0721", institution: "Institution B", department: "Electronics", block: "Bharathi Hostel", time: "10:18", dateTime: "2025-06-16T10:18", event: "Entry", tone: "green", personType: "Student", category: "Hostel resident", accessCategory: "Authorized", year: "Year II", batch: "2023–2027", residence: "Hosteller", hostel: "Bharathi Hostel", room: "B-214", logId: "HST-•••-3018", guard: "Lakshmi Iyer", guardNumber: "WRD-B-0011", decision: "Authorised" },
   { initials: "ST", name: "Sneha Thomas", id: "22MEC0617", institution: "Institution B", department: "Mechanical", block: "Bharathi Hostel", time: "09:46", dateTime: "2025-06-16T09:46", event: "Exit", tone: "gray", personType: "Student", category: "Hostel resident", accessCategory: "Authorized", year: "Year III", residence: "Hosteller", hostel: "Bharathi Hostel", room: "C-108", logId: "HST-•••-3012", guard: "Lakshmi Iyer", guardNumber: "WRD-B-0011", decision: "Authorised" },
@@ -2484,7 +2829,7 @@ const logRows: LogRecord[] = [
   { initials: "UP", name: "Unrecognized person", id: "Not available", institution: "Not identified", department: "Not available", block: "Gate 2 Hospital Entrance", time: "09:15", dateTime: "2025-06-16T09:15", event: "Denied", tone: "red", personType: "Unauthorised", category: "Unauthorised visitor", accessCategory: "Unauthorized", logId: "DEN-•••-4050", guard: "P. Murugan", guardNumber: "SG-102", guardNotes: "Person attempted entry without valid hospital/campus credentials.", entries: 1, decision: "Denied" },
 ];
 
-const assignedGuardNumbers = new Set(["GRD-B-0017", "GRD-B-0031", "GRD-B-0038", "GRD-B-0044", "GRD-B-0052", "SG-101", "SG-102", "SG-103", "SG-104"]);
+const assignedGuardNumbers = new Set(["GRD-B-0017", "GRD-B-0031", "GRD-B-0038", "GRD-B-0044", "GRD-B-0052", "SG-101", "SG-102", "SG-103", "SG-104", "WRD-B-0011"]);
 const recordKey = (row: LogRecord) => row.logId ?? `${row.name}-${row.dateTime}`;
 const reviewFor = (reviews: Record<string, ReviewRecord>, row: LogRecord): ReviewRecord => {
   const rev = reviews[recordKey(row)];
@@ -2594,7 +2939,133 @@ export function getDecisionDetails(reviews: Record<string, ReviewRecord>, row: L
   };
 }
 
-export function exportRecordsToCsv(rows: LogRecord[], reviews: Record<string, ReviewRecord>) {
+export function formatUnauthorizedDateTime(dateTimeStr?: string): string {
+  if (!dateTimeStr) return "Not Available";
+  if (/^\d{2}-\d{2}-\d{4}\s+\d{2}:\d{2}\s+(AM|PM)$/i.test(dateTimeStr.trim())) {
+    return dateTimeStr.trim();
+  }
+  try {
+    const cleanStr = dateTimeStr.includes("T") ? dateTimeStr : dateTimeStr.replace(" ", "T");
+    const d = new Date(cleanStr);
+    if (isNaN(d.getTime())) return dateTimeStr;
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
+    let hours = d.getHours();
+    const minutes = String(d.getMinutes()).padStart(2, "0");
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    const strHours = String(hours).padStart(2, "0");
+    return `${day}-${month}-${year} ${strHours}:${minutes} ${ampm}`;
+  } catch {
+    return dateTimeStr || "Not Available";
+  }
+}
+
+function getUnauthorizedReviewAction(reviews: Record<string, ReviewRecord>, row: LogRecord): ReviewAction | undefined {
+  const rev = reviewFor(reviews, row);
+  const actions = rev.actions || [];
+  return [...actions].reverse().find(a => a.type === "Unauthorised" || a.type === "Authorised" || a.type === "Verified");
+}
+
+export function getUnauthorizedAction(reviews: Record<string, ReviewRecord>, row: LogRecord): string {
+  const action = getUnauthorizedReviewAction(reviews, row);
+  if (action?.action_taken && action.action_taken.trim()) return action.action_taken.trim();
+  if (action?.reason && action.reason.trim()) return action.reason.trim();
+  if (row.actionTaken && row.actionTaken.trim()) return row.actionTaken.trim();
+  const general = getActionTaken(reviews, row);
+  if (general && general !== "—" && general !== "Not Available") return general;
+  return "Denied entry by security";
+}
+
+export function getUnauthorizedName(row: LogRecord, reviews: Record<string, ReviewRecord>): string {
+  const action = getUnauthorizedReviewAction(reviews, row);
+  const val = action?.full_name || row.name;
+  if (!val || !val.trim() || val.trim().toLowerCase() === "unrecognized person" || val.trim().toLowerCase() === "unknown person") {
+    if (val && val.trim()) return val.trim();
+    return "Not Available";
+  }
+  return val.trim();
+}
+
+export function getUnauthorizedAddress(row: LogRecord, reviews: Record<string, ReviewRecord>): string {
+  const action = getUnauthorizedReviewAction(reviews, row);
+  const val = action?.address || row.address;
+  if (!val || !val.trim() || val.trim().toLowerCase() === "not available" || val.trim().toLowerCase() === "not identified") {
+    return "Not Available";
+  }
+  return val.trim();
+}
+
+export function getUnauthorizedContact(row: LogRecord, reviews: Record<string, ReviewRecord>): string {
+  const action = getUnauthorizedReviewAction(reviews, row);
+  const val = action?.contact_number || row.phoneNumber || (row as any).contactNumber;
+  if (!val || !val.trim() || val.trim().toLowerCase() === "not available") {
+    return "Not Available";
+  }
+  return val.trim();
+}
+
+export function getUnauthorizedLocation(row: LogRecord, reviews: Record<string, ReviewRecord>): string {
+  const action = getUnauthorizedReviewAction(reviews, row);
+  const val = action?.location || row.block || (row as any).location;
+  if (!val || !val.trim() || val.trim().toLowerCase() === "not available") {
+    return "Not Available";
+  }
+  return val.trim();
+}
+
+export function getUnauthorizedVehicle(row: LogRecord, reviews: Record<string, ReviewRecord>): string {
+  const action = getUnauthorizedReviewAction(reviews, row);
+  const val = action?.vehicle_number || row.vehicleNumber;
+  if (!val || !val.trim() || val.trim() === "—" || val.trim() === "-" || val.trim().toLowerCase() === "none" || val.trim().toLowerCase() === "n/a" || val.trim().toLowerCase() === "not available") {
+    return "—";
+  }
+  return val.trim();
+}
+
+export function getUnauthorizedDateTime(row: LogRecord, reviews: Record<string, ReviewRecord>): string {
+  const action = getUnauthorizedReviewAction(reviews, row);
+  const val = action?.incident_datetime || row.dateTime;
+  if (!val) return "Not Available";
+  return formatUnauthorizedDateTime(val);
+}
+
+export function exportRecordsToCsv(rows: LogRecord[], reviews: Record<string, ReviewRecord>, isUnauthorized = false) {
+  const isUnauth = isUnauthorized || (rows.length > 0 && rows.every(r => recordCategory(reviews, r) === "Unauthorized" || r.accessCategory === "Unauthorized" || r.decision === "Denied"));
+  if (isUnauth) {
+    const headers = ["S.No", "Name", "Address", "Contact Number", "Location", "Vehicle Number", "Date & Time"];
+    const csvRows = [headers.join(",")];
+    rows.forEach((row, index) => {
+      const name = getUnauthorizedName(row, reviews);
+      const address = getUnauthorizedAddress(row, reviews);
+      const contact = getUnauthorizedContact(row, reviews);
+      const location = getUnauthorizedLocation(row, reviews);
+      const vehicle = getUnauthorizedVehicle(row, reviews);
+      const dateTime = getUnauthorizedDateTime(row, reviews);
+      const line = [
+        index + 1,
+        `"${name.replace(/"/g, '""')}"`,
+        `"${address.replace(/"/g, '""')}"`,
+        `"${contact.replace(/"/g, '""')}"`,
+        `"${location.replace(/"/g, '""')}"`,
+        `"${vehicle.replace(/"/g, '""')}"`,
+        `"${dateTime.replace(/"/g, '""')}"`,
+      ];
+      csvRows.push(line.join(","));
+    });
+    const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `unauthorized_records_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    return;
+  }
+
   const headers = ["S.No", "Name", "Reg No", "Department", "Institution", "Year", "Category", "Accommodation", "Status", "Date & Time", "Location", "Security Officer", "Action Taken", "Decision Made By", "Decision Date & Time"];
   const csvRows = [headers.join(",")];
   rows.forEach((row, index) => {
@@ -2637,7 +3108,23 @@ const missingValues = ["", "not available", "not identified", "unknown", "n/a", 
 const logValue = (value?: string | null) => (value && !missingValues.includes(value.trim().toLowerCase()) ? value : "-");
 const accommodationOf = (row: LogRecord) => (row.residence === "Day scholar" ? "Day Scholar" : row.residence);
 
-function AuditTable({ rows, reviews, title = "AUDIT LOG", hideCommonInfo = false, plainNames = false, fieldVisibility = DEFAULT_LOG_FIELD_VISIBILITY }: { rows: LogRecord[]; reviews: Record<string, ReviewRecord>; title?: string; hideCommonInfo?: boolean; plainNames?: boolean; fieldVisibility?: LogFieldVisibility }) {
+function AuditTable({
+  rows,
+  reviews,
+  title = "AUDIT LOG",
+  hideCommonInfo = false,
+  plainNames = false,
+  fieldVisibility = DEFAULT_LOG_FIELD_VISIBILITY,
+  isUnauthorizedOnly = false,
+}: {
+  rows: LogRecord[];
+  reviews: Record<string, ReviewRecord>;
+  title?: string;
+  hideCommonInfo?: boolean;
+  plainNames?: boolean;
+  fieldVisibility?: LogFieldVisibility;
+  isUnauthorizedOnly?: boolean;
+}) {
   const [selected, setSelected] = useState<LogRecord | null>(null);
   const personCategory = selected?.personType === "Student" ? "Student" : selected?.personType === "Staff" ? "Staff" : selected?.personType === "Unauthorised" ? "Unauthorized person" : "Visitor";
   const authorizationStatus = selected?.decision === "Authorised" ? "Authorized" : selected?.decision;
@@ -2646,53 +3133,125 @@ function AuditTable({ rows, reviews, title = "AUDIT LOG", hideCommonInfo = false
   const review = selected ? reviewFor(reviews, selected) : null;
   const revocation = selected ? latestRevocation(reviews, selected) : undefined;
   const isRevoked = review?.status === "Revoked";
+
+  const isUnauthorizedView =
+    isUnauthorizedOnly ||
+    (rows.length > 0 &&
+      rows.every(row => {
+        const cat = recordCategory(reviews, row);
+        return (
+          cat === "Unauthorized" ||
+          row.accessCategory === "Unauthorized" ||
+          row.decision === "Denied" ||
+          row.event === "Denied" ||
+          row.personType === "Unauthorised"
+        );
+      }));
+
+  const isSelectedUnauthorized =
+    selected &&
+    (selected.accessCategory === "Unauthorized" ||
+      selected.decision === "Denied" ||
+      selected.personType === "Unauthorised" ||
+      selected.event === "Denied" ||
+      recordCategory(reviews, selected) === "Unauthorized");
+
   return <>
     {title && <div className="list-label">{rows.length} RECORDS · {title}</div>}
     <div className="audit-table-wrap">
-      <table className="audit-table">
-        <thead>
-          <tr>
-            <th>S.No</th>
-            <th>Name</th>
-            <th>Reg No</th>
-            <th>Dept</th>
-            <th>Institute</th>
-            <th>Year</th>
-            <th>Category</th>
-            <th>Accommodation</th>
-            <th>Action Taken</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, index) => {
-            const rowReview = reviewFor(reviews, row);
-            const category = recordCategory(reviews, row);
-            const actionTakenText = getActionTaken(reviews, row);
-            return (
-              <tr key={`${row.name}${row.time}${index}`} onClick={() => setSelected(row)}>
-                <td>{index + 1}</td>
-                <td>
-                  <strong>{logValue(row.name)}</strong>
-                  {!plainNames && (
-                    <div className="record-badges">
-                      <Status tone={row.tone}>{row.event}</Status>
-                      <Status tone={category === "Authorized" || category === "Revoked" ? "green" : category === "Visitors" ? "amber" : "red"}>{category}</Status>
-                      <Status tone={reviewTone(rowReview.status)}>{rowReview.status}</Status>
-                    </div>
-                  )}
-                </td>
-                <td>{logValue(row.id)}</td>
-                <td>{logValue(row.department)}</td>
-                <td>{logValue(row.institution)}</td>
-                <td>{logValue(row.year?.replace("Year ", ""))}</td>
-                <td>{category}</td>
-                <td>{logValue(accommodationOf(row))}</td>
-                <td className="action-taken-cell" title={actionTakenText}>{actionTakenText}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      {isUnauthorizedView ? (
+        <table className="audit-table unauthorized-table">
+          <thead>
+            <tr>
+              <th>S.No</th>
+              <th>Name</th>
+              <th>Address</th>
+              <th>Contact Number</th>
+              <th>Location</th>
+              <th>Vehicle Number</th>
+              <th>Date &amp; Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => {
+              const name = getUnauthorizedName(row, reviews);
+              const address = getUnauthorizedAddress(row, reviews);
+              const contact = getUnauthorizedContact(row, reviews);
+              const location = getUnauthorizedLocation(row, reviews);
+              const vehicle = getUnauthorizedVehicle(row, reviews);
+              const dateTime = getUnauthorizedDateTime(row, reviews);
+
+              return (
+                <tr
+                  key={`${row.logId || row.name}-${row.dateTime}-${index}`}
+                  onClick={() => setSelected(row)}
+                  className="clickable-row"
+                >
+                  <td>{index + 1}</td>
+                  <td>
+                    <strong>{name}</strong>
+                    {!plainNames && (
+                      <div className="record-badges">
+                        <Status tone="red">Unauthorized</Status>
+                      </div>
+                    )}
+                  </td>
+                  <td title={address}>{address}</td>
+                  <td>{contact}</td>
+                  <td title={location}>{location}</td>
+                  <td>{vehicle}</td>
+                  <td>{dateTime}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      ) : (
+        <table className="audit-table">
+          <thead>
+            <tr>
+              <th>S.No</th>
+              <th>Name</th>
+              <th>Reg No</th>
+              <th>Dept</th>
+              <th>Institute</th>
+              <th>Year</th>
+              <th>Category</th>
+              <th>Accommodation</th>
+              <th>Action Taken</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => {
+              const rowReview = reviewFor(reviews, row);
+              const category = recordCategory(reviews, row);
+              const actionTakenText = getActionTaken(reviews, row);
+              return (
+                <tr key={`${row.name}${row.time}${index}`} onClick={() => setSelected(row)}>
+                  <td>{index + 1}</td>
+                  <td>
+                    <strong>{logValue(row.name)}</strong>
+                    {!plainNames && (
+                      <div className="record-badges">
+                        <Status tone={row.tone}>{row.event}</Status>
+                        <Status tone={category === "Authorized" || category === "Revoked" ? "green" : category === "Visitors" ? "amber" : "red"}>{category}</Status>
+                        <Status tone={reviewTone(rowReview.status)}>{rowReview.status}</Status>
+                      </div>
+                    )}
+                  </td>
+                  <td>{logValue(row.id)}</td>
+                  <td>{logValue(row.department)}</td>
+                  <td>{logValue(row.institution)}</td>
+                  <td>{logValue(row.year?.replace("Year ", ""))}</td>
+                  <td>{category}</td>
+                  <td>{logValue(accommodationOf(row))}</td>
+                  <td className="action-taken-cell" title={actionTakenText}>{actionTakenText}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
     </div>
     {selected && (
       <section className="audit-profile log-details-panel">
@@ -2702,9 +3261,10 @@ function AuditTable({ rows, reviews, title = "AUDIT LOG", hideCommonInfo = false
             <span>{isRevoked ? "Entry capture" : `Entry capture · ${selected.time}`}</span>
           </div>
           <div>
-            <span>{personCategory.toUpperCase()} LOG DETAILS</span>
-            <h2>{selected.name}</h2>
-            {!isRevoked && <p>{logValue(selected.id)} · {logValue(selected.institution)}</p>}
+            <span>{isSelectedUnauthorized ? "UNAUTHORIZED RECORD DETAILS" : `${personCategory.toUpperCase()} LOG DETAILS`}</span>
+            <h2>{isSelectedUnauthorized ? getUnauthorizedName(selected, reviews) : selected.name}</h2>
+            {!isRevoked && !isSelectedUnauthorized && <p>{logValue(selected.id)} · {logValue(selected.institution)}</p>}
+            {isSelectedUnauthorized && <p><span className="status status-red">Unauthorized</span> · {getUnauthorizedLocation(selected, reviews)}</p>}
           </div>
           <button onClick={() => setSelected(null)} aria-label="Close log details">
             <X size={18} />
@@ -2715,8 +3275,8 @@ function AuditTable({ rows, reviews, title = "AUDIT LOG", hideCommonInfo = false
           <div className="audit-detail-section supervisor-review-highlight">
             <div className="audit-detail-title">SUPERVISOR / CSO DECISION & ACTION TAKEN</div>
             <dl>
-              <div><dt>Current Verification Status</dt><dd><Status tone={reviewTone(review?.status || "Pending Verification")}>{review?.status || "Pending Verification"}</Status></dd></div>
-              <div><dt>Action Taken</dt><dd className="action-taken-detail"><strong>{getActionTaken(reviews, selected)}</strong></dd></div>
+              <div><dt>Current Verification Status</dt><dd><Status tone={reviewTone(review?.status || (isSelectedUnauthorized ? "Unauthorised" : "Pending Verification"))}>{review?.status || (isSelectedUnauthorized ? "Denied" : "Pending Verification")}</Status></dd></div>
+              <div><dt>Action Taken</dt><dd className="action-taken-detail"><strong>{isSelectedUnauthorized ? getUnauthorizedAction(reviews, selected) : getActionTaken(reviews, selected)}</strong></dd></div>
               {(() => {
                 const dec = getDecisionDetails(reviews, selected);
                 if (dec) {
@@ -2727,7 +3287,7 @@ function AuditTable({ rows, reviews, title = "AUDIT LOG", hideCommonInfo = false
                     </>
                   );
                 }
-                return <div><dt>Decision Status</dt><dd>Pending Review</dd></div>;
+                return <div><dt>Decision Status</dt><dd>{isSelectedUnauthorized ? "Logged / Pending Review" : "Pending Review"}</dd></div>;
               })()}
             </dl>
           </div>
@@ -2751,7 +3311,25 @@ function AuditTable({ rows, reviews, title = "AUDIT LOG", hideCommonInfo = false
           </>
         )}
 
-        {!isRevoked && (
+        {isSelectedUnauthorized ? (
+          <div className="audit-detail-section unauthorized-detail-section">
+            <div className="audit-detail-title">UNAUTHORIZED RECORD INFORMATION</div>
+            <dl>
+              <div><dt>S.No</dt><dd>{rows.indexOf(selected) + 1}</dd></div>
+              <div><dt>Name</dt><dd><strong>{getUnauthorizedName(selected, reviews)}</strong></dd></div>
+              <div><dt>Address</dt><dd>{getUnauthorizedAddress(selected, reviews)}</dd></div>
+              <div><dt>Contact Number</dt><dd>{getUnauthorizedContact(selected, reviews)}</dd></div>
+              <div><dt>Location</dt><dd>{getUnauthorizedLocation(selected, reviews)}</dd></div>
+              <div><dt>Vehicle Number</dt><dd>{getUnauthorizedVehicle(selected, reviews)}</dd></div>
+              <div><dt>Date &amp; Time</dt><dd>{getUnauthorizedDateTime(selected, reviews)}</dd></div>
+              <div><dt>Action Taken</dt><dd className="action-taken-detail"><strong>{getUnauthorizedAction(reviews, selected)}</strong></dd></div>
+              <div><dt>Assigned Gate / Location</dt><dd>{selected.block}</dd></div>
+              <div><dt>Security Guard / Officer</dt><dd>{selected.guard ? `${selected.guard} (${selected.guardNumber || "SG"})` : "Security Officer"}</dd></div>
+              {selected.guardNotes && <div><dt>Security Guard Notes</dt><dd>{selected.guardNotes}</dd></div>}
+              {selected.logId && <div><dt>Incident ID</dt><dd>{selected.logId}</dd></div>}
+            </dl>
+          </div>
+        ) : !isRevoked ? (
           <div className="audit-detail-section">
             <div className="audit-detail-title">{personCategory.toUpperCase()} DETAILS</div>
             <dl>
@@ -2778,7 +3356,7 @@ function AuditTable({ rows, reviews, title = "AUDIT LOG", hideCommonInfo = false
               {isRevoked && revocation && <><div><dt>Revoked by</dt><dd>{revocation.actor} · {revocation.actorNumber}</dd></div><div><dt>Revoked at</dt><dd>{revocation.timestamp}</dd></div></>}
             </dl>
           </div>
-        )}
+        ) : null}
 
         {!isRevoked && revocation && (
           <div className="audit-detail-section revocation-details">
@@ -2792,7 +3370,7 @@ function AuditTable({ rows, reviews, title = "AUDIT LOG", hideCommonInfo = false
           </div>
         )}
 
-        {!isRevoked && !hideCommonInfo && (
+        {!isRevoked && !isSelectedUnauthorized && !hideCommonInfo && (
           <div className="audit-detail-section">
             <div className="audit-detail-title">ORIGINAL SECURITY EVENT</div>
             <dl>
@@ -3038,11 +3616,6 @@ function UnauthorisedEntriesTable({
   reviews: Record<string, ReviewRecord>;
 }) {
   const [selected, setSelected] = useState<LogRecord | null>(null);
-  const displayName = (row: LogRecord) =>
-    missingValues.includes(row.name.trim().toLowerCase()) || row.name === "Unrecognized person"
-      ? "Unauthorized person"
-      : row.name;
-  const entryCount = (row: LogRecord) => row.entries ?? 1;
 
   const getStatus = (row: LogRecord) => {
     const rev = reviewFor(reviews, row);
@@ -3064,42 +3637,48 @@ function UnauthorisedEntriesTable({
     return { label: row.decision || row.event || "Denied", tone: (row.tone || "red") as any };
   };
 
-  const getReportedBy = (row: LogRecord) => {
-    const dec = getDecisionDetails(reviews, row);
-    if (dec) return dec.role;
-    if (row.guard) return row.guard;
-    return "Campus Supervisor";
-  };
-
   return (
     <>
       <div className="audit-table-wrap supervisor-audit-table-wrap">
-        <table className="audit-table supervisor-audit-table">
+        <table className="audit-table unauthorized-table supervisor-audit-table">
           <thead>
             <tr>
               <th>S.No</th>
-              <th>Person</th>
-              <th>Reported By</th>
-              <th>Phone No</th>
-              <th>Status</th>
-              <th>Action Taken</th>
-              <th>Entries</th>
+              <th>Name</th>
+              <th>Address</th>
+              <th>Contact Number</th>
+              <th>Location</th>
+              <th>Vehicle Number</th>
+              <th>Date &amp; Time</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row, index) => {
-              const statusInfo = getStatus(row);
-              const actionTakenText = getActionTaken(reviews, row);
-              const reportedByText = getReportedBy(row);
+              const name = getUnauthorizedName(row, reviews);
+              const address = getUnauthorizedAddress(row, reviews);
+              const contact = getUnauthorizedContact(row, reviews);
+              const location = getUnauthorizedLocation(row, reviews);
+              const vehicle = getUnauthorizedVehicle(row, reviews);
+              const dateTime = getUnauthorizedDateTime(row, reviews);
+
               return (
-                <tr key={recordKey(row)} onClick={() => setSelected(row)}>
+                <tr
+                  key={recordKey(row)}
+                  onClick={() => setSelected(row)}
+                  className="clickable-row"
+                >
                   <td>{index + 1}</td>
-                  <td><strong>{displayName(row)}</strong></td>
-                  <td>{reportedByText}</td>
-                  <td>{row.phoneNumber ? row.phoneNumber : "—"}</td>
-                  <td><Status tone={statusInfo.tone}>{statusInfo.label}</Status></td>
-                  <td className="action-taken-cell" title={actionTakenText}>{actionTakenText}</td>
-                  <td>{entryCount(row)}</td>
+                  <td>
+                    <strong>{name}</strong>
+                    <div className="record-badges">
+                      <Status tone="red">Unauthorized</Status>
+                    </div>
+                  </td>
+                  <td title={address}>{address}</td>
+                  <td>{contact}</td>
+                  <td title={location}>{location}</td>
+                  <td>{vehicle}</td>
+                  <td>{dateTime}</td>
                 </tr>
               );
             })}
@@ -3107,11 +3686,12 @@ function UnauthorisedEntriesTable({
         </table>
       </div>
       {selected && (
-        <section className="audit-profile supervisor-log-details">
+        <section className="audit-profile supervisor-log-details log-details-panel">
           <div className="supervisor-log-details-head">
             <div>
-              <span>UNAUTHORISED ENTRY DETAILS</span>
-              <h2>{displayName(selected)}</h2>
+              <span>UNAUTHORIZED RECORD DETAILS</span>
+              <h2>{getUnauthorizedName(selected, reviews)}</h2>
+              <p><span className="status status-red">Unauthorized</span> · {getUnauthorizedLocation(selected, reviews)}</p>
             </div>
             <button onClick={() => setSelected(null)} aria-label="Close log details">
               <X size={18} />
@@ -3122,7 +3702,7 @@ function UnauthorisedEntriesTable({
             <div className="audit-detail-title">SUPERVISOR / CSO DECISION & ACTION TAKEN</div>
             <dl>
               <div><dt>Verification Decision</dt><dd><Status tone={getStatus(selected).tone}>{getStatus(selected).label}</Status></dd></div>
-              <div><dt>Action Taken</dt><dd className="action-taken-detail"><strong>{getActionTaken(reviews, selected)}</strong></dd></div>
+              <div><dt>Action Taken</dt><dd className="action-taken-detail"><strong>{getUnauthorizedAction(reviews, selected)}</strong></dd></div>
               {(() => {
                 const dec = getDecisionDetails(reviews, selected);
                 if (dec) {
@@ -3138,17 +3718,21 @@ function UnauthorisedEntriesTable({
             </dl>
           </div>
 
-          <div className="audit-detail-section">
-            <div className="audit-detail-title">ORIGINAL SECURITY GUARD RECORD</div>
+          <div className="audit-detail-section unauthorized-detail-section">
+            <div className="audit-detail-title">UNAUTHORIZED RECORD INFORMATION</div>
             <dl>
               <div><dt>S.No</dt><dd>{rows.indexOf(selected) + 1}</dd></div>
-              <div><dt>Name</dt><dd>{displayName(selected)}</dd></div>
-              <div><dt>Phone No</dt><dd>{selected.phoneNumber ? selected.phoneNumber : "—"}</dd></div>
-              <div><dt>Gate / Location</dt><dd>{selected.block}</dd></div>
-              <div><dt>Original Entry Date & Time</dt><dd>{selected.dateTime.replace("T", " ")}</dd></div>
-              <div><dt>Security Officer</dt><dd>{selected.guard} ({selected.guardNumber})</dd></div>
-              <div><dt>Original Security Notes</dt><dd>{selected.guardNotes ?? "—"}</dd></div>
-              <div><dt>Entries Count</dt><dd>{entryCount(selected)}</dd></div>
+              <div><dt>Name</dt><dd><strong>{getUnauthorizedName(selected, reviews)}</strong></dd></div>
+              <div><dt>Address</dt><dd>{getUnauthorizedAddress(selected, reviews)}</dd></div>
+              <div><dt>Contact Number</dt><dd>{getUnauthorizedContact(selected, reviews)}</dd></div>
+              <div><dt>Location</dt><dd>{getUnauthorizedLocation(selected, reviews)}</dd></div>
+              <div><dt>Vehicle Number</dt><dd>{getUnauthorizedVehicle(selected, reviews)}</dd></div>
+              <div><dt>Date &amp; Time</dt><dd>{getUnauthorizedDateTime(selected, reviews)}</dd></div>
+              <div><dt>Action Taken</dt><dd className="action-taken-detail"><strong>{getUnauthorizedAction(reviews, selected)}</strong></dd></div>
+              <div><dt>Assigned Gate / Location</dt><dd>{selected.block}</dd></div>
+              <div><dt>Security Guard / Officer</dt><dd>{selected.guard ? `${selected.guard} (${selected.guardNumber || "SG"})` : "Security Officer"}</dd></div>
+              {selected.guardNotes && <div><dt>Security Guard Notes</dt><dd>{selected.guardNotes}</dd></div>}
+              {selected.logId && <div><dt>Incident ID</dt><dd>{selected.logId}</dd></div>}
             </dl>
           </div>
         </section>
@@ -3419,6 +4003,9 @@ function Audit({
             reviewActions: r.review_actions,
             reviewStatus: r.review_status,
             actionTaken: (r.review_actions && r.review_actions.length > 0) ? r.review_actions[r.review_actions.length - 1].action_taken : undefined,
+            address: (r.review_actions && r.review_actions.length > 0 && r.review_actions[r.review_actions.length - 1].address) || undefined,
+            location: r.location_block || (r.review_actions && r.review_actions.length > 0 && r.review_actions[r.review_actions.length - 1].location) || undefined,
+            vehicleNumber: (r.review_actions && r.review_actions.length > 0 && r.review_actions[r.review_actions.length - 1].vehicle_number) || undefined,
           }));
           setApiRecords(mapped);
         }
@@ -3443,7 +4030,16 @@ function Audit({
     return assignedGuardNumbers.has(row.guardNumber) || (row.guard && row.guard.includes("Selvam"));
   });
 
-  const unauthRows = apiRecords !== null ? apiRecords : fallbackUnauthRows;
+  const baseUnauthRows = apiRecords !== null ? apiRecords : fallbackUnauthRows;
+  const mockUnauthInPeriod = sampleMockUnauthorizedRecords.filter(row => {
+    const recordDate = row.dateTime.slice(0, 10);
+    return recordDate >= auditFrom && recordDate <= auditTo;
+  });
+  const existingKeys = new Set(baseUnauthRows.map(r => r.logId || `${r.name}-${r.dateTime}`));
+  const unauthRows = [
+    ...baseUnauthRows,
+    ...mockUnauthInPeriod.filter(r => !existingKeys.has(r.logId || `${r.name}-${r.dateTime}`)),
+  ];
 
   // Tab 2 (Security Worklog) data for Campus Supervisor (Institution B security personnel)
   const supervisorWorklogEntries = worklogEntries.filter(
@@ -3495,6 +4091,20 @@ function Audit({
         title="Campus records"
         subtitle={scope === "cso" ? "Institution B · CSO scope" : "Institution B · Campus Supervisor scope"}
         back={() => go("home")}
+        action={
+          activeTab === "unauthorised" ? (
+            <div className="header-actions">
+              <button
+                className="icon-btn"
+                onClick={() => exportRecordsToCsv(unauthRows, reviews, true)}
+                aria-label="Export unauthorized records as CSV"
+                title="Export CSV with 7 standard columns"
+              >
+                <FileClock size={18} />
+              </button>
+            </div>
+          ) : undefined
+        }
       />
       <div className="page-content">
         <section className="filter-panel supervisor-audit-filters">
@@ -3601,6 +4211,7 @@ function Alerts({
   updateReview,
   logs,
   deleteLog,
+  onAddAuditLog,
 }: {
   go: (screen: Screen) => void;
   back: () => void;
@@ -3609,6 +4220,7 @@ function Alerts({
   updateReview: (row: LogRecord, type: "Authorised" | "Unauthorised" | "Revoked", reason?: string, incidentData?: IncidentData) => void;
   logs?: LogRecord[];
   deleteLog?: (row: LogRecord) => void;
+  onAddAuditLog?: (log: AuditLogItem) => void;
 }) {
   const currentLogs = logs ?? logRows;
   const alertRows = currentLogs.filter(row => {
@@ -3616,6 +4228,7 @@ function Alerts({
     if (role === "security") return row.block === "Main Gate";
     if (role === "warden") return row.block === "Bharathi Hostel" || row.guard === roleMeta.warden.name;
     if (role === "staff") return row.institution === "Institution B" && row.block === "Block A";
+    if (role === "supervisor") return assignedGuardNumbers.has(row.guardNumber) || row.block === "Bharathi Hostel" || row.guardNumber === "WRD-B-0011" || row.guard === roleMeta.warden.name || (row.guard && row.guard.includes("Selvam"));
     return assignedGuardNumbers.has(row.guardNumber);
   });
   const [readKeys, setReadKeys] = useState<string[]>([]);
@@ -3627,6 +4240,113 @@ function Alerts({
   const [reason, setReason] = useState("");
   const [reasonError, setReasonError] = useState(false);
   const [campusLocations, setCampusLocations] = useState<string[]>(defaultCampusLocations);
+
+  // Manager & Admin Requests state
+  const [requestsList, setRequestsList] = useState<any[]>([]);
+  const [activeFilter, setActiveFilter] = useState<"all" | "alerts" | "requests">("all");
+  const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
+  const [replyMessage, setReplyMessage] = useState("");
+  const [replyError, setReplyError] = useState<string | null>(null);
+  const [replySuccess, setReplySuccess] = useState<string | null>(null);
+  const [isReplying, setIsReplying] = useState(false);
+
+  const fetchRequests = () => {
+    if (role === "admin" || role === "manager") {
+      const url =
+        role === "manager"
+          ? "http://127.0.0.1:8000/api/v1/manager-requests/?manager_username=manager"
+          : "http://127.0.0.1:8000/api/v1/manager-requests/";
+      fetch(url)
+        .then(res => (res.ok ? res.json() : []))
+        .then(data => {
+          if (Array.isArray(data)) {
+            setRequestsList(data);
+          }
+        })
+        .catch(() => {});
+    }
+  };
+
+  useEffect(() => {
+    fetchRequests();
+  }, [role]);
+
+  const openRequest = async (req: any) => {
+    setSelectedRequest(req);
+    setReplyMessage("");
+    setReplyError(null);
+    setReplySuccess(null);
+
+    if (role === "admin" && req.status === "Sent") {
+      try {
+        const resp = await fetch(
+          `http://127.0.0.1:8000/api/v1/manager-requests/${req.request_id}/view?admin_name=Avery%20Williams&admin_username=admin`,
+          { method: "POST" }
+        );
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.request) {
+            setSelectedRequest(data.request);
+            setRequestsList(prev => prev.map(r => (r.request_id === req.request_id ? data.request : r)));
+          }
+          if (data.audit_log && onAddAuditLog) {
+            onAddAuditLog(data.audit_log);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to mark request as viewed:", err);
+      }
+    }
+  };
+
+  const handleSendReply = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!selectedRequest || isReplying) return;
+
+    const trimmed = replyMessage.trim();
+    if (!trimmed) {
+      setReplyError("Reply message is mandatory and cannot be empty.");
+      return;
+    }
+    if (trimmed.length > 500) {
+      setReplyError("Reply message cannot exceed 500 characters.");
+      return;
+    }
+
+    setIsReplying(true);
+    setReplyError(null);
+    try {
+      const resp = await fetch(`http://127.0.0.1:8000/api/v1/manager-requests/${selectedRequest.request_id}/reply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reply_message: trimmed,
+          admin_name: "Avery Williams",
+          admin_username: "admin",
+        }),
+      });
+
+      if (!resp.ok) {
+        const errData = await resp.json().catch(() => ({}));
+        throw new Error(errData.detail || "Failed to send reply.");
+      }
+
+      const data = await resp.json();
+      if (data.request) {
+        setSelectedRequest(data.request);
+        setRequestsList(prev => prev.map(r => (r.request_id === selectedRequest.request_id ? data.request : r)));
+      }
+      if (data.audit_logs && Array.isArray(data.audit_logs) && onAddAuditLog) {
+        data.audit_logs.forEach((log: AuditLogItem) => onAddAuditLog(log));
+      }
+      setReplyMessage("");
+      setReplySuccess("Reply sent successfully. Notification dispatched to Manager.");
+    } catch (err: any) {
+      setReplyError(err.message || "Could not connect to backend server. Please try again.");
+    } finally {
+      setIsReplying(false);
+    }
+  };
 
   // Form fields for expanded unauthorised confirmation
   const [unauthFullName, setUnauthFullName] = useState("");
@@ -3763,6 +4483,217 @@ function Alerts({
       }
     }
   };
+
+  if (selectedRequest && role === "admin") {
+    return (
+      <>
+        <TopBar
+          title="Request details"
+          subtitle={selectedRequest.request_id}
+          back={() => {
+            setSelectedRequest(null);
+            setReplyMessage("");
+            setReplyError(null);
+            setReplySuccess(null);
+          }}
+        />
+        <div className="page-content">
+          <section className="alert-record-head">
+            <div className={`alert-symbol ${selectedRequest.status === "Replied" ? "green-bg" : selectedRequest.status === "Viewed" ? "blue-bg" : "amber-bg"}`}>
+              <Send size={20} />
+            </div>
+            <div>
+              <h1 style={{ fontSize: "18px" }}>{selectedRequest.subject}</h1>
+              <p>From: {selectedRequest.manager_name} (Institute Manager)</p>
+            </div>
+            <Status tone={selectedRequest.status === "Replied" ? "green" : selectedRequest.status === "Viewed" ? "blue" : "amber"}>
+              {selectedRequest.status}
+            </Status>
+          </section>
+
+          <section className="info-card" style={{ marginTop: "12px" }}>
+            <div className="card-kicker"><FileClock size={15} />REQUEST DETAILS</div>
+            <dl>
+              <div><dt>Request ID</dt><dd><strong>{selectedRequest.request_id}</strong></dd></div>
+              <div><dt>From</dt><dd>{selectedRequest.manager_name}</dd></div>
+              <div><dt>Institution</dt><dd>{selectedRequest.institution}</dd></div>
+              <div><dt>Subject</dt><dd>{selectedRequest.subject}</dd></div>
+              <div><dt>Date &amp; Time</dt><dd>{selectedRequest.created_at ? selectedRequest.created_at.replace("T", " ").slice(0, 19) : ""}</dd></div>
+              <div><dt>Current Status</dt><dd>{selectedRequest.status}</dd></div>
+            </dl>
+          </section>
+
+          <section className="info-card" style={{ marginTop: "12px" }}>
+            <div className="card-kicker"><Mail size={15} />COMPLETE QUERY / MESSAGE</div>
+            <p style={{ margin: "8px 0 0 0", fontSize: "14px", lineHeight: "1.6", color: "#1e293b", whiteSpace: "pre-wrap" }}>
+              {selectedRequest.message}
+            </p>
+          </section>
+
+          {selectedRequest.reply_message && (
+            <section className="info-card" style={{ marginTop: "16px", border: "1px solid #bbf7d0", backgroundColor: "#f0fdf4" }}>
+              <div className="card-kicker" style={{ color: "#16a34a" }}><CheckCircle2 size={15} />REPLY TO MANAGER (SENT)</div>
+              <div style={{ marginTop: "8px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <strong style={{ fontSize: "13px", color: "#166534" }}>{selectedRequest.admin_name || "Avery Williams"} (Super admin)</strong>
+                  <small style={{ color: "#15803d", fontWeight: "600" }}>{selectedRequest.replied_at ? selectedRequest.replied_at.replace("T", " ").slice(0, 19) : ""}</small>
+                </div>
+                <p style={{ margin: "4px 0 0 0", fontSize: "14px", lineHeight: "1.6", color: "#14532d", whiteSpace: "pre-wrap" }}>
+                  {selectedRequest.reply_message}
+                </p>
+              </div>
+            </section>
+          )}
+
+          {selectedRequest.status !== "Replied" && (
+            <section className="card" style={{ marginTop: "16px", padding: "16px" }}>
+              <div style={{ marginBottom: "12px" }}>
+                <span style={{ fontSize: "11px", fontWeight: "700", color: "#2563eb", letterSpacing: "0.5px" }}>REPLY TO MANAGER</span>
+                <h3 style={{ fontSize: "16px", margin: "2px 0 0", color: "#0f172a" }}>Reply to Manager</h3>
+              </div>
+
+              {replySuccess ? (
+                <div style={{ backgroundColor: "#ecfdf5", color: "#065f46", padding: "12px", borderRadius: "8px", fontSize: "13px", border: "1px solid #a7f3d0" }}>
+                  {replySuccess}
+                </div>
+              ) : (
+                <form onSubmit={handleSendReply} className="form-stack guard-form">
+                  <label className="field">
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span>Admin Reply Message <b>*</b></span>
+                      <span className="char-counter" style={{
+                        fontSize: "11px",
+                        fontWeight: "600",
+                        color: replyMessage.length > 500 ? "#dc2626" : replyMessage.length > 450 ? "#d97706" : "#64748b"
+                      }}>
+                        {500 - replyMessage.length} characters left ({replyMessage.length}/500)
+                      </span>
+                    </div>
+                    <textarea
+                      rows={5}
+                      maxLength={500}
+                      value={replyMessage}
+                      disabled={isReplying}
+                      onChange={e => {
+                        setReplyMessage(e.target.value);
+                        if (replyError) setReplyError(null);
+                      }}
+                      placeholder="Type your official reply to Manager Priya Raman (maximum 500 characters)..."
+                      required
+                    />
+                  </label>
+
+                  {replyError && (
+                    <div style={{
+                      backgroundColor: "#fef2f2",
+                      color: "#b91c1c",
+                      padding: "8px 12px",
+                      borderRadius: "6px",
+                      fontSize: "12px",
+                      marginTop: "6px",
+                      border: "1px solid #fecaca"
+                    }}>
+                      {replyError}
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", gap: "10px", marginTop: "14px", justifyContent: "flex-end" }}>
+                    <button
+                      type="button"
+                      className="btn secondary"
+                      disabled={isReplying}
+                      onClick={() => {
+                        setSelectedRequest(null);
+                        setReplyMessage("");
+                        setReplyError(null);
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="btn primary"
+                      disabled={isReplying || !replyMessage.trim() || replyMessage.length > 500}
+                      style={{ display: "flex", alignItems: "center", gap: "6px" }}
+                    >
+                      <Send size={15} />
+                      {isReplying ? "Sending Reply..." : "Send Reply"}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </section>
+          )}
+        </div>
+      </>
+    );
+  }
+
+  if (selectedRequest && role === "manager") {
+    return (
+      <>
+        <TopBar
+          title="Admin Reply Details"
+          subtitle={selectedRequest.request_id}
+          back={() => setSelectedRequest(null)}
+        />
+        <div className="page-content">
+          <section className="alert-record-head">
+            <div className={`alert-symbol ${selectedRequest.status === "Replied" ? "green-bg" : "blue-bg"}`}>
+              {selectedRequest.status === "Replied" ? <CheckCircle2 size={20} /> : <Send size={20} />}
+            </div>
+            <div>
+              <h1 style={{ fontSize: "18px" }}>{selectedRequest.subject}</h1>
+              <p>Request ID: {selectedRequest.request_id}</p>
+            </div>
+            <Status tone={selectedRequest.status === "Replied" ? "green" : "blue"}>
+              {selectedRequest.status === "Replied" ? "Replied" : selectedRequest.status}
+            </Status>
+          </section>
+
+          <section className="info-card" style={{ marginTop: "12px" }}>
+            <div className="card-kicker"><FileClock size={15} />REQUEST SUMMARY</div>
+            <dl>
+              <div><dt>Request ID</dt><dd><strong>{selectedRequest.request_id}</strong></dd></div>
+              <div><dt>Subject</dt><dd>{selectedRequest.subject}</dd></div>
+              <div><dt>Date &amp; Time Sent</dt><dd>{selectedRequest.created_at ? selectedRequest.created_at.replace("T", " ").slice(0, 19) : ""}</dd></div>
+              <div><dt>Status</dt><dd>{selectedRequest.status}</dd></div>
+            </dl>
+          </section>
+
+          <section className="info-card" style={{ marginTop: "12px" }}>
+            <div className="card-kicker"><Mail size={15} />ORIGINAL REQUEST SENT TO ADMIN</div>
+            <p style={{ margin: "8px 0 0 0", fontSize: "14px", lineHeight: "1.6", color: "#1e293b", whiteSpace: "pre-wrap" }}>
+              {selectedRequest.message}
+            </p>
+          </section>
+
+          {selectedRequest.reply_message ? (
+            <section className="info-card" style={{ marginTop: "16px", border: "1px solid #bbf7d0", backgroundColor: "#f0fdf4" }}>
+              <div className="card-kicker" style={{ color: "#16a34a" }}><CheckCircle2 size={15} />ADMIN REPLY</div>
+              <div style={{ marginTop: "8px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <strong style={{ fontSize: "13px", color: "#166534" }}>{selectedRequest.admin_name || "Avery Williams"} (Super admin)</strong>
+                  <small style={{ color: "#15803d", fontWeight: "600" }}>{selectedRequest.replied_at ? selectedRequest.replied_at.replace("T", " ").slice(0, 19) : ""}</small>
+                </div>
+                <p style={{ margin: "6px 0 10px 0", fontSize: "14px", lineHeight: "1.6", color: "#14532d", whiteSpace: "pre-wrap" }}>
+                  {selectedRequest.reply_message}
+                </p>
+                <div style={{ padding: "8px 10px", backgroundColor: "#e2e8f0", borderRadius: "6px", fontSize: "11px", color: "#475569" }}>
+                  Notice: This reply is permanently recorded in the institutional audit trail. Manager cannot edit or delete this reply.
+                </div>
+              </div>
+            </section>
+          ) : (
+            <div style={{ marginTop: "16px", padding: "14px", backgroundColor: "#fef3c7", borderRadius: "8px", color: "#92400e", fontSize: "13px" }}>
+              Admin has not yet replied to this request. You will be notified in this section as soon as Admin sends a reply.
+            </div>
+          )}
+        </div>
+      </>
+    );
+  }
+
   if (selected) {
     const review = reviewFor(reviews, selected);
     const knownInstitution = !["Not identified", "Not available"].includes(selected.institution);
@@ -3787,7 +4718,6 @@ function Alerts({
             </div>
           </section>
         )}
-        <section className="info-card alert-info"><div className="card-kicker"><FileClock size={15} />ORIGINAL SECURITY RECORD</div><dl><div><dt>Original event category</dt><dd>{selected.accessCategory}</dd></div><div><dt>Event</dt><dd>{selected.event}</dd></div>{selected.phoneNumber && <div><dt>Phone number</dt><dd>{selected.phoneNumber}</dd></div>}<div><dt>Security officer</dt><dd>{selected.guard}</dd></div><div><dt>Security number</dt><dd>{selected.guardNumber}</dd></div><div><dt>Institution</dt><dd>{knownInstitution ? selected.institution : "Institution B"}</dd></div><div><dt>Gate / Location</dt><dd>{selected.block}</dd></div><div><dt>Date & time</dt><dd>{selected.dateTime.replace("T", " ")}</dd></div><div><dt>Current verification status</dt><dd>{review.status}</dd></div></dl></section>
         {(() => {
           const latestUnauth = [...review.actions].reverse().find(a => a.type === "Unauthorised" && (a.full_name || a.action_taken || a.address));
           if (!latestUnauth) return null;
@@ -4022,12 +4952,255 @@ function Alerts({
       )}
     </>;
   }
+  const unreadRequestCount = role === "admin"
+    ? requestsList.filter(r => r.status === "Sent").length
+    : requestsList.filter(r => r.status === "Replied").length;
+
   return <>
-    <TopBar title={role === "staff" ? "Staff alerts" : role === "cso" ? "Alerts" : "Security alerts"} subtitle={role === "supervisor" ? "" : role === "cso" ? "Institution B · CSO review" : "Relevant to your assigned scope"} back={back} action={<button className="text-action" onClick={markAllRead}>{readKeys.length === alertRows.length ? "All read" : "Mark read"}</button>} />
+    <TopBar
+      title={
+        role === "admin"
+          ? "Admin Notifications"
+          : role === "manager"
+          ? "Manager Notifications"
+          : role === "staff"
+          ? "Staff alerts"
+          : role === "cso"
+          ? "Alerts"
+          : "Security alerts"
+      }
+      subtitle={
+        role === "admin"
+          ? "Campus Security & Management Requests"
+          : role === "manager"
+          ? "Institutional Requests & Super Admin Replies"
+          : role === "supervisor"
+          ? ""
+          : role === "cso"
+          ? "Institution B · CSO review"
+          : "Relevant to your assigned scope"
+      }
+      back={back}
+      action={<button className="text-action" onClick={markAllRead}>{readKeys.length === alertRows.length ? "All read" : "Mark read"}</button>}
+    />
     <div className="page-content">
-      <div className="notification-legend"><span><i />Unread</span><strong>{alertRows.filter(row => reviewFor(reviews, row).status === "Pending Verification").length} pending verification</strong></div>
+      {role === "admin" && (
+        <div style={{ display: "flex", gap: "8px", margin: "0 0 12px 0", overflowX: "auto" }}>
+          <button
+            type="button"
+            className={`filter-chip ${activeFilter === "all" ? "active" : ""}`}
+            onClick={() => setActiveFilter("all")}
+            style={{
+              padding: "6px 14px",
+              borderRadius: "20px",
+              border: "1px solid var(--line)",
+              background: activeFilter === "all" ? "var(--blue)" : "#fff",
+              color: activeFilter === "all" ? "#fff" : "#475569",
+              fontSize: "12px",
+              fontWeight: "600",
+            }}
+          >
+            All Notifications ({alertRows.length + requestsList.length})
+          </button>
+          <button
+            type="button"
+            className={`filter-chip ${activeFilter === "alerts" ? "active" : ""}`}
+            onClick={() => setActiveFilter("alerts")}
+            style={{
+              padding: "6px 14px",
+              borderRadius: "20px",
+              border: "1px solid var(--line)",
+              background: activeFilter === "alerts" ? "var(--blue)" : "#fff",
+              color: activeFilter === "alerts" ? "#fff" : "#475569",
+              fontSize: "12px",
+              fontWeight: "600",
+            }}
+          >
+            Security Alerts ({alertRows.length})
+          </button>
+          <button
+            type="button"
+            className={`filter-chip ${activeFilter === "requests" ? "active" : ""}`}
+            onClick={() => setActiveFilter("requests")}
+            style={{
+              padding: "6px 14px",
+              borderRadius: "20px",
+              border: "1px solid var(--line)",
+              background: activeFilter === "requests" ? "var(--blue)" : "#fff",
+              color: activeFilter === "requests" ? "#fff" : "#475569",
+              fontSize: "12px",
+              fontWeight: "600",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+            }}
+          >
+            Requests ({requestsList.length})
+            {unreadRequestCount > 0 && (
+              <span style={{
+                background: "#ef4444",
+                color: "#fff",
+                borderRadius: "10px",
+                padding: "1px 6px",
+                fontSize: "10px",
+                fontWeight: "700",
+              }}>
+                {unreadRequestCount} new
+              </span>
+            )}
+          </button>
+        </div>
+      )}
+
+      {role === "manager" && (
+        <div style={{ display: "flex", gap: "8px", margin: "0 0 12px 0", overflowX: "auto" }}>
+          <button
+            type="button"
+            className={`filter-chip ${activeFilter === "all" ? "active" : ""}`}
+            onClick={() => setActiveFilter("all")}
+            style={{
+              padding: "6px 14px",
+              borderRadius: "20px",
+              border: "1px solid var(--line)",
+              background: activeFilter === "all" ? "var(--blue)" : "#fff",
+              color: activeFilter === "all" ? "#fff" : "#475569",
+              fontSize: "12px",
+              fontWeight: "600",
+            }}
+          >
+            All Notifications
+          </button>
+          <button
+            type="button"
+            className={`filter-chip ${activeFilter === "requests" ? "active" : ""}`}
+            onClick={() => setActiveFilter("requests")}
+            style={{
+              padding: "6px 14px",
+              borderRadius: "20px",
+              border: "1px solid var(--line)",
+              background: activeFilter === "requests" ? "var(--blue)" : "#fff",
+              color: activeFilter === "requests" ? "#fff" : "#475569",
+              fontSize: "12px",
+              fontWeight: "600",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+            }}
+          >
+            Requests &amp; Replies ({requestsList.length})
+            {unreadRequestCount > 0 && (
+              <span style={{
+                background: "#10b981",
+                color: "#fff",
+                borderRadius: "10px",
+                padding: "1px 6px",
+                fontSize: "10px",
+                fontWeight: "700",
+              }}>
+                {unreadRequestCount} replied
+              </span>
+            )}
+          </button>
+        </div>
+      )}
+
+      {role !== "admin" && role !== "manager" && (
+        <div className="notification-legend"><span><i />Unread</span><strong>{alertRows.filter(row => reviewFor(reviews, row).status === "Pending Verification").length} pending verification</strong></div>
+      )}
+
       <div className="alert-list">
-        {alertOrder.map(key => alertRows.find(row => recordKey(row) === key)).filter((row): row is LogRecord => Boolean(row)).map(row => {
+        {/* REQUEST CARDS FOR ADMIN PORTAL */}
+        {role === "admin" && activeFilter !== "alerts" && requestsList.map(req => {
+          const isSent = req.status === "Sent";
+          return (
+            <article
+              key={req.request_id}
+              className={`alert-card ${isSent ? "unread high" : "muted"}`}
+              onClick={() => openRequest(req)}
+              style={{ cursor: "pointer" }}
+            >
+              <div className={`alert-symbol ${isSent ? "amber-bg" : req.status === "Replied" ? "green-bg" : "blue-bg"}`}>
+                <Send size={18} />
+              </div>
+              <div className="alert-card-body">
+                <div className="alert-heading-row">
+                  <span style={{ color: isSent ? "#d97706" : "#2563eb", fontWeight: "700", letterSpacing: "0.4px" }}>
+                    REQUEST FROM MANAGER
+                  </span>
+                  <span style={{ fontSize: "11px", color: "#64748b" }}>{req.request_id}</span>
+                </div>
+                <h3 style={{ margin: "2px 0 4px" }}>{req.subject}</h3>
+                <p style={{ margin: "0 0 4px 0", color: "#334155", fontWeight: "500", fontSize: "13px" }}>
+                  {req.manager_name} · {req.institution}
+                </p>
+                <p style={{ margin: "0 0 6px 0", fontSize: "12px", color: "#64748b", fontStyle: "italic" }}>
+                  "{req.message && req.message.length > 90 ? req.message.slice(0, 90) + "..." : req.message}"
+                </p>
+                <div className="alert-meta">
+                  <b>{req.created_at ? req.created_at.replace("T", " ").slice(0, 16) : ""}</b>
+                  <Status tone={req.status === "Replied" ? "green" : req.status === "Viewed" ? "blue" : "amber"}>
+                    {req.status === "Sent" ? "New / Unread" : req.status}
+                  </Status>
+                  <button type="button" onClick={(e) => { e.stopPropagation(); openRequest(req); }}>
+                    Open <ChevronRight size={13} />
+                  </button>
+                </div>
+              </div>
+            </article>
+          );
+        })}
+
+        {/* REQUEST & REPLY CARDS FOR MANAGER PORTAL */}
+        {role === "manager" && activeFilter !== "alerts" && requestsList.map(req => {
+          const isReplied = req.status === "Replied";
+          return (
+            <article
+              key={req.request_id}
+              className={`alert-card ${isReplied ? "unread" : "muted"}`}
+              onClick={() => openRequest(req)}
+              style={{ cursor: "pointer" }}
+            >
+              <div className={`alert-symbol ${isReplied ? "green-bg" : "blue-bg"}`}>
+                {isReplied ? <CheckCircle2 size={18} /> : <Send size={18} />}
+              </div>
+              <div className="alert-card-body">
+                <div className="alert-heading-row">
+                  <span style={{ color: isReplied ? "#059669" : "#2563eb", fontWeight: "700", letterSpacing: "0.4px" }}>
+                    {isReplied ? "ADMIN REPLIED TO YOUR REQUEST" : "REQUEST TO ADMIN"}
+                  </span>
+                  <span style={{ fontSize: "11px", color: "#64748b" }}>{req.request_id}</span>
+                </div>
+                <h3 style={{ margin: "2px 0 4px" }}>{req.subject}</h3>
+                {isReplied ? (
+                  <>
+                    <p style={{ margin: "0 0 4px 0", color: "#15803d", fontWeight: "600", fontSize: "13px" }}>
+                      Admin Reply: "{req.reply_message && req.reply_message.length > 80 ? req.reply_message.slice(0, 80) + "..." : req.reply_message}"
+                    </p>
+                    <p style={{ margin: "0 0 6px 0", fontSize: "12px", color: "#64748b" }}>
+                      Replied by {req.admin_name || "Avery Williams"} (Super admin)
+                    </p>
+                  </>
+                ) : (
+                  <p style={{ margin: "0 0 6px 0", fontSize: "12px", color: "#64748b", fontStyle: "italic" }}>
+                    "{req.message && req.message.length > 90 ? req.message.slice(0, 90) + "..." : req.message}"
+                  </p>
+                )}
+                <div className="alert-meta">
+                  <b>{(req.replied_at || req.created_at || "").replace("T", " ").slice(0, 16)}</b>
+                  <Status tone={req.status === "Replied" ? "green" : req.status === "Viewed" ? "blue" : "amber"}>
+                    {req.status}
+                  </Status>
+                  <button type="button" onClick={(e) => { e.stopPropagation(); openRequest(req); }}>
+                    Open <ChevronRight size={13} />
+                  </button>
+                </div>
+              </div>
+            </article>
+          );
+        })}
+
+        {/* SECURITY ALERTS */}
+        {activeFilter !== "requests" && alertOrder.map(key => alertRows.find(row => recordKey(row) === key)).filter((row): row is LogRecord => Boolean(row)).map(row => {
           const review = reviewFor(reviews, row);
           const unread = !readKeys.includes(recordKey(row));
           const notificationType = role === "warden" ? "Unrecognized Hostel Entry" : review.status === "Verified" ? "Verification Completed" : review.status === "Unauthorised" ? "Marked Unauthorised" : review.status === "Revoked" ? "Unauthorized Decision Revoked" : `${row.accessCategory} Event Alert`;
@@ -4604,13 +5777,18 @@ function CampusEntries({
             : new Date().toISOString().slice(0, 19);
           const timePart = dt.length >= 16 ? dt.slice(11, 16) : "10:00";
           const isDenied = item.verification_status === "Unauthorized" || item.review_status === "Unauthorised";
+          const actionTaken = (item.review_actions && item.review_actions.length > 0) ? item.review_actions[item.review_actions.length - 1].action_taken : undefined;
+          const address = (item.review_actions && item.review_actions.length > 0) ? item.review_actions[item.review_actions.length - 1].address : undefined;
+          const contactNumber = (item.review_actions && item.review_actions.length > 0) ? item.review_actions[item.review_actions.length - 1].contact_number : item.phone_number;
+          const loc = (item.review_actions && item.review_actions.length > 0) ? item.review_actions[item.review_actions.length - 1].location : item.location_block;
+          const vehicleNumber = (item.review_actions && item.review_actions.length > 0) ? item.review_actions[item.review_actions.length - 1].vehicle_number : item.vehicle_number;
           return {
             initials: item.name ? item.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase() || "UP" : "UP",
             name: item.name || "Unrecognized person",
             id: item.identifier_value || "Not available",
             institution: "SRM GROUP OF INSTITUTIONS TRICHY",
             department: item.department || "Not available",
-            block: item.location_block || "Main Gate",
+            block: loc || "Main Gate",
             time: timePart,
             dateTime: dt,
             event: isDenied ? "Denied" : "Entry",
@@ -4619,7 +5797,7 @@ function CampusEntries({
             category: isDenied ? "Unauthorised visitor" : "Internal · Institution B",
             accessCategory: isDenied ? "Unauthorized" : "Authorized",
             logId: item.record_identifier,
-            phoneNumber: item.phone_number,
+            phoneNumber: contactNumber,
             guard: item.guard_name || "G. Selvam",
             guardNumber: item.guard_code || "SG-101",
             guardNotes: item.flag_reason || (isDenied ? "Identity could not be verified at the gate." : undefined),
@@ -4628,7 +5806,10 @@ function CampusEntries({
             photo: item.snapshot_url || undefined,
             reviewActions: item.review_actions,
             reviewStatus: item.review_status,
-            actionTaken: (item.review_actions && item.review_actions.length > 0) ? item.review_actions[item.review_actions.length - 1].action_taken : undefined,
+            actionTaken,
+            address,
+            location: loc,
+            vehicleNumber,
           };
         });
         setDbLogs(mapped);
@@ -4651,7 +5832,11 @@ function CampusEntries({
     ? ["All blocks", "Main Gate", "Block A", "Block B", "Library Block", "Bharathi Hostel", "North Gate", "East Gate", "South Gate"]
     : ["All blocks", ...(blocksByInst[institution] || ["Main Gate", "Block A", "Block B"])];
 
-  const currentSourceLogs = dbLogs && dbLogs.length > 0 ? dbLogs : (logs ?? logRows);
+  const baseSourceLogs = dbLogs && dbLogs.length > 0 ? dbLogs : (logs ?? logRows);
+  const currentSourceLogs = [
+    ...baseSourceLogs,
+    ...sampleMockUnauthorizedRecords.filter(m => !baseSourceLogs.some(b => b.logId === m.logId)),
+  ];
 
   const rows = currentSourceLogs.filter(row =>
     row.accessCategory !== "Visitors" &&
@@ -4661,7 +5846,7 @@ function CampusEntries({
     (block === "All blocks" || row.block === block) &&
     (category === "All Categories" || recordCategory(reviews, row) === category) &&
     row.dateTime >= fromDate && row.dateTime <= toDate &&
-    (!query || `${row.name} ${row.id} ${row.institution} ${row.department} ${row.guard}`.toLowerCase().includes(query.toLowerCase()))
+    (!query || `${row.name} ${row.id} ${row.institution} ${row.department} ${row.guard} ${row.address || ""} ${row.vehicleNumber || ""} ${row.phoneNumber || ""}`.toLowerCase().includes(query.toLowerCase()))
   ).sort((a, b) => b.dateTime.localeCompare(a.dateTime));
 
   return <>
@@ -4671,7 +5856,7 @@ function CampusEntries({
       back={() => go("home")}
       action={
         <div className="header-actions">
-          <button className="icon-btn" onClick={() => exportRecordsToCsv(rows, reviews)} aria-label="Export records as CSV" title="Export CSV with Action Taken">
+          <button className="icon-btn" onClick={() => exportRecordsToCsv(rows, reviews, category === "Unauthorized")} aria-label="Export records as CSV" title="Export CSV">
             <FileClock size={18} />
           </button>
         </div>
@@ -4719,11 +5904,34 @@ function CampusEntries({
         <label><Clock3 size={15} /><span>To</span><input type="datetime-local" value={toDate} onChange={event => setToDate(event.target.value)} /></label>
       </div>
       <div className="entry-overview two-column">
-        <div><strong>{rows.filter(row => recordCategory(reviews, row) === "Authorized").length}</strong><span>Authorized</span></div>
-        <div><strong>{rows.filter(row => recordCategory(reviews, row) === "Unauthorized").length}</strong><span>Unauthorized</span></div>
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setCategory(category === "Authorized" ? "All Categories" : "Authorized")}
+          className={`overview-card-clickable ${category === "Authorized" ? "active-filter-green" : ""}`}
+        >
+          <strong>{rows.filter(row => recordCategory(reviews, row) === "Authorized").length}</strong>
+          <span>Authorized</span>
+        </div>
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setCategory(category === "Unauthorized" ? "All Categories" : "Unauthorized")}
+          className={`overview-card-clickable ${category === "Unauthorized" ? "active-filter-red" : ""}`}
+        >
+          <strong>{rows.filter(row => recordCategory(reviews, row) === "Unauthorized").length}</strong>
+          <span>Unauthorized</span>
+        </div>
       </div>
       <div className="manager-log-count"><strong>{rows.length}</strong><span>matching records</span></div>
-      <AuditTable rows={rows} reviews={reviews} title="" plainNames fieldVisibility={fieldVisibility} />
+      <AuditTable
+        rows={rows}
+        reviews={reviews}
+        title=""
+        plainNames
+        fieldVisibility={fieldVisibility}
+        isUnauthorizedOnly={category === "Unauthorized"}
+      />
       {rows.length === 0 && <div className="empty-state"><DoorOpen size={25} /><strong>No matching campus records</strong><span>Reset or change the filters.</span></div>}
     </div>
   </>;
@@ -4868,8 +6076,33 @@ function WelfareBlockLogs({ reviews }: { reviews: Record<string, ReviewRecord> }
     <div className="page-content"><div className="search-input"><Search size={17} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search student, register no. or department" />{query && <button onClick={() => setQuery("")}>Clear</button>}</div>
       <section className="filter-panel admin-filters"><div className="filter-fields"><Field label="Block"><select value={block} onChange={event => setBlock(event.target.value)}><option>All blocks</option>{welfareBlocks.map(item => <option key={item}>{item}</option>)}</select></Field><Field label="Category"><select value={category} onChange={event => setCategory(event.target.value)}><option>All Categories</option><option>Authorized</option><option>Unauthorized</option></select></Field></div></section>
       <div className="date-filter admin-date"><label><CalendarDays size={15} /><span>From</span><input type="datetime-local" value={fromDate} onChange={event => setFromDate(event.target.value)} /></label><span>to</span><label><Clock3 size={15} /><span>To</span><input type="datetime-local" value={toDate} onChange={event => setToDate(event.target.value)} /></label></div>
-      <div className="entry-overview two-column"><div><strong>{rows.filter(row => row.accessCategory === "Authorized").length}</strong><span>Authorized</span></div><div><strong>{rows.filter(row => row.accessCategory === "Unauthorized").length}</strong><span>Unauthorized</span></div></div>
-      <AuditTable rows={rows} reviews={reviews} title="STUDENT LOGS" plainNames />
+      <div className="entry-overview two-column">
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setCategory(category === "Authorized" ? "All Categories" : "Authorized")}
+          className={`overview-card-clickable ${category === "Authorized" ? "active-filter-green" : ""}`}
+        >
+          <strong>{rows.filter(row => row.accessCategory === "Authorized").length}</strong>
+          <span>Authorized</span>
+        </div>
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setCategory(category === "Unauthorized" ? "All Categories" : "Unauthorized")}
+          className={`overview-card-clickable ${category === "Unauthorized" ? "active-filter-red" : ""}`}
+        >
+          <strong>{rows.filter(row => row.accessCategory === "Unauthorized").length}</strong>
+          <span>Unauthorized</span>
+        </div>
+      </div>
+      <AuditTable
+        rows={rows}
+        reviews={reviews}
+        title="STUDENT LOGS"
+        plainNames
+        isUnauthorizedOnly={category === "Unauthorized"}
+      />
       {rows.length === 0 && <div className="empty-state"><Users size={25} /><strong>No matching student logs</strong><span>Reset or change the filters.</span></div>}
     </div>
   </>;
@@ -6315,7 +7548,7 @@ export default function App() {
     const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
     const dateStr = now.toISOString().slice(0, 10);
     const dateTimeStr = `${dateStr}T${timeStr}`;
-    const randNum = Math.floor(1000 + Math.random() * 9000);
+    const randNum = Date.now().toString().slice(-4) + Math.floor(10 + Math.random() * 90);
     const logId = `DEN-•••-${randNum}`;
     const personName = fullName?.trim() || "Unrecognized person";
     const initials = fullName?.trim() ? (fullName.trim().split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase() || "UP") : "UP";
@@ -6338,14 +7571,14 @@ export default function App() {
       phoneNumber: phoneNumber,
       guard: role === "warden" ? roleMeta.warden.name : role === "staff" ? roleMeta.staff.name : role === "cso" ? roleMeta.cso.name : role === "supervisor" ? roleMeta.supervisor.name : "G. Selvam",
       guardNumber: role === "warden" ? (roleMeta.warden.supervisorNumber || "WRD-B-0011") : role === "cso" ? (roleMeta.cso.supervisorNumber || "CSO-0001") : role === "supervisor" ? (roleMeta.supervisor.supervisorNumber || "SUP-B-0004") : "GRD-B-0017",
-      guardNotes: notes || (phoneNumber ? ((role === "supervisor" || role === "cso") ? `Contact: ${phoneNumber}. Identity could not be verified by ${role.toUpperCase()}.` : `Contact: ${phoneNumber}. Identity could not be verified at the Main Gate.`) : ((role === "supervisor" || role === "cso") ? `Identity could not be verified by ${role.toUpperCase()}.` : "Identity could not be verified at the Main Gate.")),
+      guardNotes: notes || (role === "warden" ? "Identity could not be verified by Warden at Bharathi Hostel." : "Identity could not be verified at the Main Gate."),
       entries: 1,
       decision: "Denied",
       photo: photo || undefined,
     };
 
     setLogs(current => {
-      const updated = [newRecord, ...current];
+      const updated = [newRecord, ...current.filter(c => c.logId !== logId)];
       try {
         localStorage.setItem("campus_secure_custom_logs", JSON.stringify(updated.slice(0, 30)));
       } catch (e) {
@@ -6354,19 +7587,27 @@ export default function App() {
       return updated;
     });
 
-    fetch("http://localhost:8000/api/v1/access-logs/unauthorized", {
+    const postPayload = {
+      name: personName,
+      phone_number: phoneNumber,
+      location_block: role === "warden" ? "Bharathi Hostel" : role === "staff" ? "Block A" : (role === "supervisor" || role === "cso") ? "Institution B Campus" : "Main Gate",
+      guard_name: role === "warden" ? roleMeta.warden.name : role === "cso" ? roleMeta.cso.name : role === "supervisor" ? roleMeta.supervisor.name : "G. Selvam",
+      notes: notes || (role === "warden" ? "Identity could not be verified by Warden at Bharathi Hostel." : "Identity could not be verified at the Main Gate."),
+      image_base64: photo || null,
+      log_id: logId,
+    };
+
+    fetch("http://127.0.0.1:8000/api/v1/access-logs/unauthorized", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: personName,
-        phone_number: phoneNumber,
-        location_block: role === "warden" ? "Bharathi Hostel" : role === "staff" ? "Block A" : (role === "supervisor" || role === "cso") ? "Institution B Campus" : "Main Gate",
-        guard_name: role === "warden" ? roleMeta.warden.name : role === "cso" ? roleMeta.cso.name : role === "supervisor" ? roleMeta.supervisor.name : "G. Selvam",
-        notes: notes || ((role === "supervisor" || role === "cso") ? `Identity could not be verified by ${role.toUpperCase()}.` : "Identity could not be verified at the Main Gate."),
-        image_base64: photo || null,
-        log_id: logId,
-      }),
-    }).catch(err => console.warn("Background log save to API failed:", err));
+      body: JSON.stringify(postPayload),
+    }).catch(() => {
+      fetch("http://localhost:8000/api/v1/access-logs/unauthorized", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(postPayload),
+      }).catch(err => console.warn("Background log save to API failed:", err));
+    });
   };
   const [authorizedFaces, setAuthorizedFaces] = useState<AuthorizedFaceProfile[]>([]);
   const [visitorPasses, setVisitorPasses] = useState<VisitorPass[]>(initialVisitorPasses);
@@ -6709,14 +7950,31 @@ export default function App() {
   else if (["users", "assign-supervisor"].includes(screen) && role !== "admin") content = <AccessDenied role={role} go={go} />;
   else if (screen === "login-logs" && role !== "admin" && role !== "cso") content = <AccessDenied role={role} go={go} />;
   else if (screen === "profile") content = <Profile role={role} go={go} back={back} />;
-  else if (screen === "alerts") content = <Alerts role={role} go={go} back={back} reviews={reviews} updateReview={updateReview} logs={logs} deleteLog={deleteLog} />;
+  else if (screen === "alerts") content = <Alerts role={role} go={go} back={back} reviews={reviews} updateReview={updateReview} logs={logs} deleteLog={deleteLog} onAddAuditLog={addAuditLog} />;
   else if (role === "security" || role === "warden" || role === "staff") {
     if (screen === "home") content = <LevelOneHome role={role} go={go} />;
     else if (screen === "scan") content = <LevelOneScan role={role} go={go} completeScan={completeScan} logs={logs} />;
     else if (screen === "logs") content = <Logs role={role} reviews={reviews} logs={logs} />;
-    else if (screen === "unrecognized") content = <UnrecognizedResult role={role} go={go} verifyRegister={verifyRegister} capturedPhoto={capturedPhoto} biometricScores={biometricScores} />;
+    else if (screen === "unrecognized") content = <UnrecognizedResult role={role} go={go} verifyRegister={verifyRegister} capturedPhoto={capturedPhoto} biometricScores={biometricScores} onRecordEvent={recordUnauthorizedEvent} />;
     else if (screen === "identity") content = <IdentityResult role={role} go={go} identityCase={identityCase} verificationMethod={verificationMethod} student={matchedStudent} capturedPhoto={capturedPhoto} fieldVisibility={adminLogFieldVisibility} />;
-    else if (screen === "unauthorised") content = <UnauthorizedForm role={role} go={go} capturedPhoto={capturedPhoto} onRecordEvent={recordUnauthorizedEvent} />;
+    else if (screen === "unauthorised") {
+      if (role === "security" || role === "warden") {
+        content = (
+          <div className="success-page">
+            <div className="success-symbol warning-symbol">
+              <ShieldAlert size={38} />
+            </div>
+            <Status tone="amber">CAMPUS SUPERVISOR NOTIFIED</Status>
+            <h1>Unauthorized Event Recorded</h1>
+            <p>Campus Supervisor has been notified.</p>
+            <Button onClick={() => go("scan")}>Scan next person</Button>
+            <Button variant="secondary" onClick={() => go("home")}>Return home</Button>
+          </div>
+        );
+      } else {
+        content = <UnauthorizedForm role={role} go={go} capturedPhoto={capturedPhoto} onRecordEvent={recordUnauthorizedEvent} />;
+      }
+    }
     else if (screen === "success") content = <Success role={role} go={go} />;
     else content = <LevelOneHome role={role} go={go} />;
   } else if (role === "access-supervisor") {
@@ -6728,7 +7986,7 @@ export default function App() {
     else content = <AccessSupervisorHome go={go} todayCount={todayPassCount} />;
   } else if (role === "supervisor") {
     if (screen === "scan") content = <LevelOneScan role="supervisor" go={go} completeScan={completeScan} logs={logs} />;
-    else if (screen === "unrecognized") content = <UnrecognizedResult role="supervisor" go={go} verifyRegister={verifyRegister} capturedPhoto={capturedPhoto} biometricScores={biometricScores} />;
+    else if (screen === "unrecognized") content = <UnrecognizedResult role="supervisor" go={go} verifyRegister={verifyRegister} capturedPhoto={capturedPhoto} biometricScores={biometricScores} onRecordEvent={recordUnauthorizedEvent} />;
     else if (screen === "identity") content = <IdentityResult role="supervisor" go={go} identityCase={identityCase} verificationMethod={verificationMethod} student={matchedStudent} capturedPhoto={capturedPhoto} fieldVisibility={adminLogFieldVisibility} />;
     else if (screen === "unauthorised") content = <UnauthorizedForm role="supervisor" go={go} capturedPhoto={capturedPhoto} onRecordEvent={recordUnauthorizedEvent} />;
     else if (screen === "success") content = <Success role="supervisor" go={go} />;
@@ -6738,7 +7996,7 @@ export default function App() {
     else content = <SupervisorHome go={go} reviews={reviews} logs={logs} />;
   } else if (role === "cso") {
     if (screen === "scan") content = <LevelOneScan role="cso" go={go} completeScan={completeScan} logs={logs} />;
-    else if (screen === "unrecognized") content = <UnrecognizedResult role="cso" go={go} verifyRegister={verifyRegister} capturedPhoto={capturedPhoto} biometricScores={biometricScores} />;
+    else if (screen === "unrecognized") content = <UnrecognizedResult role="cso" go={go} verifyRegister={verifyRegister} capturedPhoto={capturedPhoto} biometricScores={biometricScores} onRecordEvent={recordUnauthorizedEvent} />;
     else if (screen === "identity") content = <IdentityResult role="cso" go={go} identityCase={identityCase} verificationMethod={verificationMethod} student={matchedStudent} capturedPhoto={capturedPhoto} fieldVisibility={adminLogFieldVisibility} />;
     else if (screen === "unauthorised") content = <UnauthorizedForm role="cso" go={go} capturedPhoto={capturedPhoto} onRecordEvent={recordUnauthorizedEvent} />;
     else if (screen === "success") content = <Success role="cso" go={go} />;
@@ -6784,7 +8042,7 @@ export default function App() {
     );
     else content = <WelfareHome go={go} />;
   } else if (role === "manager") {
-    if (screen === "manager-students") content = <ManagerStudentDirectory go={go} students={studentsList} onUpdateStudent={handleUpdateStudent} permissions={managerEditPermissions} editorName={roleMeta.manager.name} editorRole="Institute Manager" />;
+    if (screen === "manager-students") content = <ManagerStudentDirectory go={go} students={studentsList} onUpdateStudent={handleUpdateStudent} permissions={managerEditPermissions} editorName={roleMeta.manager.name} editorRole="Institute Manager" onAddAuditLog={addAuditLog} />;
     else if (screen === "add-student") content = <ManualAddStudent go={go} onAddStudent={handleAddStudent} editorName={roleMeta.manager.name} editorRole="Institute Manager" />;
     else if (screen === "campus-entries") content = <CampusEntries go={go} reviews={reviews} scope="institution" fieldVisibility={adminLogFieldVisibility} logs={logs} />;
     else if (screen === "institution-users") content = <InstitutionUserDirectory go={go} />;

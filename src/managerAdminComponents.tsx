@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type ChangeEvent, type DragEvent, type FormEvent } from "react";
+import { useState, useRef, useEffect, useMemo, type ChangeEvent, type DragEvent, type FormEvent } from "react";
 import * as XLSX from "xlsx";
 import {
   AlertTriangle,
@@ -6,12 +6,14 @@ import {
   CalendarDays,
   Camera,
   Check,
+  CheckCircle2,
   CheckSquare,
   ChevronRight,
   CircleUserRound,
   Clock3,
   DoorOpen,
   Download,
+  Edit2,
   Eye,
   EyeOff,
   FileClock,
@@ -24,7 +26,9 @@ import {
   MoreVertical,
   Plus,
   RefreshCw,
+  RotateCcw,
   Search,
+  Send,
   Shield,
   ShieldAlert,
   ShieldCheck,
@@ -44,6 +48,7 @@ import type { StudentMatch, Screen, Role } from "./App";
 
 export type AuditLogItem = {
   id: string;
+  requestId?: string;
   timestamp: string;
   dateTime: string;
   editedBy: string;
@@ -58,7 +63,11 @@ export type AuditLogItem = {
     | "User Status Changed"
     | "Security Assignment Updated"
     | "Settings Modified"
-    | "Access Permissions Updated";
+    | "Access Permissions Updated"
+    | "Request Sent to Admin"
+    | "Request Viewed by Admin"
+    | "Admin Reply Sent"
+    | "Notification Delivered";
   institution: string;
   block?: string;
   actionDetails: string;
@@ -830,6 +839,24 @@ export function ManualAddStudent({
 // -------------------------------------------------------------
 // 2. MANAGE INSTITUTION STUDENTS (Institute Manager)
 // -------------------------------------------------------------
+export function normalizeYear(raw?: string): string {
+  if (!raw) return "";
+  const trimmed = raw.trim();
+  if (/^iv(\s+year)?$/i.test(trimmed) || /^4(th)?(\s+year)?$/i.test(trimmed)) return "IV Year";
+  if (/^iii(\s+year)?$/i.test(trimmed) || /^3(rd)?(\s+year)?$/i.test(trimmed)) return "III Year";
+  if (/^ii(\s+year)?$/i.test(trimmed) || /^2(nd)?(\s+year)?$/i.test(trimmed)) return "II Year";
+  if (/^i(\s+year)?$/i.test(trimmed) || /^1(st)?(\s+year)?$/i.test(trimmed)) return "I Year";
+  return trimmed.includes("Year") ? trimmed : `${trimmed} Year`;
+}
+
+export const MANAGER_REQUEST_SUBJECTS = [
+  "Student Data Update",
+  "Access / Permission Request",
+  "Accommodation Update",
+  "Report / Record Correction",
+  "Other",
+] as const;
+
 export function ManagerStudentDirectory({
   go,
   students,
@@ -837,6 +864,7 @@ export function ManagerStudentDirectory({
   permissions,
   editorName = "Priya Raman",
   editorRole = "Institute Manager",
+  onAddAuditLog,
 }: {
   go: (screen: Screen) => void;
   students: StudentMatch[];
@@ -844,26 +872,137 @@ export function ManagerStudentDirectory({
   permissions: ManagerEditPermissions;
   editorName?: string;
   editorRole?: AuditLogItem["editorRole"];
+  onAddAuditLog?: (log: AuditLogItem) => void;
 }) {
   const [query, setQuery] = useState("");
   const [deptFilter, setDeptFilter] = useState("All");
+  const [yearFilter, setYearFilter] = useState("All");
   const [editingStudent, setEditingStudent] = useState<StudentMatch | null>(null);
+  const [dbStudents, setDbStudents] = useState<StudentMatch[]>([]);
+
+  // Send Request to Admin Modal State
+  const [showSendRequest, setShowSendRequest] = useState(false);
+  const [requestSubject, setRequestSubject] = useState("");
+  const [requestMessage, setRequestMessage] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const [requestSuccess, setRequestSuccess] = useState<string | null>(null);
 
   // Form draft
   const [draft, setDraft] = useState<StudentMatch | null>(null);
   const [editComment, setEditComment] = useState("");
   const [commentError, setCommentError] = useState("");
 
-  const institutionStudents = students.filter(s =>
-    (s.institute || "").toLowerCase().includes("trichy") || (s.institute || "").toLowerCase().includes("institution b")
-  );
+  // Dynamically fetch students from backend database API
+  useEffect(() => {
+    let active = true;
+    const fetchDbStudents = async () => {
+      try {
+        const resp = await fetch("http://localhost:8000/api/v1/students/?institution_id=1");
+        if (resp.ok && active) {
+          const data = await resp.json();
+          if (Array.isArray(data)) {
+            const mapped: StudentMatch[] = data.map((item: any) => ({
+              initials: item.initials || (item.name ? item.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase() : "ST"),
+              name: item.name,
+              registerNumber: item.register_number,
+              dateOfBirth: item.date_of_birth,
+              department: item.department,
+              year: item.year_roman || "I Year",
+              batch: item.batch,
+              institute: "SRM GROUP OF INSTITUTIONS TRICHY",
+              similarity: 100,
+              accommodationType: (item.residence_type === "PG" ? "PG" : item.residence_type?.toLowerCase().includes("hostel") ? "Hosteller" : "Day Scholar") as any,
+              hostelName: item.hostel_name,
+              roomNumber: item.room_number,
+              routeNumber: item.bus_route,
+              boardingPoint: item.bus_boarding_point,
+              vehicleNumber: item.vehicle_number,
+              photo: item.photo_url,
+              phoneNumber: item.phone_number || item.contact_number,
+              contactNumber: item.contact_number,
+              section: item.section || "A",
+              classCode: item.class_code || computeClassCode(item.department, item.year_roman, item.section || "A", item.register_number),
+            }));
+            setDbStudents(mapped);
+          }
+        }
+      } catch (err) {
+        // Fallback gracefully to props students
+      }
+    };
+    fetchDbStudents();
+    return () => {
+      active = false;
+    };
+  }, []);
 
-  const filtered = institutionStudents.filter(s => {
-    const text = `${s.name} ${s.registerNumber} ${s.department} ${s.classCode || ""}`.toLowerCase();
-    const matchQuery = !query || text.includes(query.toLowerCase());
-    const matchDept = deptFilter === "All" || s.department.toLowerCase().includes(deptFilter.toLowerCase());
-    return matchQuery && matchDept;
-  });
+  const institutionStudents = useMemo(() => {
+    const propStudents = students.filter(s =>
+      (s.institute || "").toLowerCase().includes("trichy") || (s.institute || "").toLowerCase().includes("institution b")
+    );
+    const map = new Map<string, StudentMatch>();
+    // First seed with backend database students
+    dbStudents.forEach(s => map.set(s.registerNumber, s));
+    // Overlay props students (which include any recently added/edited students)
+    propStudents.forEach(s => map.set(s.registerNumber, s));
+    return Array.from(map.values());
+  }, [students, dbStudents]);
+
+  // Dynamically load available departments from existing database / students
+  const availableDepartments = useMemo(() => {
+    const set = new Set<string>();
+    institutionStudents.forEach(s => {
+      if (s.department && s.department.trim()) {
+        set.add(s.department.trim());
+      }
+    });
+    // Ensure key departments are present
+    set.add("Information Technology");
+    set.add("General Medicine & Surgery");
+    set.add("Medical Laboratory Technology");
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [institutionStudents]);
+
+  // Dynamically load available academic years
+  const availableYears = useMemo(() => {
+    const standardYears = ["I Year", "II Year", "III Year", "IV Year"];
+    const set = new Set<string>(standardYears);
+    institutionStudents.forEach(s => {
+      const ny = normalizeYear(s.year);
+      if (ny) set.add(ny);
+    });
+    return Array.from(set);
+  }, [institutionStudents]);
+
+  const filtered = useMemo(() => {
+    return institutionStudents.filter(s => {
+      const q = query.trim().toLowerCase();
+      const matchQuery =
+        !q ||
+        s.name.toLowerCase().includes(q) ||
+        s.registerNumber.toLowerCase().includes(q) ||
+        (s.department && s.department.toLowerCase().includes(q)) ||
+        (s.classCode && s.classCode.toLowerCase().includes(q));
+
+      const matchDept =
+        deptFilter === "All" ||
+        s.department.trim().toLowerCase() === deptFilter.trim().toLowerCase();
+
+      const normYear = normalizeYear(s.year);
+      const matchYear =
+        yearFilter === "All" ||
+        normYear.toLowerCase() === yearFilter.toLowerCase();
+
+      return matchQuery && matchDept && matchYear;
+    });
+  }, [institutionStudents, query, deptFilter, yearFilter]);
+
+  const handleResetFilters = () => {
+    setDeptFilter("All");
+    setYearFilter("All");
+    setQuery("");
+  };
 
   const startEdit = (s: StudentMatch) => {
     setEditingStudent(s);
@@ -937,10 +1076,67 @@ export function ManagerStudentDirectory({
     };
 
     onUpdateStudent(updatedStudent, auditLog);
+    setDbStudents(prev => prev.map(s => (s.registerNumber === updatedStudent.registerNumber ? updatedStudent : s)));
     setEditingStudent(null);
     setDraft(null);
     setEditComment("");
     setCommentError("");
+  };
+
+  const handleSendRequest = async (e: FormEvent) => {
+    e.preventDefault();
+    if (isSending) return;
+    setRequestError(null);
+
+    if (!requestSubject) {
+      setRequestError("Please select a subject.");
+      return;
+    }
+    const trimmed = requestMessage.trim();
+    if (!trimmed) {
+      setRequestError("Query / Message is mandatory and cannot be empty.");
+      return;
+    }
+    if (trimmed.length > 500) {
+      setRequestError("Query / Message exceeds maximum 500 characters.");
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      const resp = await fetch("http://127.0.0.1:8000/api/v1/manager-requests/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject: requestSubject,
+          message: trimmed,
+          manager_name: editorName,
+          manager_username: "manager",
+          institution: "SRM GROUP OF INSTITUTIONS TRICHY",
+        }),
+      });
+
+      if (!resp.ok) {
+        const errData = await resp.json().catch(() => ({}));
+        throw new Error(errData.detail || "Failed to send request.");
+      }
+
+      const data = await resp.json();
+      setRequestSuccess("Request sent successfully. You will be notified once Admin replies.");
+
+      if (data.audit_logs && Array.isArray(data.audit_logs)) {
+        data.audit_logs.forEach((log: AuditLogItem) => {
+          if (onAddAuditLog) onAddAuditLog(log);
+        });
+      }
+
+      setRequestSubject("");
+      setRequestMessage("");
+    } catch (err: any) {
+      setRequestError(err.message || "Could not connect to backend server. Please try again.");
+    } finally {
+      setIsSending(false);
+    }
   };
 
   return (
@@ -953,9 +1149,24 @@ export function ManagerStudentDirectory({
           <h1>Institution Students</h1>
           <p>SRM GROUP OF INSTITUTIONS TRICHY</p>
         </div>
-        <button className="icon-btn primary" onClick={() => go("add-student")} title="Add Student">
-          <Plus size={18} />
-        </button>
+        <div className="header-actions" style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={() => {
+              setShowSendRequest(true);
+              setRequestError(null);
+              setRequestSuccess(null);
+            }}
+            title="Send Request to Admin"
+            aria-label="Send Request to Admin"
+          >
+            <Send size={18} />
+          </button>
+          <button className="icon-btn primary" onClick={() => go("add-student")} title="Add Student">
+            <Plus size={18} />
+          </button>
+        </div>
       </div>
 
       <div className="page-content">
@@ -969,82 +1180,361 @@ export function ManagerStudentDirectory({
           {query && <button onClick={() => setQuery("")}>Clear</button>}
         </div>
 
-        <div style={{ display: "flex", gap: "8px", margin: "10px 0" }}>
-          {["All", "IT", "Medicine", "Lab Tech"].map(d => (
-            <button
-              key={d}
-              className={`filter-chip ${deptFilter === d ? "active" : ""}`}
-              onClick={() => setDeptFilter(d)}
+        {/* FILTERS BAR: Department dropdown, Year dropdown, and Reset button */}
+        <div
+          className="student-filters-bar"
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "12px",
+            alignItems: "flex-end",
+            margin: "12px 0 14px 0",
+            padding: "12px 14px",
+            backgroundColor: "#ffffff",
+            borderRadius: "10px",
+            border: "1px solid #e2e8f0",
+            boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
+          }}
+        >
+          {/* Department Filter */}
+          <div style={{ flex: "1 1 220px", minWidth: "190px", display: "flex", flexDirection: "column", gap: "5px" }}>
+            <label
+              htmlFor="student-dept-filter"
               style={{
-                padding: "6px 12px",
-                borderRadius: "20px",
-                border: "1px solid var(--line)",
-                background: deptFilter === d ? "var(--blue)" : "#fff",
-                color: deptFilter === d ? "#fff" : "#475569",
-                fontSize: "12px",
-                fontWeight: "600",
-                cursor: "pointer",
+                fontSize: "11px",
+                fontWeight: "700",
+                color: "#475569",
+                letterSpacing: "0.5px",
+                textTransform: "uppercase",
               }}
             >
-              {d}
+              Department
+            </label>
+            <select
+              id="student-dept-filter"
+              aria-label="Department"
+              value={deptFilter}
+              onChange={e => setDeptFilter(e.target.value)}
+              style={{
+                height: "36px",
+                padding: "0 10px",
+                borderRadius: "6px",
+                border: "1px solid #cbd5e1",
+                backgroundColor: "#fff",
+                fontSize: "13px",
+                color: "#1e293b",
+                fontWeight: deptFilter !== "All" ? "600" : "400",
+                outline: "none",
+                cursor: "pointer",
+                width: "100%",
+              }}
+            >
+              <option value="All">All Departments ({availableDepartments.length})</option>
+              {availableDepartments.map(dept => (
+                <option key={dept} value={dept}>
+                  {dept}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Year Filter */}
+          <div style={{ flex: "1 1 150px", minWidth: "130px", display: "flex", flexDirection: "column", gap: "5px" }}>
+            <label
+              htmlFor="student-year-filter"
+              style={{
+                fontSize: "11px",
+                fontWeight: "700",
+                color: "#475569",
+                letterSpacing: "0.5px",
+                textTransform: "uppercase",
+              }}
+            >
+              Year
+            </label>
+            <select
+              id="student-year-filter"
+              aria-label="Year"
+              value={yearFilter}
+              onChange={e => setYearFilter(e.target.value)}
+              style={{
+                height: "36px",
+                padding: "0 10px",
+                borderRadius: "6px",
+                border: "1px solid #cbd5e1",
+                backgroundColor: "#fff",
+                fontSize: "13px",
+                color: "#1e293b",
+                fontWeight: yearFilter !== "All" ? "600" : "400",
+                outline: "none",
+                cursor: "pointer",
+                width: "100%",
+              }}
+            >
+              <option value="All">All Years</option>
+              {availableYears.map(yr => (
+                <option key={yr} value={yr}>
+                  {yr}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Reset Option */}
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <button
+              type="button"
+              className="btn secondary"
+              onClick={handleResetFilters}
+              disabled={deptFilter === "All" && yearFilter === "All" && !query}
+              title="Reset Department and Year filters"
+              style={{
+                height: "36px",
+                padding: "0 14px",
+                fontSize: "12px",
+                fontWeight: "600",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                cursor: (deptFilter === "All" && yearFilter === "All" && !query) ? "default" : "pointer",
+                opacity: (deptFilter === "All" && yearFilter === "All" && !query) ? 0.5 : 1,
+              }}
+            >
+              <RotateCcw size={14} />
+              Reset
             </button>
-          ))}
+          </div>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "8px 0" }}>
-          <span style={{ fontSize: "12px", color: "#64748b", fontWeight: "600" }}>
-            {filtered.length} students enrolled
+        {/* Dynamic Enrolled Student Count & Action */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "10px 0 12px 0" }}>
+          <span style={{ fontSize: "13px", color: "#334155", fontWeight: "600" }}>
+            {filtered.length} {filtered.length === 1 ? "student enrolled" : "students enrolled"}
+            {(deptFilter !== "All" || yearFilter !== "All" || query) && (
+              <span style={{ color: "#64748b", fontWeight: "400", fontSize: "12px", marginLeft: "4px" }}>
+                (filtered from {institutionStudents.length} total)
+              </span>
+            )}
           </span>
-          <button className="text-action" onClick={() => go("add-student")}>
+          <button className="text-action" onClick={() => go("add-student")} style={{ fontSize: "12px", fontWeight: "600" }}>
             <Plus size={14} /> Add new student
           </button>
         </div>
 
-        <div className="directory-list">
-          {filtered.map(student => {
-            const classDisplay = student.classCode || computeClassCode(student.department, student.year, student.section || "C", student.registerNumber);
-            const isOwnVeh = student.transportationType === "Own Vehicle" || Boolean(student.vehicleNumber);
-            return (
-              <section key={student.registerNumber} style={{ padding: "12px 14px", marginBottom: "10px" }}>
-                <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-                  {student.photo ? (
-                    <img
-                      src={student.photo}
-                      alt={student.name}
-                      style={{ width: "48px", height: "48px", borderRadius: "10px", objectFit: "cover" }}
-                    />
-                  ) : (
-                    <div className="person-avatar">{student.initials}</div>
-                  )}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                      <strong style={{ fontSize: "14px" }}>{student.name}</strong>
-                      <span className="class-badge-preview" style={{ fontSize: "11px", padding: "2px 6px" }}>
-                        {classDisplay}
-                      </span>
-                    </div>
-                    <span style={{ fontSize: "12px", color: "#64748b", display: "block" }}>
-                      {student.registerNumber} · {student.department}
-                    </span>
-                    <small style={{ color: "#475569" }}>
-                      {student.accommodationType === "Hosteller"
-                        ? `Hostel: ${student.hostelName || "Bharathi Hostel"} (${student.roomNumber || "B-204"})`
-                        : isOwnVeh
-                        ? `Own Vehicle · Location: ${student.residentialLocation || student.location || "Thillai Nagar, Trichy"}`
-                        : `College Bus · ${student.boardingPoint || "Trichy Junction"}`}
-                    </small>
-                  </div>
-                  <button
-                    className="btn secondary"
-                    style={{ padding: "6px 10px", fontSize: "12px" }}
-                    onClick={() => startEdit(student)}
-                  >
-                    Edit
-                  </button>
-                </div>
-              </section>
-            );
-          })}
+        {/* STRUCTURED RESPONSIVE STUDENTS TABLE */}
+        <div
+          className="student-table-container audit-table-wrap"
+          style={{
+            overflowX: "auto",
+            backgroundColor: "#ffffff",
+            borderRadius: "10px",
+            border: "1px solid #e2e8f0",
+            boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
+            marginBottom: "20px",
+          }}
+        >
+          <table
+            className="manager-students-table"
+            style={{
+              width: "100%",
+              minWidth: "980px",
+              borderCollapse: "collapse",
+              textAlign: "left",
+              fontSize: "13px",
+            }}
+          >
+            <thead>
+              <tr
+                style={{
+                  backgroundColor: "#f8fafc",
+                  borderBottom: "2px solid #e2e8f0",
+                  height: "40px",
+                }}
+              >
+                <th style={{ width: "50px", textAlign: "center", padding: "8px 12px", color: "#475569", fontWeight: "700", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  S.No
+                </th>
+                <th style={{ width: "60px", textAlign: "center", padding: "8px 12px", color: "#475569", fontWeight: "700", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Photo
+                </th>
+                <th style={{ minWidth: "150px", padding: "8px 12px", color: "#475569", fontWeight: "700", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Name
+                </th>
+                <th style={{ minWidth: "130px", padding: "8px 12px", color: "#475569", fontWeight: "700", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Register Number
+                </th>
+                <th style={{ minWidth: "200px", padding: "8px 12px", color: "#475569", fontWeight: "700", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Department
+                </th>
+                <th style={{ minWidth: "95px", padding: "8px 12px", color: "#475569", fontWeight: "700", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Year
+                </th>
+                <th style={{ minWidth: "120px", padding: "8px 12px", color: "#475569", fontWeight: "700", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Class / Section
+                </th>
+                <th style={{ minWidth: "130px", padding: "8px 12px", color: "#475569", fontWeight: "700", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Accommodation
+                </th>
+                <th style={{ width: "90px", textAlign: "center", padding: "8px 12px", color: "#475569", fontWeight: "700", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Action
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={9} style={{ textAlign: "center", padding: "36px 16px", color: "#64748b" }}>
+                    <div style={{ fontSize: "14px", fontWeight: "600", marginBottom: "4px" }}>No students match your criteria</div>
+                    <div style={{ fontSize: "12px", color: "#94a3b8" }}>Try adjusting the Department, Year, or Search filter</div>
+                    <button
+                      type="button"
+                      className="btn secondary"
+                      onClick={handleResetFilters}
+                      style={{ marginTop: "12px", padding: "4px 12px", fontSize: "12px" }}
+                    >
+                      Reset Filters
+                    </button>
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((student, idx) => {
+                  const classSec =
+                    student.classCode ||
+                    (student.section ? `Sec ${student.section}` : computeClassCode(student.department, student.year, student.section || "C", student.registerNumber)) ||
+                    "—";
+                  const displayYear = normalizeYear(student.year) || student.year || "—";
+                  const accomType = student.accommodationType || "Day Scholar";
+                  const isHosteller = accomType === "Hosteller" || accomType.toLowerCase().includes("hostel");
+                  const isPG = accomType === "PG";
+
+                  return (
+                    <tr
+                      key={student.registerNumber}
+                      style={{
+                        borderBottom: "1px solid #edf0f4",
+                        height: "54px",
+                        transition: "background 0.15s ease",
+                      }}
+                      className="manager-student-row"
+                    >
+                      <td style={{ textAlign: "center", padding: "8px 12px", color: "#64748b", fontWeight: "600", fontSize: "12px" }}>
+                        {idx + 1}
+                      </td>
+                      <td style={{ textAlign: "center", padding: "8px 12px" }}>
+                        {student.photo ? (
+                          <img
+                            src={student.photo}
+                            alt={student.name}
+                            style={{
+                              width: "36px",
+                              height: "36px",
+                              borderRadius: "50%",
+                              objectFit: "cover",
+                              border: "1px solid #e2e8f0",
+                              display: "inline-block",
+                            }}
+                            onError={e => {
+                              (e.target as HTMLElement).style.display = "none";
+                            }}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: "36px",
+                              height: "36px",
+                              borderRadius: "50%",
+                              backgroundColor: "#e0e7ff",
+                              color: "#3730a3",
+                              fontWeight: "700",
+                              fontSize: "12px",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            {student.initials || student.name.slice(0, 2).toUpperCase()}
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ padding: "8px 12px", whiteSpace: "nowrap" }}>
+                        <strong style={{ color: "#0f172a", fontSize: "13px" }}>{student.name}</strong>
+                      </td>
+                      <td style={{ padding: "8px 12px", whiteSpace: "nowrap" }}>
+                        <code
+                          style={{
+                            fontSize: "12px",
+                            fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                            backgroundColor: "#f1f5f9",
+                            color: "#1e293b",
+                            padding: "3px 6px",
+                            borderRadius: "4px",
+                            fontWeight: "600",
+                          }}
+                        >
+                          {student.registerNumber}
+                        </code>
+                      </td>
+                      <td style={{ padding: "8px 12px", whiteSpace: "nowrap", color: "#334155", fontWeight: "500" }}>
+                        {student.department}
+                      </td>
+                      <td style={{ padding: "8px 12px", whiteSpace: "nowrap", color: "#475569", fontWeight: "600" }}>
+                        {displayYear}
+                      </td>
+                      <td style={{ padding: "8px 12px", whiteSpace: "nowrap" }}>
+                        <span
+                          style={{
+                            backgroundColor: "#f1f5f9",
+                            color: "#334155",
+                            padding: "2px 8px",
+                            borderRadius: "6px",
+                            fontSize: "12px",
+                            fontWeight: "600",
+                          }}
+                        >
+                          {classSec}
+                        </span>
+                      </td>
+                      <td style={{ padding: "8px 12px", whiteSpace: "nowrap" }}>
+                        <span
+                          style={{
+                            display: "inline-block",
+                            padding: "3px 8px",
+                            borderRadius: "12px",
+                            fontSize: "11px",
+                            fontWeight: "700",
+                            backgroundColor: isHosteller ? "#ede9fe" : isPG ? "#fef3c7" : "#dcfce7",
+                            color: isHosteller ? "#6d28d9" : isPG ? "#b45309" : "#15803d",
+                          }}
+                        >
+                          {isHosteller ? "Hosteller" : isPG ? "PG" : "Day Scholar"}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: "center", padding: "8px 12px", whiteSpace: "nowrap" }}>
+                        <button
+                          type="button"
+                          className="btn secondary"
+                          style={{
+                            padding: "4px 10px",
+                            fontSize: "12px",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            borderRadius: "6px",
+                            cursor: "pointer",
+                          }}
+                          onClick={() => startEdit(student)}
+                          title={`Edit ${student.name}`}
+                        >
+                          <Edit2 size={12} />
+                          <span>Edit</span>
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
 
         {/* EDIT STUDENT MODAL WITH ADMIN PERMISSION ENFORCEMENT */}
@@ -1241,6 +1731,159 @@ export function ManagerStudentDirectory({
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* SEND REQUEST TO ADMIN POPUP MODAL */}
+        {showSendRequest && (
+          <div className="audit-modal-overlay" onClick={() => { if (!isSending) setShowSendRequest(false); }}>
+            <div className="audit-modal-content request-modal-content" onClick={e => e.stopPropagation()}>
+              <div className="audit-modal-head">
+                <div>
+                  <span style={{ fontSize: "11px", color: "#3b82f6", fontWeight: "700", letterSpacing: "0.5px" }}>MANAGER TO ADMIN</span>
+                  <h2 style={{ fontSize: "16px", margin: "2px 0 0" }}>Send Request to Admin</h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { if (!isSending) setShowSendRequest(false); }}
+                  className="icon-btn"
+                  disabled={isSending}
+                  aria-label="Close"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {requestSuccess ? (
+                <div className="request-success-box" style={{ padding: "16px", textAlign: "center" }}>
+                  <div style={{
+                    width: "48px",
+                    height: "48px",
+                    borderRadius: "50%",
+                    backgroundColor: "#ecfdf5",
+                    color: "#059669",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    margin: "0 auto 12px auto"
+                  }}>
+                    <CheckCircle2 size={28} />
+                  </div>
+                  <h3 style={{ fontSize: "15px", fontWeight: "600", color: "#0f172a", marginBottom: "6px" }}>
+                    Request Sent Successfully
+                  </h3>
+                  <p style={{ fontSize: "13px", color: "#475569", lineHeight: "1.5", margin: "0 0 16px 0" }}>
+                    {requestSuccess}
+                  </p>
+                  <button
+                    type="button"
+                    className="btn primary"
+                    style={{ width: "100%", justifyContent: "center" }}
+                    onClick={() => {
+                      setShowSendRequest(false);
+                      setRequestSuccess(null);
+                    }}
+                  >
+                    Done
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleSendRequest} className="form-stack guard-form" style={{ padding: "4px 0" }}>
+                  <div className="request-sender-preview" style={{
+                    backgroundColor: "#f8fafc",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "8px",
+                    padding: "10px 12px",
+                    marginBottom: "10px",
+                    fontSize: "12px",
+                    color: "#475569"
+                  }}>
+                    <div><strong>From:</strong> {editorName} ({editorRole})</div>
+                    <div><strong>Institution:</strong> SRM GROUP OF INSTITUTIONS TRICHY</div>
+                  </div>
+
+                  <label className="field">
+                    <span>Subject <b>*</b></span>
+                    <select
+                      value={requestSubject}
+                      onChange={e => {
+                        setRequestSubject(e.target.value);
+                        if (requestError) setRequestError(null);
+                      }}
+                      disabled={isSending}
+                      required
+                    >
+                      <option value="">-- Select Request Subject --</option>
+                      {MANAGER_REQUEST_SUBJECTS.map(subj => (
+                        <option key={subj} value={subj}>{subj}</option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="field" style={{ marginTop: "8px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span>Query / Message <b>*</b></span>
+                      <span className="char-counter" style={{
+                        fontSize: "11px",
+                        fontWeight: "600",
+                        color: requestMessage.length > 500 ? "#dc2626" : requestMessage.length > 450 ? "#d97706" : "#64748b"
+                      }}>
+                        {500 - requestMessage.length} characters left ({requestMessage.length}/500)
+                      </span>
+                    </div>
+                    <textarea
+                      rows={5}
+                      maxLength={500}
+                      value={requestMessage}
+                      disabled={isSending}
+                      onChange={e => {
+                        setRequestMessage(e.target.value);
+                        if (requestError) setRequestError(null);
+                      }}
+                      placeholder="Type your request or message to Admin (maximum 500 characters)..."
+                      required
+                    />
+                  </label>
+
+                  {requestError && (
+                    <div style={{
+                      backgroundColor: "#fef2f2",
+                      color: "#b91c1c",
+                      padding: "8px 12px",
+                      borderRadius: "6px",
+                      fontSize: "12px",
+                      marginTop: "6px",
+                      border: "1px solid #fecaca"
+                    }}>
+                      {requestError}
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", gap: "10px", marginTop: "14px", justifyContent: "flex-end" }}>
+                    <button
+                      type="button"
+                      className="btn secondary"
+                      onClick={() => {
+                        setShowSendRequest(false);
+                        setRequestError(null);
+                      }}
+                      disabled={isSending}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="btn primary"
+                      disabled={isSending || !requestSubject || !requestMessage.trim()}
+                      style={{ display: "flex", alignItems: "center", gap: "6px" }}
+                    >
+                      <Send size={15} />
+                      {isSending ? "Sending Request..." : "Send Request"}
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
         )}
@@ -2113,6 +2756,10 @@ export function AuditLogsTable({
                 <option>Security Assignment Updated</option>
                 <option>Settings Modified</option>
                 <option>Access Permissions Updated</option>
+                <option>Request Sent to Admin</option>
+                <option>Request Viewed by Admin</option>
+                <option>Admin Reply Sent</option>
+                <option>Notification Delivered</option>
               </select>
             </div>
           </div>
@@ -2150,6 +2797,7 @@ export function AuditLogsTable({
           <table className="audit-table audit-logs-sticky-table">
             <thead>
               <tr>
+                <th style={{ width: "50px", textAlign: "center" }}>S.No</th>
                 <th className="sticky-col-time">Date &amp; Time</th>
                 <th className="sticky-col-action">Action</th>
                 {renderMovableHeader("editedBy", "Edited by", "audit-col-edited-by")}
@@ -2159,7 +2807,7 @@ export function AuditLogsTable({
               </tr>
             </thead>
             <tbody>
-              {filteredLogs.map(log => {
+              {filteredLogs.map((log, idx) => {
                 const badgeClass =
                   log.action === "Student Added" || log.action === "User Created"
                     ? "add"
@@ -2169,11 +2817,18 @@ export function AuditLogsTable({
                     ? "bulk"
                     : log.action === "User Status Changed"
                     ? "user"
+                    : log.action === "Request Sent to Admin" || log.action === "Request Viewed by Admin" || log.action === "Admin Reply Sent"
+                    ? "request"
+                    : log.action === "Notification Delivered"
+                    ? "notification"
                     : "settings";
 
                 const dt = formatAuditDateParts(log.timestamp, log.dateTime);
                 return (
                   <tr key={log.id} onClick={() => setSelectedLog(log)}>
+                    <td style={{ textAlign: "center", color: "#64748b", fontWeight: "600", fontSize: "12px", width: "50px" }}>
+                      {idx + 1}
+                    </td>
                     <td className="sticky-col-time">
                       <strong style={{ display: "block", color: "#1e2d43" }}>{dt.date}</strong>
                       {dt.time && <small style={{ color: "#64748b", display: "block" }}>{dt.time}</small>}
@@ -2227,12 +2882,17 @@ export function AuditLogsTable({
 
               <section className="info-card" style={{ marginBottom: "14px" }}>
                 <dl>
+                  <div><dt>S.No</dt><dd>{filteredLogs.findIndex(l => l.id === selectedLog.id) + 1}</dd></div>
+                  {selectedLog.requestId && (
+                    <div><dt>Request ID</dt><dd><strong style={{ color: "#2563eb" }}>{selectedLog.requestId}</strong></dd></div>
+                  )}
                   <div><dt>Date &amp; Time</dt><dd>{formatAuditDateParts(selectedLog.timestamp, selectedLog.dateTime).full}</dd></div>
-                  <div><dt>Edited By</dt><dd>{selectedLog.editedBy}</dd></div>
-                  <div><dt>Role</dt><dd>{selectedLog.editorRole}</dd></div>
+                  <div><dt>User Name</dt><dd>{selectedLog.editedBy}</dd></div>
+                  <div><dt>User Role</dt><dd>{selectedLog.editorRole}</dd></div>
+                  <div><dt>Action</dt><dd><strong>{selectedLog.action}</strong></dd></div>
                   <div><dt>Institution</dt><dd>{selectedLog.institution}</dd></div>
                   {selectedLog.block && <div><dt>Location Block</dt><dd>{selectedLog.block}</dd></div>}
-                  <div><dt>Action Details</dt><dd style={{ whiteSpace: "normal", textAlign: "right" }}>{selectedLog.actionDetails}</dd></div>
+                  <div><dt>Description / Details</dt><dd style={{ whiteSpace: "normal", textAlign: "right" }}>{selectedLog.actionDetails}</dd></div>
                   <div><dt>Comments</dt><dd style={{ whiteSpace: "normal", textAlign: "right" }}>{selectedLog.comments || "—"}</dd></div>
                 </dl>
               </section>
