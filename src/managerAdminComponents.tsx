@@ -45,6 +45,7 @@ import {
   X,
 } from "lucide-react";
 import type { StudentMatch, Screen, Role } from "./App";
+import { API_BASE_URL } from "./config/api";
 
 export type AuditLogItem = {
   id: string;
@@ -898,7 +899,7 @@ export function ManagerStudentDirectory({
     let active = true;
     const fetchDbStudents = async () => {
       try {
-        const resp = await fetch("http://localhost:8000/api/v1/students/?institution_id=1");
+        const resp = await fetch(`${API_BASE_URL}/api/v1/students/?institution_id=1`);
         if (resp.ok && active) {
           const data = await resp.json();
           if (Array.isArray(data)) {
@@ -1104,7 +1105,7 @@ export function ManagerStudentDirectory({
 
     setIsSending(true);
     try {
-      const resp = await fetch("http://127.0.0.1:8000/api/v1/manager-requests/", {
+      const resp = await fetch(`${API_BASE_URL}/api/v1/manager-requests/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

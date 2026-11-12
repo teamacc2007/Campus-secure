@@ -67,6 +67,7 @@ import {
   AdminAccessSettings,
   AdminSecuritiesDirectory,
 } from "./managerAdminComponents";
+import { API_BASE_URL } from "./config/api";
 
 export type Role = "security" | "warden" | "staff" | "supervisor" | "access-supervisor" | "students" | "welfare" | "admin" | "cso" | "manager";
 type ReviewStatus = "Pending Verification" | "Verified" | "Authorised" | "Unauthorised" | "Revoked";
@@ -792,7 +793,7 @@ function Login({ enter, go }: { enter: (role: Role) => void; go: (screen: Screen
     }
     setError("");
     try {
-      const res = await fetch("http://localhost:8000/api/v1/auth/login", {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: matchedRole === "admin" ? "admin" : username.trim().toLowerCase(), password }),
@@ -1071,7 +1072,7 @@ function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) =
     let active = true;
     async function loadBackendHistory() {
       try {
-        const resp = await fetch("http://localhost:8000/api/v1/access-logs/unrecognized?limit=30");
+        const resp = await fetch(`${API_BASE_URL}/api/v1/access-logs/unrecognized?limit=30`);
         if (resp.ok) {
           const data = await resp.json();
           if (active && Array.isArray(data) && data.length > 0) {
@@ -1192,7 +1193,7 @@ function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) =
 
           if (role === "security" || role === "warden" || role === "supervisor" || role === "cso") {
             try {
-              const resp = await fetch("http://localhost:8000/api/v1/ai/verify-face", {
+              const resp = await fetch(`${API_BASE_URL}/api/v1/ai/verify-face`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -1317,7 +1318,7 @@ function LevelOneScan({ go, completeScan, role, logs }: { go: (screen: Screen) =
 
         if (role === "security" || role === "warden" || role === "supervisor" || role === "cso") {
           try {
-            const resp = await fetch("http://localhost:8000/api/v1/ai/verify-face", {
+            const resp = await fetch(`${API_BASE_URL}/api/v1/ai/verify-face`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -1529,7 +1530,7 @@ function IdentityResult({ go, identityCase, verificationMethod, student, role, c
   useEffect(() => {
     if (student?.registerNumber) {
       let isMounted = true;
-      fetch(`http://localhost:8000/api/v1/students/by-register/${encodeURIComponent(student.registerNumber)}`)
+      fetch(`${API_BASE_URL}/api/v1/students/by-register/${encodeURIComponent(student.registerNumber)}`)
         .then(res => res.ok ? res.json() : null)
         .then(data => {
           if (data && isMounted) {
@@ -3784,7 +3785,7 @@ function SupervisorHome({ go, reviews, logs }: { go: (screen: Screen) => void; r
 
   useEffect(() => {
     let isMounted = true;
-    fetch("http://localhost:8000/api/v1/access-logs/unauthorized-count")
+    fetch(`${API_BASE_URL}/api/v1/access-logs/unauthorized-count`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data && typeof data.count === "number" && isMounted) {
@@ -3998,7 +3999,7 @@ function Audit({
 
   useEffect(() => {
     let active = true;
-    let url = `http://localhost:8000/api/v1/access-logs/supervisor-unauthorized?from_date=${auditFrom}&to_date=${auditTo}`;
+    let url = `${API_BASE_URL}/api/v1/access-logs/supervisor-unauthorized?from_date=${auditFrom}&to_date=${auditTo}`;
 
     fetch(url)
       .then(res => (res.ok ? res.json() : Promise.reject(res)))
@@ -4285,8 +4286,8 @@ function Alerts({
     if (role === "admin" || role === "manager") {
       const url =
         role === "manager"
-          ? "http://127.0.0.1:8000/api/v1/manager-requests/?manager_username=manager"
-          : "http://127.0.0.1:8000/api/v1/manager-requests/";
+          ? `${API_BASE_URL}/api/v1/manager-requests/?manager_username=manager`
+          : `${API_BASE_URL}/api/v1/manager-requests/`;
       fetch(url)
         .then(res => (res.ok ? res.json() : []))
         .then(data => {
@@ -4311,7 +4312,7 @@ function Alerts({
     if (role === "admin" && req.status === "Sent") {
       try {
         const resp = await fetch(
-          `http://127.0.0.1:8000/api/v1/manager-requests/${req.request_id}/view?admin_name=Avery%20Williams&admin_username=admin`,
+          `${API_BASE_URL}/api/v1/manager-requests/${req.request_id}/view?admin_name=Avery%20Williams&admin_username=admin`,
           { method: "POST" }
         );
         if (resp.ok) {
@@ -4347,7 +4348,7 @@ function Alerts({
     setIsReplying(true);
     setReplyError(null);
     try {
-      const resp = await fetch(`http://127.0.0.1:8000/api/v1/manager-requests/${selectedRequest.request_id}/reply`, {
+      const resp = await fetch(`${API_BASE_URL}/api/v1/manager-requests/${selectedRequest.request_id}/reply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -4390,7 +4391,7 @@ function Alerts({
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/v1/access-logs/locations")
+    fetch(`${API_BASE_URL}/api/v1/access-logs/locations`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
@@ -5798,7 +5799,7 @@ function CampusEntries({
 
   useEffect(() => {
     let active = true;
-    fetch("http://localhost:8000/api/v1/access-logs/?limit=300")
+    fetch(`${API_BASE_URL}/api/v1/access-logs/?limit=300`)
       .then(res => (res.ok ? res.json() : null))
       .then((data: any[]) => {
         if (!active || !Array.isArray(data)) return;
@@ -6204,8 +6205,8 @@ function AccommodationDetails({
       try {
         const q = searchQuery.trim();
         const url = q
-          ? `http://localhost:8000/api/v1/students/?query=${encodeURIComponent(q)}&institution_id=1`
-          : `http://localhost:8000/api/v1/students/?institution_id=1`;
+          ? `${API_BASE_URL}/api/v1/students/?query=${encodeURIComponent(q)}&institution_id=1`
+          : `${API_BASE_URL}/api/v1/students/?institution_id=1`;
         const res = await fetch(url);
         if (res.ok && active) {
           const data = await res.json();
@@ -6369,7 +6370,7 @@ function AccommodationDetails({
 
   const fetchBackendData = async (reg: string) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/students/accommodation/${encodeURIComponent(reg)}`);
+      const res = await fetch(`${API_BASE_URL}/api/v1/students/accommodation/${encodeURIComponent(reg)}`);
       if (res.ok) {
         const data = await res.json();
         if (data.history && Array.isArray(data.history)) {
@@ -6485,7 +6486,7 @@ function AccommodationDetails({
 
     let updatedBackendHistory: AccommodationHistoryItem[] | null = null;
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/students/accommodation/${encodeURIComponent(student.registerNumber)}`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/students/accommodation/${encodeURIComponent(student.registerNumber)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -7388,7 +7389,7 @@ export default function App() {
       const token = localStorage.getItem("campus_token");
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
-      await fetch("http://localhost:8000/api/v1/students/", {
+      await fetch(`${API_BASE_URL}/api/v1/students/`, {
         method: "POST",
         headers,
         body: JSON.stringify({
@@ -7433,7 +7434,7 @@ export default function App() {
       const token = localStorage.getItem("campus_token");
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
-      await fetch(`http://localhost:8000/api/v1/students/accommodation/${encodeURIComponent(updatedStudent.registerNumber)}`, {
+      await fetch(`${API_BASE_URL}/api/v1/students/accommodation/${encodeURIComponent(updatedStudent.registerNumber)}`, {
         method: "PUT",
         headers,
         body: JSON.stringify({
@@ -7628,17 +7629,11 @@ export default function App() {
       log_id: logId,
     };
 
-    fetch("http://127.0.0.1:8000/api/v1/access-logs/unauthorized", {
+    fetch(`${API_BASE_URL}/api/v1/access-logs/unauthorized`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(postPayload),
-    }).catch(() => {
-      fetch("http://localhost:8000/api/v1/access-logs/unauthorized", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(postPayload),
-      }).catch(err => console.warn("Background log save to API failed:", err));
-    });
+    }).catch(err => console.warn("Background log save to API failed:", err));
   };
   const [authorizedFaces, setAuthorizedFaces] = useState<AuthorizedFaceProfile[]>([]);
   const [visitorPasses, setVisitorPasses] = useState<VisitorPass[]>(initialVisitorPasses);
@@ -7663,7 +7658,7 @@ export default function App() {
 
   useEffect(() => {
     let active = true;
-    fetch("http://localhost:8000/api/v1/access-logs/?limit=300")
+    fetch(`${API_BASE_URL}/api/v1/access-logs/?limit=300`)
       .then(res => res.ok ? res.json() : [])
       .then((data: any[]) => {
         if (!active || !Array.isArray(data)) return;
@@ -7762,7 +7757,7 @@ export default function App() {
     const regTrimmed = registerNumber.trim().toUpperCase();
     if (role === "security" || role === "warden" || role === "supervisor" || role === "cso") {
       try {
-        const resp = await fetch("http://localhost:8000/api/v1/ai/verify-face", {
+        const resp = await fetch(`${API_BASE_URL}/api/v1/ai/verify-face`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -7893,7 +7888,7 @@ export default function App() {
 
     // Persist to PostgreSQL backend database
     const targetId = row.logId || key;
-    fetch(`http://localhost:8000/api/v1/access-logs/${encodeURIComponent(targetId)}/review`, {
+    fetch(`${API_BASE_URL}/api/v1/access-logs/${encodeURIComponent(targetId)}/review`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: campus-secure-backend
+    runtime: docker
+    dockerfilePath: ./deployment/Dockerfile.backend
+    dockerContext: .
+    plan: standard
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: SECRET_KEY
+        generateValue: true
+      - key: STORAGE_BACKEND
+        value: local
+      - key: DATABASE_URL
+        sync: false
+
